@@ -1,0 +1,26 @@
+Group,Item,Qty,Make/Buy
+Compute,Raspberry Pi 5 8GB + Active Cooler + 64GB A2 microSD (x2),1,buy
+Drive,JGB37-520 12V 170 RPM gear motor with Hall encoder (6 wires),2,buy
+Drive,Steel mounting bracket for 37 mm gear motor (+ its M3 screws),2,buy
+Drive,Wheel 100 mm x 30 mm with 6 mm D-shaft hub,2,buy
+Drive,"Swivel caster 50 mm, M8 threaded stem, >= 20 kg rating",2,buy
+Drive,BTS7960 (IBT-2) 43 A motor driver,2,buy
+Sensors,RPLIDAR A1M8 (with USB adapter),1,buy
+Sensors,"USB (UVC) camera board 32x32 mm, wide-angle M12 lens",1,buy
+Sensors,Camera mount (camera_mount.stl),1,3D print PETG
+Payload,"Straight-bar load cell 10 kg, 80x12.7x12.7 mm",4,buy
+Payload,HX711 module,4,buy
+Payload,Load-cell spacer (load_cell_spacer.stl),8,3D print PETG 100 %
+Payload,Cargo plate 270x280x5 (cargo_plate.dxf),1,laser-cut acrylic
+Payload,Anti-slip rubber mat for the cargo plate,1,buy
+Power,3S LiPo 11.1 V 5000 mAh XT60 + balance charger + LiPo bag + voltage alarm,1,buy
+Power,XL4015 5 A buck converter + USB-C pigtail,1,buy
+Power,"Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs",1,buy
+Power,"Emergency stop 22 mm panel-mount, latching, NC contact block",1,buy
+Power,"Toggle switch 12 mm panel-mount, 12 V DC >= 15 A",1,buy
+Chassis,Bottom plate 400x300x6 (bottom_plate.dxf),1,laser-cut 6 mm plywood
+Chassis,Top deck 400x300x5 (top_deck.dxf),1,laser-cut 5 mm acrylic
+Chassis,"M6 threaded rod, cut to 130 mm",6,cut from 1 m rod
+Chassis,M6 nut + M6 washer,24,buy
+Chassis,M8 nut + M8 washer (casters),4,buy
+Hardware,"M4x12 screws + nylock nuts (motor brackets), M4/M5x16 (load cells), M3/M2.5 screws + standoffs (Pi, camera), VHB tape, velcro strap, zip ties",1,buy

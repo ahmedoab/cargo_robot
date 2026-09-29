@@ -51,14 +51,15 @@ Gradfinal/                      <- this folder. Put it on GitHub; on the Pi it l
 ├── HW & Time plan.pdf          <- your Phase II plan
 ├── cad/                        <- 3D design (Python/CadQuery) -> STEP, STL, DXF files
 │   ├── robot_cad.py            <- the design; change numbers at the top, re-run
-│   ├── autocad/                <- CargoRobot_v2.dxf (AutoCAD: 3D model + 7 A3 drawing sheets) + the sheets as PDF
+│   ├── autocad/                <- AutoCAD files + PDFs: CargoRobot_v2 (3D model + 7 drawing sheets), CargoRobot_v2_schematics (3 sheets)
 │   └── output/                 <- robot_assembly.step, parts/*.stl, dxf/*.dxf, views/*.png, bom.csv
-├── backup_v2/                 <- untouched copy of the design files (CAD, drawings, guide, code)
+├── SIMULATION.md               <- how to run the robot in Gazebo (no hardware needed)
 ├── robot_ws/src/cargo_bot/     <- the ROS 2 package that runs on the robot
 │   ├── cargo_bot/              <- Python code: drivers, nodes, mission
 │   ├── config/                 <- settings (robot.yaml, laser filter, Nav2, SLAM)
-│   ├── launch/                 <- robot.launch.py, slam.launch.py, nav.launch.py
-│   └── urdf/                   <- robot model for RViz / TF
+│   ├── launch/                 <- robot.launch.py, sim.launch.py, slam.launch.py, nav.launch.py
+│   ├── urdf/, meshes/          <- robot model for RViz / TF / Gazebo
+│   └── worlds/                 <- simulated test room
 └── tools/                      <- bench-test and setup scripts (run without ROS)
 ```
 

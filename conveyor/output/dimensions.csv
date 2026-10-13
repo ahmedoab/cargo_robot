@@ -1,0 +1,17 @@
+Name,Value,Unit,Note
+overall_length_x,800,mm,"side plates, end to end"
+overall_width_y,429,mm,from -172 (robot side) to 257 (end of the motor)
+overall_height_z,300,mm,top of the backstop plate
+belt_surface_z,195,mm,top of the belt above the floor
+belt_width,300,mm,Y from -150 to +150
+belt_carrying_length,700.0,mm,"flat top run, X from -350 to 350"
+belt_loop_length,1563,mm,all the way round both rollers
+belt_speed,0.1,m/s,towards +X
+roller_diameter,50,mm,"axes along Y at X = -350 and +350, Z = 168"
+roller_speed,36.7,rpm,for that belt speed
+docking_face_y,-172.0,mm,"outer face of the robot-side plate: flat, from the floor up"
+docking_face_top_z,191,mm,the robot-side plate ends just below the belt
+belt_edge_from_docking_face,22.0,mm,the gap a package has to cross
+backstop_face_y,163.0,mm,inner face of the tall plate: packages stop against it
+backstop_top_z,300,mm,above the robot's lidar plane (250 mm)
+end_stop_face_x,391.0,mm,packages stop here at the end of the belt

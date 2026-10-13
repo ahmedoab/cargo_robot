@@ -55,6 +55,7 @@ Gradfinal/                      <- this folder. Put it on GitHub; on the Pi it l
 │   ├── autocad/                <- AutoCAD files + PDFs: CargoRobot_v3 (3D model + 8 drawing sheets), CargoRobot_v3_schematics (3 sheets)
 │   └── output/                 <- robot_assembly.step, parts/*.stl, dxf/*.dxf, views/*.png, bom.csv
 ├── backup_v2/                  <- untouched copy of design v2 (no pusher): CAD, drawings, guide, code
+├── conveyor/                   <- 3D model of a drop-off conveyor that fits the pusher (for simulation only)
 ├── SIMULATION.md               <- how to run the robot in Gazebo (no hardware needed)
 ├── robot_ws/src/cargo_bot/     <- the ROS 2 package that runs on the robot
 │   ├── cargo_bot/              <- Python code: drivers, nodes, mission
@@ -1652,6 +1653,8 @@ With `--conveyor`, the robot unloads by itself at the drop-off: it backs up unti
 | Backstop | A board along the far side of the belt whose top is **more than 260 mm** above the floor, at least as wide as the robot | The lidar scans 250 mm above the floor and sees nothing lower. Without the board, Nav2 doesn't know the conveyor exists and can plan a path through it. It also stops the package overshooting. |
 | Belt | **Running** while the robot unloads | A heavy package gripping a stopped rubber belt pushes the robot away instead of sliding on. Onto a stopped belt, keep packages under about 6 kg. |
 | Packages | Rigid boxes at least 10 mm high, up to 255 × 280 mm (length × width), up to 15 kg | The blade is 25 mm tall and rides 3 mm above the plate; the usable bed is 257 mm long. |
+
+A 3D model of a conveyor that meets all of these is in `conveyor/` (STEP, STL and glTF, with its dimensions in `conveyor/README.md`). It is for simulation and pictures; it is not a build design.
 
 **Set it up**
 

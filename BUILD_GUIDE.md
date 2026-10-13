@@ -48,11 +48,13 @@ This guide covers the whole build: parts, tools, fabrication, assembly, every wi
 ```
 Gradfinal/                      <- this folder. Put it on GitHub; on the Pi it lives in ~/cargo_robot
 ├── BUILD_GUIDE.md              <- this guide
+├── PUSHER_IMPACT.md            <- what the pusher (design v3) adds and costs, compared with design v2
 ├── HW & Time plan.pdf          <- your Phase II plan
 ├── cad/                        <- 3D design (Python/CadQuery) -> STEP, STL, DXF files
 │   ├── robot_cad.py            <- the design; change numbers at the top, re-run
-│   ├── autocad/                <- AutoCAD files + PDFs: CargoRobot_v2 (3D model + 7 drawing sheets), CargoRobot_v2_schematics (3 sheets)
+│   ├── autocad/                <- AutoCAD files + PDFs: CargoRobot_v3 (3D model + 8 drawing sheets), CargoRobot_v3_schematics (3 sheets)
 │   └── output/                 <- robot_assembly.step, parts/*.stl, dxf/*.dxf, views/*.png, bom.csv
+├── backup_v2/                  <- untouched copy of design v2 (no pusher): CAD, drawings, guide, code
 ├── SIMULATION.md               <- how to run the robot in Gazebo (no hardware needed)
 ├── robot_ws/src/cargo_bot/     <- the ROS 2 package that runs on the robot
 │   ├── cargo_bot/              <- Python code: drivers, nodes, mission
@@ -95,7 +97,8 @@ Gradfinal/                      <- this folder. Put it on GitHub; on the Pi it l
 | Brain | Raspberry Pi 5 (8 GB) running Ubuntu 24.04 + ROS 2 Jazzy. **No ESP32**: the Pi drives the motors, reads the encoders and reads the load cells directly. |
 | Sensors | RPLIDAR A1M8 (360° 2D lidar), USB wide-angle camera (line following + station markers), 4 × 10 kg load cells under the cargo bed |
 | Power | 3S LiPo 11.1 V 5000 mAh → 10 A fuse → master switch. The 12 V goes to the motors through the E-stop; a 5 V buck converter powers the Pi. |
-| Safety | Latching E-stop cuts **motor power only** (the Pi stays on and sees it on GPIO26). Software also stops the motors if commands stop arriving or the cargo is overloaded. |
+| Unloading | **Rear pusher (new in design v3):** a blade on a lead screw slides the cargo off the back of the bed onto a conveyor. It adds a third 12 V gear motor, a third BTS7960 and 2 limit switches. It's an add-on: the robot works the same without it. |
+| Safety | Latching E-stop cuts **motor power only**, drive motors and pusher (the Pi stays on and sees it on GPIO26). Software also stops the motors if commands stop arriving or the cargo is overloaded. |
 | Max payload | 15 kg (software limit, adjustable). Speed drops smoothly to 50 % at full load. |
 | Autonomous speed | 0.35 m/s |
 
@@ -107,6 +110,9 @@ flowchart LR
   MBUS -. divider .-> PI
   PI -- PWM + enable --> DRV
   MOT -- encoder A/B --> PI
+  MBUS --> PDRV[BTS7960 pusher] --> PMOT[Pusher motor + lead screw]
+  PI -- PWM --> PDRV
+  LIMS[2 × limit switch] --> PI
   CELLS[4 × load cell] --> HX[4 × HX711] --> PI
   LIDAR[RPLIDAR A1] -- USB --> PI
   CAM[USB camera] -- USB --> PI
@@ -123,6 +129,20 @@ flowchart LR
 | Heavy-duty omni-wheel casters | **50 mm swivel casters with an M8 threaded stem** | Bolt straight on. The caster height is adjusted with a nut, so all 4 wheels can be made to touch the floor. Omni wheels would need a custom mount and shims. |
 | Pi Camera V2/V3 **or** USB camera | **USB camera** | Works out of the box on Ubuntu 24.04 + ROS 2. The Pi camera on a Pi 5 under Ubuntu needs a custom-built camera library. |
 | 12 V 300–500 RPM motors | **12 V 170 RPM** (same JGB37-520 size) | 300–500 RPM with 100 mm wheels means 1.6–2.6 m/s top speed and little torque. 170 RPM gives about 0.9 m/s and roughly 3× the torque for carrying cargo. |
+
+### What's new in design v3: the rear pusher
+
+Design v3 is design v2 plus a way to unload by itself: the robot backs up to a conveyor and pushes the cargo off the rear of the bed.
+
+![The pusher fully out](cad/output/views/render_pusher_out.png)
+
+- **What it is:** an aluminium blade across the bed, 3 mm above the cargo plate, on two 8 mm guide rods that run just outside the deck edges. A lead screw on the right side moves it 262 mm in about 20 seconds.
+- **It's an add-on.** Every step it needs is marked **Pusher** in this guide. Everything else is the same as v2, and the robot drives, weighs and navigates without it. If parts are late or time is short, skip the Pusher steps and bolt it on later: it needs 5 extra 4.5 mm holes in the top deck, and nothing else on the chassis changes.
+- **What it costs you:** `PUSHER_IMPACT.md` (next to this guide) compares v3 with v2: parts, wiring, pins, code, build time and the new things that can go wrong. Read it before you commit to building it.
+- **The conveyor has to suit the robot:** see [section 8.7](#87-unload-onto-a-conveyor-with-the-pusher-design-v3).
+- **The untouched v2 design** is in `backup_v2/`.
+
+> The pusher has been designed and collision-checked in CAD, and its software has been tested with a simulated mechanism. It has **not** been built or run on the real robot yet. Expect to adjust fits and positions when you build it.
 
 ---
 
@@ -144,6 +164,8 @@ flowchart LR
 | 11 | 14 – 20 Dec | Report, video, slides, demo rehearsal | Report submitted, video recorded, 2 full rehearsals done |
 
 > **Parts can be late.** If they are, do Week 3's Pi setup (sections 3.1–3.4) and Week 4's software build early. Those only need the Pi and a phone charger.
+
+> **Pusher steps** are in week 0 (parts and prints), week 1 (step 12), week 2 (wires P17–P19), week 3 (wires S31–S37 and test 5), week 8 (section 8.7) and week 9 (test T8). Together they add roughly a week of work for one person; `PUSHER_IMPACT.md` has the breakdown.
 
 **Suggested split for a team of 3–4:**
 
@@ -167,6 +189,7 @@ flowchart LR
 5. **Wiring changes only with the master switch OFF** and the battery unplugged.
 6. **Shut the Pi down before switching off the master switch:** run `sudo shutdown now` and wait for the green LED to stop blinking.
 7. **Fuse first:** the fuse must be the first thing after the battery's + wire.
+8. **Keep clear of the pusher.** The blade and the bare lead screw on the right side pull in fingers, sleeves and loose wires. Nobody touches the bed while the blade moves. The E-stop stops it.
 
 ---
 
@@ -176,7 +199,7 @@ flowchart LR
 
 ### 0.1 Get approval from your supervisor (Monday)
 
-Show the drawings, either as `cad/autocad/CargoRobot_v2_drawings.pdf` or the same file opened in AutoCAD. Also show the table "What changed compared to the Phase II PDF" in section 1. Then ask:
+Show the drawings, either as `cad/autocad/CargoRobot_v3_drawings.pdf` or the same file opened in AutoCAD. Also show the table "What changed compared to the Phase II PDF" in section 1. Then ask:
 
 - [ ] Is it OK to drop the ESP32 and run everything on the Raspberry Pi?
 - [ ] Is it OK that the E-stop cuts motor power only (not the Pi)?
@@ -187,6 +210,7 @@ Show the drawings, either as `cad/autocad/CargoRobot_v2_drawings.pdf` or the sam
 - [ ] Is an ML model required for "vision classification"? The simple, reliable plan here uses printed ArUco markers to identify stations; an optional ONNX model is described in week 7.
 - [ ] What is the maximum payload you must demonstrate? (The software limit is 15 kg; change it in `config/robot.yaml`.)
 - [ ] Where is the test area, and can you put tape lines and markers on its floor?
+- [ ] **Pusher:** must the robot unload by itself onto a conveyor? If yes: how high is the belt, and can the conveyor be given a backstop board (section 8.7)? If no, skip every **Pusher** step in this guide.
 
 ### 0.2 Shopping list
 
@@ -222,13 +246,17 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 | E24 | Resistors 10 kΩ and 3.3 kΩ (¼ W) | 5 each | E-stop sense divider |
 | E25 | Small perfboard (5 × 7 cm) | 2 | |
 | E26 | Silicone wire 16 AWG red + black | 2 m each | Battery, fuse, switch, E-stop, drivers |
-| E27 | Silicone wire 20 AWG red + black | 2 m each | Buck converter, motors |
+| E27 | Silicone wire 20 AWG red + black | 3 m each | Buck converter, motors, pusher |
 | E28 | Jumper wires female-female and male-female, 20 cm | 40 each | Signals |
 | E29 | 4-core cable (or 4 jumper wires) 50 cm | 4 | Load cells → HX711s → Pi |
 | E30 | Ferrule kit + ferrule crimper | 1 | For every wire going into a screw terminal |
 | E31 | Heat-shrink assortment, zip ties, spiral wrap, 20 mm velcro strap (1 m), double-sided foam tape | 1 | |
 | E32 | Brass standoff kit M2.5 (for the Pi and the lidar) | 1 | |
 | E33 | VHB (strong double-sided foam) tape, 19 mm | 1 roll | Holds the small boards (drivers, buck, HX711s) without drilling |
+| E34 | **Pusher:** JGB37-520 12 V gear motor, about **110 RPM** (ratio 1:90), 6 mm D-shaft | 1 | No encoder needed. Body no longer than 60 mm, or it sticks out past the front of the deck. A spare 170 RPM drive motor also works: faster, but with less push force in reserve. |
+| E35 | **Pusher:** BTS7960 43 A motor driver module ("IBT-2") | 1 | The same module as E7 |
+| E36 | **Pusher:** lever microswitch, subminiature size (KW11-3Z / SS-5GL type: body 20 × 10 × 6.4 mm, two mounting holes 9.5 mm apart) | 3 | 1 spare. It needs C and NC terminals. Get the kind with a short metal **lever**: the lever gives it a few millimetres of overtravel. |
+| E37 | **Pusher:** 2-core signal cable (or 2 jumper wires twisted together) | 2 m | Limit switches → Pi |
 
 **Mechanical**
 
@@ -238,6 +266,7 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 | M2 | Laser cutting: `top_deck.dxf` in 5 mm acrylic (or 6 mm plywood) | 1 | |
 | M3 | Laser cutting: `cargo_plate.dxf` in 5 mm acrylic | 1 | |
 | M4 | 3D prints: `camera_mount.stl` × 1 and `load_cell_spacer.stl` × 8, in PETG (about 50 g, 3 hours) | 1 set | Any printer: a friend's, the university lab, or a print shop |
+| M4b | **Pusher:** 3D prints: `pusher_carriage_L.stl`, `pusher_carriage_R.stl`, `pusher_rail_holder_A.stl` × 2, `pusher_rail_holder_B.stl`, `pusher_drive_bracket.stl`, in PETG (about 150 g, 10–12 hours) | 1 set | The biggest piece is 90 × 50 × 74 mm |
 | M5 | **M6 threaded rod**, 1 m (zinc-plated steel) | 1 | Cut into 6 pieces of 130 mm |
 | M6 | M6 nuts + M6 washers | 26 each | 24 needed (4 per rod) |
 | M7 | Steel mounting bracket for 37 mm gear motors (often sold with the motor, including its M3 screws) | 2 | |
@@ -245,8 +274,15 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 | M9 | Screws for the load cells: M4 × 16 or M5 × 16 (match the cells' threads) + washers | 16 each | 2 per cell end |
 | M10 | M3 × 12 screws + nuts | 4 | Camera mount |
 | M11 | Blue thread-locker | 1 | Wheel set screws |
-| M12 | Anti-slip rubber mat, ~27 × 28 cm | 1 | Stops cargo sliding on the acrylic |
+| M12 | Anti-slip rubber mat, ~27 × 28 cm | 0 or 1 | **Only if you build without the pusher.** With the pusher the plate stays bare, so the cargo can slide off. |
 | M13 | Black matte tape 19 mm or 50 mm (line) + white/light floor, masking tape | 1 roll each | Line following + marking stations |
+| M14 | **Pusher:** T8 lead screw with **8 mm lead** (sold as "T8×8", or "pitch 2 mm, 4 starts"), 350 mm long, with its brass flange nut | 1 | You cut it to 310 mm; a 300 mm one is too short |
+| M15 | **Pusher:** smooth steel rod ("linear shaft") 8 mm × 400 mm | 2 | Used at full length. It's hardened: don't try to saw it. |
+| M16 | **Pusher:** LM8UU linear ball bearing | 4 | |
+| M17 | **Pusher:** KFL08 flange bearing block, 8 mm bore, two bolt holes about 37 mm apart | 1 | Takes the push force |
+| M18 | **Pusher:** flexible shaft coupler 6 mm → 8 mm (about 19 mm diameter × 25 mm) | 1 | Motor shaft → lead screw |
+| M19 | **Pusher:** aluminium angle 25 × 25 × 2 mm, 1 m | 1 | You cut 296 mm off it: the blade |
+| M20 | **Pusher:** screws: M4 × 20 + nut + washer × 10, M4 × 25 + nut + washer × 1, M3 × 16 × 4, M3 × 8 **socket-head** × 4, M3 × 8 × 4, M2 × 10 × 4 | 1 set | Rod holders, blade, drive bracket, bearing block; T8 nut; motor (tightened with a hex key); rod pinch screws; limit switches |
 
 **Tools you need:**
 
@@ -254,7 +290,7 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 - Multimeter (with a 10 A range)
 - Wire stripper, side cutters, ferrule crimper
 - Hacksaw and a file (to cut the threaded rod)
-- Drill with bits 2.7 and 4.5 mm (the only holes you drill yourself: motor brackets in plywood, lidar screws in acrylic)
+- Drill with bits 2.7 and 4.5 mm (the only holes you drill yourself: motor brackets in plywood, lidar screws in acrylic; for the pusher also 4 holes in the aluminium blade, and 5 in the deck if it was cut from the v2 file)
 - Spanners 10 mm (M6 nuts) and 13 mm (M8 caster nuts), hex keys, screwdrivers
 - Heat gun or lighter, marker, tape measure, square ruler
 - A known reference weight for calibration: 2 kg of rice or sugar weighed on a kitchen scale is fine
@@ -271,13 +307,17 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
      - holes: 6 × 6.5 mm (rods), 2 × 8.5 mm (casters), 4 × 2.7 mm (Pi), 2 × 3.4 mm (camera)
      - slots: 4 small battery-strap slots and 2 cable slots
    - **Top deck** (400 × 300 mm, acrylic):
-     - holes: 6 × 6.5 mm (rods), 22.5 mm (E-stop), 12.2 mm (switch)
+     - holes: 6 × 6.5 mm (rods), 22.5 mm (E-stop), 12.2 mm (switch), 5 × 4.5 mm near the side edges (pusher)
      - slots: a long wiring slot, and 4 round-ended load-cell slots
    - **Cargo plate** (270 × 280 mm, acrylic): 4 round-ended load-cell slots.
+
+> **Deck already cut from the v2 file?** Keep it. The 5 pusher holes are the only difference: drill them by hand in week 1, step 12. The bottom plate and the cargo plate are the same in v2 and v3.
 
 ### 0.4 Get the two small prints made
 
 `camera_mount.stl` and 8 × `load_cell_spacer.stl`: about 3 hours of printing in total (settings in [section 1.2](#12-3d-printing)). Anyone with a printer can do it.
+
+**Pusher:** six more prints (2 carriages, 3 rod holders, 1 drive bracket), about 10–12 hours in total. Print one carriage first and check the fits before printing the rest (section 1.2).
 
 ### 0.5 Set up your laptop
 
@@ -371,12 +411,25 @@ PETG, 0.2 mm layers, 245 °C nozzle / 80 °C bed, 4 walls:
 |---|---|---|---|---|
 | `camera_mount.stl` | 1 | Foot flat on the bed | 40 % | "Supports on build plate only" |
 | `load_cell_spacer.stl` | 8 | Flat | 100 % | None |
+| **Pusher:** `pusher_carriage_L.stl`, `pusher_carriage_R.stl` | 1 each | Standing on its rear end face, so the bearing bore points up | 40 % | "Supports on build plate only" (under the arm) |
+| **Pusher:** `pusher_rail_holder_A.stl` | 2 | Outer end face on the bed | 40 % | "Supports on build plate only" |
+| **Pusher:** `pusher_rail_holder_B.stl` | 1 | Outer end face on the bed | 40 % | "Supports on build plate only" |
+| **Pusher:** `pusher_drive_bracket.stl` | 1 | Base bar's side face (the inner edge) on the bed | 40 % | "Supports on build plate only" |
+
+> **Pusher parts are a first design: they have not been test-printed.** The orientations above are suggestions. Print **one carriage** first and check three fits before printing the rest:
+>
+> - an LM8UU bearing presses into the 15.2 mm bore by hand, firmly;
+> - the 8 mm rod slides into a rod holder's hole;
+> - the T8 nut's body goes into the 10.6 mm hole.
+>
+> If a hole comes out tight, open it with a drill bit or a round file, or set "hole horizontal expansion" to about +0.1 mm in the slicer.
 
 ### 1.3 Cut the threaded rods
 
 1. Cut **6 pieces of 130 mm** from the M6 rod with a hacksaw.
 2. **Trick:** before cutting, screw a nut past the cut mark. After cutting, unscrew it over the cut end. It re-forms the damaged thread.
 3. File each cut end flat and lightly chamfered.
+4. **Pusher:** cut the T8 lead screw to **310 mm** and a piece of the aluminium angle to **296 mm**. Use the same trick on the lead screw, with its brass nut. File the ends. Do **not** cut the 8 mm rods.
 
 ### 1.4 Assembly, step by step
 
@@ -467,12 +520,51 @@ All 4 cells sit at Y = ±110, parallel to the robot's length. Their fixed ends f
 2. Lay the cargo plate on so its 4 slots sit over the spacers. Push 2 screws + washers **down** through each slot and spacer into the cell.
 3. Tighten gently.
 4. The cargo plate must touch **only** the 4 spacers. Check with paper all around: no rubbing anywhere.
-5. Stick the anti-slip rubber mat on top.
+5. **With the pusher:** leave the plate bare, so the cargo can slide. Without the pusher: stick the anti-slip rubber mat on top.
 
 **Step 11: Camera**
 
 1. Screw the USB camera board to the tilted face of `camera_mount` (drill 2 mm holes in the print to match the board). Point the lens down-forward.
 2. Fix the mount's foot at the front edge of the bottom plate, using the two pre-cut 3.4 mm holes: M3 × 12 + nut.
+
+**Step 12: Pusher** (skip it if you build without the pusher)
+
+Sheet 07 of the drawings (`cad/autocad/CargoRobot_v3_drawings.pdf`) shows the whole pusher with numbered parts, and `cad/output/views/render_pusher_out.png` shows it fully out. The drive side is the robot's **right** side, so the E-stop side stays clear.
+
+1. **Holes in the deck.** A deck cut from the v3 file already has them. On a v2 deck, drill 5 × 4.5 mm: film on, scrap wood underneath, slowly. Positions from the plate **centre**:
+
+   | Hole | X | Y | For |
+   |---|---|---|---|
+   | 1, 2 | −162 | +140 and −140 | rear rod holders |
+   | 3 | +142 | +140 | front-left rod holder |
+   | 4, 5 | +94 and +170 | −139 | drive bracket |
+
+   Easier than measuring: clip each printed part onto the deck edge where it belongs (see below) and mark through its hole. The rear holders sit flush with the deck's rear edge; the drive bracket's rear end is 13 mm in front of the cargo plate.
+2. **Bearings into the carriages.** Press 2 LM8UU bearings into each carriage from its open rear end. The first one goes all the way to the cap at the front; the second sits flush with the rear end.
+3. **T8 nut into the right carriage** (`pusher_carriage_R`). Push the nut's body into the hole from the **front**, so its flange lies on the front face of the block. Fix it with 4 × M3 × 16 into the printed holes. Snug, not tight.
+4. **Rod holders.** Slide the three holders onto the deck edge from the side: block outside, strip on top, lip underneath.
+   - type **B** at the rear-left corner;
+   - type **A** at the rear-right corner;
+   - a second type **A**, turned round, at the front-left (its block towards the front).
+
+   Fix each with an M4 × 20 pushed up through the deck **from below** (washer under the head), washer + nut on top, finger-tight for now. From above there's no room: the rear ones sit under the edge of the cargo plate.
+5. **Left rod.** From the front, push an 8 mm rod through the front-left holder, through the left carriage, and into the rear-left holder until it's flush with the holder's rear face (its front end then sticks out about 20 mm past the front holder; that's intended). The carriage's arm points inwards, over the bed, and sits at the carriage's **rear** end.
+6. **Drive bracket and right rod.** Clip the drive bracket over the right edge of the deck at the front. Bolt it from below as well: M4 × 20 in the rear hole, M4 × 25 in the front hole (the one that ends up under the motor). Push the second rod through the bracket's rod holder, through the right carriage and into the rear-right holder.
+7. **Make the carriages slide.** Each carriage must slide along its whole rod by hand, easily. If one binds near an end, loosen that holder's bolt, slide the carriage there, and retighten. Then tighten all the M4 bolts, and screw an M3 × 8 into the small hole under each holder (3 holders + the bracket) to pinch the rods.
+   - The two carriages are not the same: the **left** one has a finger on its front end (it presses the HOME switch), the **right** one takes the T8 nut.
+8. **Blade.**
+   1. Drill 4 × 4.3 mm in one leg of the angle: 8 mm and 20 mm from each end, 13.5 mm from the **outside** of the other leg.
+   2. Lay the drilled leg on the two carriage arms. The other leg hangs down **behind** the arms, towards the rear: it's the pushing face.
+   3. Bolt it with 4 × M4 × 20 + nuts under the arms.
+   4. Check the gap: the blade's lower edge must clear the cargo plate by **about 3 mm** along the whole stroke. A 2 mm card must slide under it everywhere. **The blade must never touch the cargo plate**, or the scale reads wrong. Too low? Put washers between the blade and both arms.
+9. **Bearing block.** Bolt the KFL08 to the **rear** face of the bracket's first wall, with its round boss through the wall's big hole: 2 × M4 × 20 + nuts.
+10. **Lead screw.** Slide the right carriage to the middle. From the rear, turn the lead screw through the carriage's nut, then on through the bearing block until about 12 mm sticks out in front of it. Fit the coupler on that end (the lead screw goes about 11 mm in) and tighten the coupler's screw on that side. Tighten the two small set screws of the bearing block onto the lead screw: they carry the push force.
+11. **Motor.** Push the motor's shaft through the second wall from the front, into the coupler. The gearbox shaft is off-centre: turn the motor until the shaft lines up with the coupler and the motor body sits towards the **inside** of the robot. Fix it with 4 × M3 × 8 socket-head screws into the gearbox face, through the wall's 4 holes. There are only 30 mm between the two walls, so tighten them with the short end of a hex key. They must not go deeper than 4 mm into the gearbox. (The gearbox has 6 threaded holes; the 2 next to the shaft stay empty, because screw heads there would rub on the coupler.) Tighten the coupler's motor side on the flat of the D-shaft.
+12. **Limit switches.** Both sit on top of a type **A** rod holder, each with 2 × M2 × 10 down through the switch into the holder's two small printed holes. Solder 2-core wire to **C** and **NC** of each switch first: 60 cm for HOME, 100 cm for END.
+    - **HOME:** on the **front-left** holder, its lever pointing to the rear. The finger on the front end of the left carriage presses it when the blade is parked.
+    - **END:** on the **rear-right** holder, its lever pointing to the front. The right carriage presses it when the blade is fully out. Its body sits 4 mm in from the holder's rear face; bend its solder lugs sideways so that nothing sticks out behind the robot.
+13. **Turn the coupler by hand.** The blade must travel from the HOME click to the END click without binding. At END, the blade's face is level with the deck's rear edge and nothing sticks out behind it.
+14. Tie the two switch cables and the motor's wires along the right edge of the deck, **away from the lead screw**, with slack where they go down into the bay. Week 2 and week 3 connect them.
 
 ### 1.5 Set the casters: all 4 wheels on the floor
 
@@ -492,6 +584,7 @@ The two drive wheels must carry most of the weight (for grip), and the casters m
 - [ ] Push the robot by hand: it rolls straight, turns smoothly, the casters swivel freely, nothing rubs.
 - [ ] Put 10 kg on the cargo plate: nothing bends visibly, the cargo plate touches only the spacers, and no wheel lifts.
 - [ ] Press the E-stop hard: the deck doesn't bend noticeably. If it does, add a nut/washer "support" under the deck near the E-stop.
+- [ ] **Pusher:** turning the coupler by hand moves the blade the whole way, both switches click, the blade clears the cargo plate everywhere, and nothing sticks out behind the deck's rear edge.
 
 **Done when:** the chassis rolls freely with all 4 wheels on the floor and carries 10 kg. Take photos for the report.
 
@@ -505,7 +598,7 @@ The two drive wheels must carry most of the weight (for grip), and the casters m
 
 ### 2.1 Power diagram
 
-The full power schematic is sheet E02 in `cad/autocad/CargoRobot_v2_schematics.pdf` (also as an AutoCAD `.dxf`). Print it and keep it next to you while wiring. The diagram below is the same circuit in short form.
+The full power schematic is sheet E02 in `cad/autocad/CargoRobot_v3_schematics.pdf` (also as an AutoCAD `.dxf`). Print it and keep it next to you while wiring. The diagram below is the same circuit in short form.
 
 ```mermaid
 flowchart LR
@@ -515,10 +608,12 @@ flowchart LR
   M12 -->|16 AWG| DL["Left BTS7960 B+"]
   M12 -->|16 AWG| DR["Right BTS7960 B+"]
   M12 -->|signal| DIV["10k / 3.3k divider → GPIO26"]
+  M12 -->|20 AWG| DP["Pusher BTS7960 B+"]
   BN["LiPo −"] -->|16 AWG black| G["WAGO: GND bus"]
   G --> BIN["Buck IN−"]
   G --> DLN["Left BTS7960 B−"]
   G --> DRN["Right BTS7960 B−"]
+  G --> DPN["Pusher BTS7960 B−"]
   BO["Buck OUT+ 5.1 V / OUT−"] -->|USB-C pigtail| PI["Pi 5 USB-C power"]
 ```
 
@@ -542,6 +637,9 @@ flowchart LR
 | P14 | GND | Buck **IN−** | 20 AWG black | Ferrule |
 | P15 | Buck **OUT+ / OUT−** | USB-C pigtail red / black | the pigtail's wires, max 30 cm | Ferrules |
 | P16 | LiPo balance plug | Voltage alarm | — | Plug in, check the alarm shows 3 cell voltages |
+| P17 | MOTOR +12 V | **Pusher** BTS7960 **B+** | 20 AWG red | Ferrule |
+| P18 | GND | **Pusher** BTS7960 **B−** | 20 AWG black | Ferrule |
+| P19 | **Pusher** BTS7960 **M+ / M−** | Pusher motor's two terminals | 20 AWG, ~60 cm, up over the right edge of the deck at the front | Ferrules at the driver; soldered at the motor |
 
 > **Motor wire colours:** the most common JGB37-520 encoder cable is red = motor +, white = motor −, blue = encoder VCC, black = encoder GND, yellow = encoder A, green = encoder B. **Check your seller's diagram.** Only red and white go to the driver in this week; the other four are for week 3.
 
@@ -558,15 +656,16 @@ flowchart LR
    - Button released → **beep**
    - Button pressed → **no beep**
 6. **Motor drivers** (P7–P12). Stick the BTS7960 boards to the bottom plate at the rear, one each side of the centre line (see the top view), with **VHB tape** under the board. Their heatsinks must point up.
-7. **Buck converter** (P13, P14). Stick it down with VHB tape at the rear-left. Don't connect the pigtail yet.
-8. **Set the buck output to 5.1 V (important):**
+7. **Pusher driver** (P17–P19). Stick the third BTS7960 on the bottom plate at the front-right, opposite the Pi (X = +120, Y = −65). P17 takes the last free slot of the 5-way MOTOR +12 V WAGO; for P18, link a second WAGO to the GND bus. Because it's on the **motor** bus, the E-stop also stops the pusher. Which way round M+ / M− go doesn't matter: `invert_motor` fixes the direction in week 3.
+8. **Buck converter** (P13, P14). Stick it down with VHB tape at the rear-left. Don't connect the pigtail yet.
+9. **Set the buck output to 5.1 V (important):**
    1. Insert the 10 A fuse, then connect the battery with the master switch **OFF**. Switch **ON**.
    2. Multimeter (DC V) on buck OUT+ / OUT−.
    3. Turn the **voltage** potentiometer (the small brass screw; often many turns needed) until it reads **5.10–5.20 V**.
    4. Turn the **current** potentiometer fully clockwise (about 15 turns, maximum current).
    5. Switch **OFF**.
-9. **USB-C pigtail** (P15): red → OUT+, black → OUT−. If the pigtail has more wires (e.g. white/green data wires), cut them short and insulate them with heat-shrink.
-10. **Battery alarm** (P16): plug it into the balance lead. It beeps below the threshold; set it to **3.5 V** if it's adjustable.
+10. **USB-C pigtail** (P15): red → OUT+, black → OUT−. If the pigtail has more wires (e.g. white/green data wires), cut them short and insulate them with heat-shrink.
+11. **Battery alarm** (P16): plug it into the balance lead. It beeps below the threshold; set it to **3.5 V** if it's adjustable.
 
 ### 2.4 Pi 5 power setting
 
@@ -588,6 +687,7 @@ With the battery **connected**:
 | T2.3 Switch off | Switch OFF, V at MAIN bus | 0 V | |
 | T2.4 Main bus | Switch ON, V at MAIN bus | 11.1–12.6 V (the battery voltage) | |
 | T2.5 E-stop | E-stop pressed: V at MOTOR bus. Released (twist to unlatch): V again | 0 V / battery V | |
+| T2.5b E-stop and pusher | The same, measured at the pusher BTS7960's B+ | 0 V / battery V | |
 | T2.6 5 V rail | V at buck OUT | 5.10–5.20 V | |
 | T2.7 Pi boots | Plug the USB-C into the Pi (SD card from week 3, or just watch the LEDs) | Red LED on, no warning | |
 | T2.8 5 V under load | Pi booted, run `stress` in week 3 (section 3.6), measure V at Pi GPIO pin 2 (5V) and pin 6 (GND) | ≥ 5.0 V | |
@@ -666,6 +766,8 @@ Go to the very end of the file and add:
 [all]
 usb_max_current_enable=1
 ```
+
+**Pusher: free the SPI pins.** The pusher's motor driver uses GPIO 9 and GPIO 10, which Ubuntu reserves for SPI by default. In the same file, find the line `dtparam=spi=on` and put a `#` in front of it, so it reads `#dtparam=spi=on`. If the file has no such line, there is nothing to do.
 
 Save with **Ctrl+O**, **Enter**, then exit with **Ctrl+X**.
 
@@ -748,7 +850,7 @@ Also measure the voltage between GPIO pin 2 (5 V) and pin 6 (GND) during the tes
 
 ### 3.7 Signal wiring
 
-Sheet E03 in `cad/autocad/CargoRobot_v2_schematics.pdf` shows everything in this section as a schematic. Every wire with the same name is connected together.
+Sheet E03 in `cad/autocad/CargoRobot_v3_schematics.pdf` shows everything in this section as a schematic. Every wire with the same name is connected together.
 
 **Master switch OFF, battery unplugged.** Plug the GPIO screw-terminal HAT onto the Pi. All numbers below are **BCM GPIO numbers**, with the **physical pin** in brackets. The terminal HAT is labelled with both.
 
@@ -759,19 +861,19 @@ Sheet E03 in `cad/autocad/CargoRobot_v2_schematics.pdf` shows everything in this
    3V3 bus A (encoders)  [ 1][ 2]  5V   - DO NOT USE
                          [ 3][ 4]  5V   - DO NOT USE
                          [ 5][ 6]  GND  -> logic GND bus
-                         [ 7][ 8]
+   GPIO4  pusher HOME sw [ 7][ 8]
    GND -> logic GND bus  [ 9][10]
    GPIO17 L-enc A        [11][12]  GPIO18 R-driver RPWM
    GPIO27 L-enc B        [13][14]  GND
    GPIO22 R-enc A        [15][16]  GPIO23 R-enc B
    3V3 bus B (modules)   [17][18]  GPIO24 HX711 SCK (all 4)
-                         [19][20]  GND
-                         [21][22]  GPIO25 HX711 DOUT front-left
+   GPIO10 pusher RPWM    [19][20]  GND
+   GPIO9  pusher LPWM    [21][22]  GPIO25 HX711 DOUT front-left
                          [23][24]
                    GND   [25][26]
                          [27][28]
    GPIO5  motor ENABLE   [29][30]  GND
-                         [31][32]  GPIO12 L-driver RPWM
+   GPIO6  pusher END sw  [31][32]  GPIO12 L-driver RPWM
    GPIO13 L-driver LPWM  [33][34]  GND
    GPIO19 R-driver LPWM  [35][36]  GPIO16 HX711 DOUT front-right
    GPIO26 E-STOP sense   [37][38]  GPIO20 HX711 DOUT rear-left
@@ -785,8 +887,8 @@ These pins are defined in one place, `robot_ws/src/cargo_bot/cargo_bot/pins.py`.
 | Bus | Fed from | Feeds |
 |---|---|---|
 | **3V3-A** | Pi pin 1 | Left encoder VCC, right encoder VCC |
-| **3V3-B** | Pi pin 17 | Left BTS7960 VCC, right BTS7960 VCC, HX711 bus on the deck |
-| **LOGIC-GND** | Pi pins 6 and 9 | Encoder GNDs, BTS7960 GNDs, HX711 bus on the deck, divider GND |
+| **3V3-B** | Pi pin 17 | Left BTS7960 VCC, right BTS7960 VCC, HX711 bus on the deck; **pusher** BTS7960 VCC, R_EN and L_EN |
+| **LOGIC-GND** | Pi pins 6 and 9 | Encoder GNDs, BTS7960 GNDs, HX711 bus on the deck, divider GND; **pusher** BTS7960 GND and both limit switches |
 | **HX-3V3 / HX-GND / HX-SCK** | On the top deck, under the cargo plate | The 4 HX711 boards |
 
 **Signal wire list** (24–26 AWG jumpers, ferrules into the HAT):
@@ -824,8 +926,17 @@ These pins are defined in one place, `robot_ws/src/cargo_bot/cargo_bot/pins.py`.
 | S28 | Divider junction (see below) | GPIO26 (pin 37) |
 | S29 | RPLIDAR USB adapter | Pi USB 2.0 port (black) |
 | S30 | USB camera | Pi USB 3.0 port (blue) |
+| S31 | **Pusher** BTS7960 **RPWM** | GPIO10 (pin 19) |
+| S32 | **Pusher** BTS7960 **LPWM** | GPIO9 (pin 21) |
+| S33 | **Pusher** BTS7960 **R_EN** + **L_EN** (linked) and **VCC** | 3V3-B bus (**3.3 V, not 5 V**). This driver is always enabled; it has no enable pin on the Pi. |
+| S34 | **Pusher** BTS7960 **GND** (logic header) | LOGIC-GND |
+| S35 | **HOME** limit switch **NC** | GPIO4 (pin 7) |
+| S36 | **END** limit switch **NC** | GPIO6 (pin 31) |
+| S37 | Both limit switches **C** | LOGIC-GND |
 
 "Front-left" etc. means: looking down at the robot, with its front (lidar end) pointing away from you.
+
+**Pusher limit switches (S35–S37).** Each switch has three terminals: C (common), NC (normally closed) and NO (normally open). Use **C and NC**; leave NO empty. While a switch is *not* pressed, C and NC are connected, so the pin is held at GND and reads 0. Pressing it opens the contact and the pin reads 1. A wire that breaks or falls off also reads 1, so a loose wire stops the pusher instead of letting it run into the end stop.
 
 **E-stop sense divider (S28).** Solder it on a small piece of perfboard:
 
@@ -846,7 +957,7 @@ MOTOR +12 V bus ──[ 10 kΩ ]──┬──[ 3.3 kΩ ]── LOGIC-GND
 - [ ] No continuity between any 3V3 bus and GND.
 - [ ] No continuity between 3V3 and the 12 V buses.
 - [ ] Nothing is connected to Pi pins 2 or 4 (5 V).
-- [ ] Each wire S1–S23 beeps from end to end.
+- [ ] Each wire S1–S23 beeps from end to end (and S31–S37, if you built the pusher).
 
 ### 3.8 Bench tests [PI]
 
@@ -914,6 +1025,36 @@ python3 tools/test_hx711.py
 4. If a cell is marked "opposite sign", either swap its green and white wires on the HX711 (A+ ↔ A−), or keep the `-1` in `signs`.
 5. Run `python3 tools/test_hx711.py` again (empty bed at start), then put the 2 kg weight on. The total must read **2.00 ± 0.05 kg**, in the middle **and** near each corner.
 
+**Test 5: Pusher** (only if you built it)
+
+Bed empty, hands and wires clear of the blade and the lead screw.
+
+```bash
+python3 tools/test_pusher.py
+```
+
+1. Press each limit switch by hand. The tool must show `HOME: PRESSED` and `END: PRESSED` for the right one, and `-` when released.
+   - Both show PRESSED all the time → a wire is off, or on NO instead of NC.
+   - `GPIO busy` → SPI is still enabled (section 3.3), or the robot's launch file is still running.
+2. Check the direction:
+
+   ```bash
+   python3 tools/test_pusher.py --jog out      # the blade must move towards the REAR for 1 s
+   python3 tools/test_pusher.py --jog in       # ... and back towards the FRONT
+   ```
+
+   - It goes the wrong way → set `invert_motor: true` under `pusher_node` in `robot.yaml`, then repeat.
+   - Nothing moves → the tool prints `motor power: OFF` when the E-stop is pressed. Otherwise check P17–P19 and S31–S34.
+3. Run a full cycle:
+
+   ```bash
+   python3 tools/test_pusher.py --cycle
+   ```
+
+   The blade goes out until the END switch clicks, pauses, and comes back to HOME. The tool prints the time of each stroke: roughly 15–25 s with a 110 RPM motor.
+4. Put a 2 kg box on the bed and run the cycle again. The box must slide off the rear without the blade stalling or tilting, and the weight shown by `test_hx711.py` must be back at zero afterwards.
+5. Start a cycle and press the **E-stop** while the blade moves: it stops at once. Release the E-stop: the blade stays where it is (the tool ends with a fault). `--cycle` brings it home again.
+
 **Save your settings:**
 
 ```bash
@@ -927,6 +1068,7 @@ git add -A && git commit -m "bench-test calibration" && git push
 - [ ] `min_duty` and `kf` are measured.
 - [ ] The scale reads the 2 kg weight as 2.0 ± 0.05 kg.
 - [ ] The E-stop shows `motor power: OFF` when pressed.
+- [ ] **Pusher:** a full `--cycle` runs without a fault, pushes a 2 kg box off the rear, and stops when the E-stop is pressed.
 
 ---
 
@@ -942,11 +1084,12 @@ robot_ws/src/cargo_bot/
 ├── cargo_bot/
 │   ├── pins.py          <- GPIO wiring table (single source of truth)
 │   ├── hw.py            <- low-level drivers: Motor, QuadratureEncoder, HX711Array, DigitalIn/Out
-│   ├── control.py       <- maths: kinematics, wheel PID, odometry, payload speed factor
+│   ├── control.py       <- maths: kinematics, wheel PID, odometry, payload speed factor, pusher sequence
 │   ├── base_driver.py   <- NODE: /cmd_vel -> motors, encoders -> /odom + TF, E-stop -> /estop
 │   ├── payload_node.py  <- NODE: 4 load cells -> /payload_weight, /payload_corners, /payload/tare
 │   ├── speed_limiter.py <- NODE: /cmd_vel x weight factor -> /cmd_vel_safe
 │   ├── vision_node.py   <- NODE: USB camera -> line following + ArUco station markers
+│   ├── pusher_node.py   <- NODE: cargo pusher (design v3): /pusher/push, /pusher/home, /pusher/stop -> /pusher/state
 │   └── mission.py       <- delivery mission (home -> pickup -> dropoff -> home) using Nav2
 ├── config/
 │   ├── robot.yaml       <- all tunable numbers of our nodes
@@ -977,6 +1120,9 @@ flowchart LR
   LID[rplidar_node] -- /scan --> FIL[laser filter] -- /scan_filtered --> NAV
   RSP[robot_state_publisher] -- TF base_link→laser, camera --> NAV
   BASE -- /joint_states --> RSP
+  MIS[mission --conveyor] -- /pusher/push --> PUS[pusher_node]
+  PUS -- /pusher/state --> MIS
+  BASE -- /estop --> PUS
 ```
 
 The full code of every file is in [Appendix B](#appendix-b--full-source-code). Each file starts with a comment explaining what it does.
@@ -990,7 +1136,7 @@ cd ~/cargo_robot/robot_ws
 colcon build --symlink-install
 echo "source ~/cargo_robot/robot_ws/install/setup.bash" >> ~/.bashrc
 source ~/.bashrc
-ros2 pkg executables cargo_bot           # lists base_driver, mission, payload_node, speed_limiter, vision_node
+ros2 pkg executables cargo_bot           # lists base_driver, mission, payload_node, pusher_node, speed_limiter, vision_node
 ```
 
 > **Rule:** after changing anything in `config/`, `launch/` or `urdf/`, run `cd ~/cargo_robot/robot_ws && colcon build --symlink-install` again, then restart the launch. It takes about 5 seconds.
@@ -1476,6 +1622,7 @@ Useful options:
 
 - `--loops 5`: repeat the delivery 5 times.
 - `--set-initial-pose`: tells AMCL the robot starts at *home*, so you can skip the 2D Pose Estimate click.
+- `--conveyor`: unload at the drop-off with the pusher instead of waiting for a person ([section 8.7](#87-unload-onto-a-conveyor-with-the-pusher-design-v3)).
 - **Ctrl+C**: cancels the mission and stops the robot.
 
 ### 8.6 Tuning Nav2 (only if needed)
@@ -1491,7 +1638,73 @@ Edit `robot_ws/src/cargo_bot/config/nav2_params.yaml`, then rebuild and restart:
 | Oscillates on straight paths | `lookahead_dist` up (0.6 → 0.8) |
 | "Robot is in collision" / won't start | footprint too big, or the laser filter box is too small. Check `/scan_filtered` in RViz: no dots may be inside the robot outline. |
 
-**Done when:** the delivery mission runs **3 times in a row** without help, with 5 kg of cargo. Record a video of it for the report.
+### 8.7 Unload onto a conveyor with the pusher (design v3)
+
+With `--conveyor`, the robot unloads by itself at the drop-off: it backs up until its rear touches the conveyor, pushes the cargo off, checks that the bed is empty and drives clear.
+
+**What the conveyor must be like**
+
+| | Requirement | Why |
+|---|---|---|
+| Belt height | Top of the belt **180–205 mm** above the floor | The bed is 211 mm high. A pusher can't lift, and a drop of more than about 3 cm tips the package over. |
+| Side facing the robot | A flat, rigid face at least 40 cm wide, from 165 mm above the floor up to the belt: the conveyor's own side frame, or a board fixed to it | The robot backs up until its rear edge (178–183 mm high) presses on it. |
+| Gap | The belt starts within 2–3 cm of that face | The package has to bridge the gap. |
+| Backstop | A board along the far side of the belt whose top is **more than 260 mm** above the floor, at least as wide as the robot | The lidar scans 250 mm above the floor and sees nothing lower. Without the board, Nav2 doesn't know the conveyor exists and can plan a path through it. It also stops the package overshooting. |
+| Belt | **Running** while the robot unloads | A heavy package gripping a stopped rubber belt pushes the robot away instead of sliding on. Onto a stopped belt, keep packages under about 6 kg. |
+| Packages | Rigid boxes at least 10 mm high, up to 255 × 280 mm (length × width), up to 15 kg | The blade is 25 mm tall and rides 3 mm above the plate; the usable bed is 257 mm long. |
+
+**Set it up**
+
+1. Put the conveyor and its backstop in place, then make the map again (week 6), so they're on it.
+2. Tighten Nav2's goal tolerance as in the table in 8.6: `xy_goal_tolerance` 0.10 and `yaw_goal_tolerance` 0.15.
+3. Record the **dropoff** station (8.4) with the robot's **rear towards the conveyor, square to it, and about 30 cm clear of it**. It needs that room to turn on the spot when it arrives.
+4. Start the robot with the pusher node:
+
+   ```bash
+   ros2 launch cargo_bot robot.launch.py pusher:=true
+   ```
+
+5. Try the pusher by itself first, with the bed empty:
+
+   ```bash
+   ros2 topic echo /pusher/state --once                     # home
+   ros2 service call /pusher/push std_srvs/srv/Trigger      # one cycle: out, pause, back
+   ros2 service call /pusher/stop std_srvs/srv/Trigger      # stop the motor now
+   ros2 service call /pusher/home std_srvs/srv/Trigger      # park the blade; also clears a fault
+   ```
+
+6. Run the mission:
+
+   ```bash
+   ros2 run cargo_bot mission --stations ~/maps/stations.yaml --conveyor
+   ```
+
+**What happens at the drop-off**
+
+1. The robot backs up at 5 cm/s until its wheels stop turning: the rear is pressing on the conveyor. If it backs up `--dock-distance` (0.6 m) without touching anything, or doesn't move at all, it does **not** push: the mission stops with an error.
+2. It calls `/pusher/push`. The blade goes out (about 20 s), pauses half a second and comes back.
+3. It reads the scale. The bed must be empty within 10 s; if the cargo is still there, the mission stops with the robot still at the conveyor.
+4. It drives 30 cm forward, clear of the conveyor, and carries on with Nav2.
+
+`/pusher/state` says what the pusher is doing:
+
+| State | Meaning |
+|---|---|
+| `home` | parked at the front, HOME switch pressed |
+| `pushing`, `out`, `returning` | moving to the rear, pausing there, coming back |
+| `stopped` | standing between the switches: after `/pusher/stop`, or at start-up if it wasn't parked. Call `/pusher/home`. |
+| `fault` | it gave up; the reason is in the `pusher_node` log. Fix the cause, then call `/pusher/home`. |
+
+The pusher stops by itself, and stays stopped, when:
+
+- a stroke takes longer than `stroke_timeout` (45 s);
+- the blade hasn't left its switch 2 s after starting: motor wired backwards, jammed, or no motor power;
+- the E-stop is pressed during a stroke. Releasing the E-stop does **not** restart it;
+- both switches read "pressed" at once: a switch wire is broken.
+
+The settings (`duty_out`, `duty_in`, `stroke_timeout`, `dwell`, `invert_motor`) are under `pusher_node` in `robot.yaml`.
+
+**Done when:** the delivery mission runs **3 times in a row** without help, with 5 kg of cargo. Record a video of it for the report. **Pusher:** the same with `--conveyor`, the box landing on the belt each time.
 
 ---
 
@@ -1559,6 +1772,12 @@ ros2 bag record -o ~/tests/mission_run1 /scan_filtered /odom /tf /tf_static /pay
 1. 10 laps of the tape track. **Record:** lap time and the number of times the line was lost.
 2. **Good:** ≥ 9/10 laps without losing the line.
 
+### T8: Conveyor unloading (pusher)
+
+1. Run the mission with `--conveyor` 10 times each with a 1 kg, a 5 kg and a 10 kg box.
+2. **Record:** unloads that needed no help, out of 10; the time from arriving at the drop-off to driving clear; where on the belt the box lands; every fault message.
+3. **Good:** ≥ 9/10 at each weight, under 60 s per unload.
+
 ### Results table (copy into the report)
 
 | Test | Metric | Result | Target | Pass? |
@@ -1570,6 +1789,7 @@ ros2 bag record -o ~/tests/mission_run1 /scan_filtered /odom /tf /tf_static /pay
 | T5 | goal position error (mean/max) | | < 10 cm | |
 | T6 | runtime @ 10 kg | | ≥ 1 h | |
 | T7 | line-follow laps without loss | | ≥ 9/10 | |
+| T8 | conveyor unloads without help @ 1 / 5 / 10 kg | | ≥ 9/10 | |
 
 **Done when:** every row has a result, backed by a video or data file.
 
@@ -1581,7 +1801,7 @@ ros2 bag record -o ~/tests/mission_run1 /scan_filtered /odom /tf /tf_static /pay
 
 ### 10.1 Cable harness (task 3.2.1)
 
-1. **Label every wire** at both ends (heat-shrink labels or tape + marker) with its ID from the wire lists (P1…P16, S1…S30).
+1. **Label every wire** at both ends (heat-shrink labels or tape + marker) with its ID from the wire lists (P1…P19, S1…S37).
 2. **Route power and signals apart:**
    - power wires (red/black, motor wires) along the **left** side;
    - signal wires along the **right** side;
@@ -1589,6 +1809,7 @@ ros2 bag record -o ~/tests/mission_run1 /scan_filtered /odom /tf /tf_static /pay
 3. **Twist** each motor's two power wires together (≈ 1 twist per 2 cm). This reduces electrical noise into the encoders.
 4. **Bundle** with zip ties every 8–10 cm. Use spiral wrap where a bundle passes the cable slots or bends.
 5. **Strain relief:** every cable that goes to a moving or removable part (the motors, the top deck, the lidar) gets a zip tie to a rod or plate 3–5 cm before its connector.
+   - **Pusher:** its motor wires and the two limit-switch cables run along the right edge of the deck. Tie them down every 8 cm so that nothing can reach the lead screw or lie in the carriages' path.
 6. **Ferrules:** every stranded wire in a screw terminal (HAT, BTS7960, buck) must have a crimped ferrule. Tug each wire: none may come out.
 7. **Service loop:** leave ~10 cm of slack on the wires between the bottom plate and the top deck, so the deck can be lifted off without unplugging anything.
 8. Take a clear photo from above for the report. Update the wire lists if anything changed.
@@ -1598,6 +1819,7 @@ ros2 bag record -o ~/tests/mission_run1 /scan_filtered /odom /tf /tf_static /pay
 - The simplest cover is 2–3 mm acrylic or PVC-foam side panels, 400 × 100 mm, one per side (plus front/rear pieces if you want). Hold them against the outside of the rods with small zip ties through 4 mm holes, or use VHB tape on the plate edges.
 - Leave openings for: the master switch access, USB/SD access to the Pi, the camera's view, and airflow at the Pi fan and motor drivers.
 - **Never** block the lidar's scan plane (the ring at the top of the lidar).
+- **Pusher:** fix the side panels against the rods, on the **inside**. Don't tape them to the plate edges: the carriages run along the outside of the deck edges. The pusher itself stays uncovered.
 
 ### 10.3 Start automatically at power-on
 
@@ -1635,6 +1857,7 @@ systemctl status cargobot.service        # "active (running)"
 journalctl -u cargobot.service -f        # live log; Ctrl+C to leave
 ```
 
+- **Pusher:** add ` pusher:=true` after `robot.launch.py` in the `ExecStart` line. The blade never moves by itself at start-up; if it isn't parked, the state is `stopped` until someone calls `/pusher/home`.
 - Stop it for manual work: `sudo systemctl stop cargobot`.
 - Disable it: `sudo systemctl disable cargobot`.
 
@@ -1668,10 +1891,11 @@ Shut down the Pi and put the SD card in the laptop.
    - block diagram (section 1);
    - design changes from Phase I/PDF, with reasons (the table in section 1).
 4. **Mechanical design:**
-   - CAD renders (`cad/output/views/*.png`), and the 7 engineering drawing sheets from `cad/autocad/CargoRobot_v2_drawings.pdf` as an appendix;
+   - CAD renders (`cad/output/views/*.png`), and the 8 engineering drawing sheets from `cad/autocad/CargoRobot_v3_drawings.pdf` as an appendix;
    - material choices;
    - load path (cargo → load cells → deck → threaded rods → bottom plate → wheels and casters);
-   - design choices that keep it simple to build: threaded rods, bought steel motor brackets, adjustable swivel casters, laser-cut slots instead of hand drilling.
+   - design choices that keep it simple to build: threaded rods, bought steel motor brackets, adjustable swivel casters, laser-cut slots instead of hand drilling;
+   - the pusher (sheet 07): how it works, why the blade never touches the weighed plate, and what it added to the design (`PUSHER_IMPACT.md`).
 5. **Electrical design:**
    - power diagram, wire lists P/S, GPIO map;
    - E-stop design and divider calculation;
@@ -1680,7 +1904,7 @@ Shut down the Pi and put the SD card in the laptop.
    - ROS graph: run `ros2 run rqt_graph rqt_graph` on the laptop and screenshot it;
    - each node's job, the PID + odometry maths (section 5.1), the speed-scaling curve (section 7.2), Nav2 configuration (section 8.1).
 7. **Calibration:** encoders, PID, odometry (week 5 data), load cells.
-8. **Testing & results:** T1–T7 tables, graphs, discussion of every failure.
+8. **Testing & results:** T1–T8 tables, graphs, discussion of every failure.
 9. **Conclusion & future work:**
    - rear-facing sensor (so it can reverse);
    - battery monitoring through an ADC;
@@ -1704,7 +1928,7 @@ Film in landscape, 1080p, good light, 2–3 minutes total. Shot list:
 1. Robot overview, 360° walk-around (10 s).
 2. Mapping time-lapse, with the RViz map growing (screen recording) (20 s).
 3. RViz goal click → robot drives there (20 s).
-4. **Full delivery mission** with cargo: loading at pickup, slower drive, unloading, return (60 s).
+4. **Full delivery mission** with cargo: loading at pickup, slower drive, unloading (with the pusher: the box sliding onto the conveyor), return (60 s).
 5. Overload: too much weight → robot refuses (10 s).
 6. Obstacle avoidance: a person steps in front (15 s).
 7. E-stop press (10 s).
@@ -1738,6 +1962,7 @@ About 12–15 slides, 15 minutes:
 - [ ] Laptop charged; `rviz2`, `rqt_image_view` and the rviz config tested at home.
 - [ ] Map of the demo room. If the room is different, arrive 1 hour early and make a new map (week 6: ~15 min) plus `stations.yaml` (8.4).
 - [ ] Tape line and markers laid; stations taped.
+- [ ] **Pusher:** conveyor and backstop in place and on the map; dropoff station recorded 30 cm in front of it; one `--conveyor` run done in the room.
 - [ ] The video on the laptop **and** a USB stick (plan B if the live demo fails).
 - [ ] Two full rehearsals done in the week before, timed.
 
@@ -1771,6 +1996,15 @@ About 12–15 slides, 15 minutes:
 | Pi reboots when the motors start | Battery sag / buck too weak / shared ground problem | Charge the battery; buck at 5.2 V; thicker/shorter 5 V wires; check the GND bus connections |
 | Pi gets hot / slows down | No cooler, or a heavy load | Fit the active cooler; check `vcgencmd measure_temp` if available, or `cat /sys/class/thermal/thermal_zone0/temp` |
 | Camera not found | Wrong device number | `v4l2-ctl --list-devices`, set `device:` in `robot.yaml` |
+| `cannot use the pusher pins: 'GPIO busy'` | SPI is still enabled (it owns GPIO 9 and 10), or another program has the pins | Section 3.3: `#dtparam=spi=on`, then reboot; `sudo systemctl stop cargobot` |
+| Pusher fault: "did not leave the HOME switch" | Motor wired backwards, no motor power (E-stop), or the blade is jammed | `tools/test_pusher.py --jog out`; set `invert_motor: true`; check P17–P19 |
+| Pusher fault: "both limit switches read 'pressed'" | A switch wire is off, or on NO instead of NC | `tools/test_pusher.py`, press each switch; C → LOGIC-GND, NC → its pin |
+| Pusher fault: "did not reach the END switch in time" | Rods binding, coupler or bearing block slipping on the lead screw, or the package is stuck against something | Master switch off, turn the coupler by hand; loosen and realign the rod holders; tighten the coupler and the bearing block's set screws |
+| The blade tilts, or one end lags behind | The push is far off-centre, or a carriage binds | Centre the package; realign the rod holders; check all 4 blade bolts are tight |
+| The blade runs but the package stays, or the robot is pushed away from the conveyor | A heavy package on a stopped belt; the anti-slip mat is still on the plate | Run the belt while unloading; bare plate |
+| The weight reading changes when the empty blade moves | The blade or one of its wires touches the cargo plate | Washers between the blade and both carriage arms; re-route the wire |
+| Mission: "backed up … without touching the conveyor" | The dropoff station is too far from the conveyor, or Nav2 stopped short of it | Re-record the station; tighten the goal tolerance (8.6); raise `--dock-distance` |
+| Mission: "the robot did not move when backing up" | E-stop pressed, overload, or the robot stopped already touching the conveyor | Release the E-stop; record the dropoff station further from the conveyor |
 
 ---
 
@@ -1856,16 +2090,20 @@ After changing a number in `cad/robot_cad.py` [WINDOWS PowerShell in `C:\Univers
 
 ```powershell
 .venv\Scripts\python robot_cad.py        # STEP, STL, DXF, SVG, BOM -> output/
-.venv\Scripts\python check_render.py     # collision check, all-wheels-on-the-floor check, PNG renders
-.venv\Scripts\python make_autocad.py     # AutoCAD file (3D model + 7 drawing sheets) + drawings PDF
+.venv\Scripts\python check_render.py     # collision check (pusher parked, half-way, fully out), wheels-on-the-floor check, PNG renders
+.venv\Scripts\python make_autocad.py     # AutoCAD file (3D model + 8 drawing sheets) + drawings PDF
+.venv\Scripts\python make_schematics.py  # electrical schematics (3 sheets) + PDF; reads the pins from pins.py
+.venv\Scripts\python export_ros_mesh.py  # robot body mesh for RViz / Gazebo
 ```
+
+The untouched v2 design can be regenerated the same way from `backup_v2\cad` (see `backup_v2/README.md`).
 
 **AutoCAD:**
 
-1. Open `cad/autocad/CargoRobot_v2.dxf` (File → Open → *Files of type: DXF*).
+1. Open `cad/autocad/CargoRobot_v3.dxf` (File → Open → *Files of type: DXF*).
 2. Save it as a `.dwg`.
 3. The Model tab has the 3D robot. Set the visual style to *Shaded with Edges* and orbit with Shift + middle mouse button.
-4. The layout tabs 01–07 are the A3 drawing sheets, ready to plot.
+4. The layout tabs 01–08 are the A3 drawing sheets, ready to plot.
 
 **Other CAD programs:** open `output/robot_assembly.step` in Fusion 360, SolidWorks, Onshape or FreeCAD.
 
@@ -1902,6 +2140,12 @@ PINS = {
     "hx711_dout": [25, 16, 20, 21],   # pins 22, 36, 38, 40 -> front-left, front-right, rear-left, rear-right
     # Motor-power sense (10k / 3.3k divider after the E-stop): 1 = motors powered, 0 = E-stop pressed
     "estop_sense": 26,      # pin 37
+    # Pusher (design v3): a third BTS7960 (its R_EN + L_EN are wired to 3.3 V, so it is always enabled)
+    "pusher_out": 10,       # pin 19 -> pusher BTS7960 RPWM (blade moves to the rear, pushing the cargo off)
+    "pusher_in": 9,         # pin 21 -> pusher BTS7960 LPWM (blade moves back to the front)
+    # Pusher limit switches: C -> GND, NC -> pin (pull-up in software). 0 = not pressed, 1 = pressed OR wire broken
+    "pusher_home": 4,       # pin 7  <- HOME switch (blade parked at the front)
+    "pusher_end": 6,        # pin 31 <- END switch (blade fully out at the rear)
 }
 
 CORNERS = ["front_left", "front_right", "rear_left", "rear_right"]
@@ -2186,6 +2430,99 @@ def median(values):
     s = sorted(values)
     n = len(s)
     return s[n // 2] if n % 2 else 0.5 * (s[n // 2 - 1] + s[n // 2])
+
+
+class PusherCycle:
+    """The cargo pusher's sequence. The node reads the two limit switches, calls update() at a fixed rate
+    and applies the duty it returns (+ = blade towards the rear, - = blade back towards the front).
+
+    state   home       parked at the front (HOME switch pressed)
+            pushing    moving to the rear, sliding the cargo off
+            out        pausing at the rear (END switch pressed)
+            returning  moving back to the front
+            stopped    standing somewhere between the two switches
+            fault      gave up; 'reason' says why, home() clears it
+    """
+
+    START_GRACE = 2.0       # s: by now the blade must have left the switch it started from
+
+    def __init__(self, duty_out=1.0, duty_in=1.0, stroke_timeout=45.0, dwell=0.5):
+        self.duty_out, self.duty_in = duty_out, duty_in
+        self.stroke_timeout, self.dwell = stroke_timeout, dwell
+        self.state, self.reason = "stopped", ""
+        self.elapsed = 0.0
+        self.at_home = self.at_end = False
+
+    def push(self):
+        """Start one unload cycle (out, pause, back). Returns (accepted, message)."""
+        if self.state == "home":
+            self._go("pushing")
+            return True, "pushing"
+        if self.state == "fault":
+            return False, f"fault: {self.reason} - call pusher/home first"
+        if self.state == "stopped":
+            return False, "the blade is not parked - call pusher/home first"
+        return False, "busy"
+
+    def home(self):
+        """Bring the blade back to the front. Also clears a fault. Returns (accepted, message)."""
+        self.reason = ""
+        if self.at_home and not self.at_end:
+            self.state = "home"
+            return True, "already parked"
+        self._go("returning")
+        return True, "returning"
+
+    def stop(self):
+        self.state = "home" if self.at_home else "stopped"
+
+    def _go(self, state):
+        self.state, self.elapsed = state, 0.0
+
+    def _fault(self, reason):
+        self.state, self.reason = "fault", reason
+        return 0.0
+
+    def update(self, at_home, at_end, estop, dt):
+        """at_home / at_end: True while that limit switch is pressed. Returns the motor duty, -1..1."""
+        self.at_home, self.at_end = at_home, at_end
+        moving = self.state in ("pushing", "out", "returning")
+        if at_home and at_end:
+            return self._fault("both limit switches read 'pressed': a switch wire is broken or unplugged")
+        if moving and estop:
+            return self._fault("the E-stop was pressed during the stroke")
+        if moving:
+            self.elapsed += dt
+
+        if self.state == "pushing":
+            if at_end:
+                self._go("out")
+            elif at_home and self.elapsed > self.START_GRACE:
+                return self._fault("the blade did not leave the HOME switch: motor wired backwards "
+                                   "(set invert_motor), jammed, or no motor power")
+            elif self.elapsed > self.stroke_timeout:
+                return self._fault("the blade did not reach the END switch in time: jammed, or no motor power")
+            else:
+                return self.duty_out
+        if self.state == "out":
+            if self.elapsed >= self.dwell:
+                self._go("returning")
+            return 0.0
+        if self.state == "returning":
+            if at_home:
+                self.state = "home"
+            elif at_end and self.elapsed > self.START_GRACE:
+                return self._fault("the blade did not leave the END switch: jammed, or no motor power")
+            elif self.elapsed > self.stroke_timeout:
+                return self._fault("the blade did not reach the HOME switch in time: jammed, or no motor power")
+            else:
+                return -self.duty_in
+
+        if self.state == "home" and not at_home:
+            self.state = "stopped"
+        elif self.state == "stopped" and at_home:
+            self.state = "home"
+        return 0.0
 ```
 
 ### `robot_ws/src/cargo_bot/cargo_bot/base_driver.py`
@@ -2741,18 +3078,147 @@ if __name__ == "__main__":
     main()
 ```
 
+### `robot_ws/src/cargo_bot/cargo_bot/pusher_node.py`
+
+```python
+"""Pusher node (design v3): slides the cargo off the rear of the robot with the lead-screw blade.
+
+  services   pusher/push    std_srvs/Trigger   start one unload cycle: blade out to the END switch, then back
+             pusher/home    std_srvs/Trigger   bring the blade back to the HOME switch (also clears a fault)
+             pusher/stop    std_srvs/Trigger   stop the motor now
+  publishes  pusher/state   std_msgs/String    home | pushing | out | returning | stopped | fault
+  subscribes estop          std_msgs/Bool      from base_driver: True while the E-stop has cut motor power
+
+The services answer at once; watch pusher/state to see when the cycle has finished.
+The motor stops on a limit switch, when a stroke takes longer than stroke_timeout (jammed, or no motor
+power), when the E-stop is pressed during a stroke, and when the node shuts down.
+"""
+import rclpy
+from rclpy.node import Node
+from std_msgs.msg import Bool, String
+from std_srvs.srv import Trigger
+
+from cargo_bot import hw
+from cargo_bot.control import PusherCycle
+from cargo_bot.pins import PINS
+
+
+class PusherNode(Node):
+    def __init__(self):
+        super().__init__("pusher_node")
+        self.declare_parameters("", [
+            ("duty_out", 1.0),               # 0..1, motor power while pushing the cargo off
+            ("duty_in", 1.0),                # 0..1, motor power while returning
+            ("stroke_timeout", 45.0),        # s, give up if a limit switch is not reached in this time
+            ("dwell", 0.5),                  # s, pause at the rear before returning
+            ("invert_motor", False),         # true if "out" moves the blade to the FRONT
+            ("pwm_freq", 1000),
+            ("rate", 50.0),                  # Hz
+        ])
+        p = lambda name: self.get_parameter(name).value
+        self.dt = 1.0 / p("rate")
+        self.cycle = PusherCycle(p("duty_out"), p("duty_in"), p("stroke_timeout"), p("dwell"))
+
+        chip = hw.open_chip()
+        try:
+            self.motor = hw.Motor(chip, PINS["pusher_out"], PINS["pusher_in"], p("pwm_freq"), p("invert_motor"))
+            # NC contact to GND + pull-up: 0 = not pressed, 1 = pressed (or the wire is broken)
+            self.switches = [hw.DigitalIn(chip, PINS[name], pull_down=False) for name in ("pusher_home", "pusher_end")]
+        except Exception as e:
+            self.get_logger().error(f"cannot use the pusher pins: {e}. If it says 'GPIO busy', SPI is still "
+                                    "enabled on the Pi: see BUILD_GUIDE.md, section 3.3")
+            raise
+        self.pressed = [False, False]        # debounced: [HOME, END]
+        self.last_raw = [0, 0]
+        self.estop = False
+        self.last_state = None
+
+        self.state_pub = self.create_publisher(String, "pusher/state", 10)
+        self.create_subscription(Bool, "estop", self.on_estop, 10)
+        self.create_service(Trigger, "pusher/push", self.on_push)
+        self.create_service(Trigger, "pusher/home", self.on_home)
+        self.create_service(Trigger, "pusher/stop", self.on_stop)
+        self.create_timer(self.dt, self.loop)
+        self.create_timer(0.2, self.publish_state)
+        self.get_logger().info("pusher_node ready")
+
+    def on_estop(self, msg):
+        self.estop = msg.data
+
+    def on_push(self, request, response):
+        if self.estop:
+            response.success, response.message = False, "the E-stop is pressed"
+        else:
+            response.success, response.message = self.cycle.push()
+        return response
+
+    def on_home(self, request, response):
+        response.success, response.message = self.cycle.home()
+        return response
+
+    def on_stop(self, request, response):
+        self.cycle.stop()
+        response.success, response.message = True, "stopped"
+        return response
+
+    def loop(self):
+        for i, switch in enumerate(self.switches):
+            raw = switch.read()
+            self.pressed[i] = bool(raw and self.last_raw[i])     # pressed = two readings in a row
+            self.last_raw[i] = raw
+        duty = self.cycle.update(self.pressed[0], self.pressed[1], self.estop, self.dt)
+        self.motor.set(duty)
+        if self.cycle.state != self.last_state:
+            self.last_state = self.cycle.state
+            if self.cycle.state == "fault":
+                self.get_logger().error(f"pusher fault: {self.cycle.reason}")
+            else:
+                self.get_logger().info(f"pusher: {self.cycle.state}")
+            self.publish_state()
+
+    def publish_state(self):
+        self.state_pub.publish(String(data=self.cycle.state))
+
+    def shutdown(self):
+        self.motor.set(0.0)
+        for part in [self.motor] + self.switches:
+            part.close()
+        hw.close_chip()
+
+
+def main():
+    rclpy.init()
+    node = PusherNode()
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        node.shutdown()
+        node.destroy_node()
+        rclpy.try_shutdown()
+
+
+if __name__ == "__main__":
+    main()
+```
+
 ### `robot_ws/src/cargo_bot/cargo_bot/mission.py`
 
 ```python
-"""Delivery mission: home -> pickup (wait for cargo) -> dropoff (wait until unloaded) -> home.
+"""Delivery mission: home -> pickup (wait for cargo) -> dropoff (unload) -> home.
+
+At the drop-off the cargo is unloaded either by hand (the default: the robot waits until the bed is empty)
+or, with --conveyor, by the robot itself: it backs up until its rear touches the conveyor, pushes the cargo
+off with the pusher (pusher_node must be running), checks that the bed is empty and drives clear.
 
 Needs Nav2 running with a map (see BUILD_GUIDE.md, week 8) and a stations file:
 
     home:    [x, y, yaw_degrees]
     pickup:  [x, y, yaw_degrees]
-    dropoff: [x, y, yaw_degrees]
+    dropoff: [x, y, yaw_degrees]      with --conveyor: rear towards the conveyor, about 30 cm clear of it
 
-Run:  ros2 run cargo_bot mission --stations ~/maps/stations.yaml [--loops 3] [--set-initial-pose]
+Run:  ros2 run cargo_bot mission --stations ~/maps/stations.yaml [--loops 3] [--set-initial-pose] [--conveyor]
 """
 import argparse
 import math
@@ -2761,9 +3227,11 @@ import time
 
 import rclpy
 import yaml
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Twist
 from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
-from std_msgs.msg import Float32
+from nav_msgs.msg import Odometry
+from std_msgs.msg import Float32, String
+from std_srvs.srv import Trigger
 
 
 def make_pose(nav, x, y, yaw_deg):
@@ -2779,13 +3247,28 @@ def make_pose(nav, x, y, yaw_deg):
 
 
 class Mission:
-    def __init__(self, nav, stations, load_kg, hold_s):
+    def __init__(self, nav, stations, load_kg, hold_s, conveyor=None):
+        """conveyor: None = unload by hand, or a dict with dock_speed, dock_distance, clear_distance, push_timeout."""
         self.nav, self.stations, self.load_kg, self.hold_s = nav, stations, load_kg, hold_s
+        self.conveyor = conveyor
         self.weight = None
+        self.odom = None                 # (x, y, forward speed) from the wheel odometry
+        self.pusher_state = None
         nav.create_subscription(Float32, "payload_weight", self.on_weight, 10)
+        if conveyor:
+            nav.create_subscription(Odometry, "odom", self.on_odom, 10)
+            nav.create_subscription(String, "pusher/state", self.on_pusher_state, 10)
+            self.cmd_pub = nav.create_publisher(Twist, "cmd_vel", 10)
+            self.push_client = nav.create_client(Trigger, "pusher/push")
 
     def on_weight(self, msg):
         self.weight = msg.data
+
+    def on_odom(self, msg):
+        self.odom = (msg.pose.pose.position.x, msg.pose.pose.position.y, msg.twist.twist.linear.x)
+
+    def on_pusher_state(self, msg):
+        self.pusher_state = msg.data
 
     def go(self, name):
         x, y, yaw = self.stations[name]
@@ -2798,13 +3281,18 @@ class Mission:
             raise RuntimeError(f"navigation to {name} failed: {result}")
         self.nav.get_logger().info(f"arrived at {name}")
 
-    def wait_weight(self, loaded):
-        """Block until the bed has been loaded (or emptied) for hold_s seconds in a row."""
+    def wait_weight(self, loaded, timeout=None):
+        """Block until the bed has been loaded (or emptied) for hold_s seconds in a row.
+        With a timeout (seconds), give up with an error instead of waiting for ever."""
         what = "cargo to be LOADED" if loaded else "cargo to be REMOVED"
         self.nav.get_logger().info(f"waiting for {what} ...")
         since = None
+        t_end = None if timeout is None else time.monotonic() + timeout
         while True:
             rclpy.spin_once(self.nav, timeout_sec=0.1)
+            if t_end is not None and time.monotonic() > t_end:
+                seen = "no payload_weight data" if self.weight is None else f"payload = {self.weight:.2f} kg"
+                raise RuntimeError(f"gave up waiting for {what} ({seen})")
             if self.weight is None:
                 continue
             ok = self.weight > self.load_kg if loaded else self.weight < self.load_kg / 2.0
@@ -2816,13 +3304,90 @@ class Mission:
                 self.nav.get_logger().info(f"payload = {self.weight:.2f} kg")
                 return
 
+    def creep(self, speed, distance, until_contact=False):
+        """Drive straight at speed (m/s, negative = backwards) for distance metres of wheel odometry.
+        With until_contact, also stop when the wheels stand still: the robot is pressing on something.
+        Returns (why it stopped: "distance" or "contact", metres travelled)."""
+        t0 = time.monotonic()
+        while self.odom is None:
+            rclpy.spin_once(self.nav, timeout_sec=0.1)
+            if time.monotonic() - t0 > 5.0:
+                raise RuntimeError("no odometry (is base_driver running?)")
+        x0, y0, _ = self.odom
+        travelled = lambda: math.hypot(self.odom[0] - x0, self.odom[1] - y0)
+        cmd = Twist()
+        cmd.linear.x = float(speed)
+        t0, still_since, reason = time.monotonic(), None, "distance"
+        time_limit = 5.0 + 3.0 * distance / abs(speed)
+        try:
+            while travelled() < distance:
+                self.cmd_pub.publish(cmd)
+                rclpy.spin_once(self.nav, timeout_sec=0.05)
+                now = time.monotonic()
+                if now - t0 > time_limit:
+                    raise RuntimeError("the robot is not moving (E-stop pressed, or overloaded?)")
+                if not until_contact or now - t0 < 1.0:           # the first second: still starting to move
+                    continue
+                if abs(self.odom[2]) > 0.2 * abs(speed):
+                    still_since = None
+                elif still_since is None:
+                    still_since = now
+                elif now - still_since > 0.5:
+                    reason = "contact"
+                    break
+        finally:
+            self.cmd_pub.publish(Twist())
+        return reason, travelled()
+
+    def push_cargo_off(self):
+        """One pusher cycle: blade out to the rear, then back. Returns when the blade is parked again."""
+        if not self.push_client.wait_for_service(timeout_sec=5.0):
+            raise RuntimeError("pusher_node is not running (start robot.launch.py with pusher:=true)")
+        future = self.push_client.call_async(Trigger.Request())
+        while not future.done():
+            rclpy.spin_once(self.nav, timeout_sec=0.1)
+        if not future.result().success:
+            raise RuntimeError(f"the pusher refused to start: {future.result().message}")
+        self.nav.get_logger().info("pushing the cargo off ...")
+        t_end = time.monotonic() + self.conveyor["push_timeout"]
+        left_home = False
+        while True:
+            rclpy.spin_once(self.nav, timeout_sec=0.1)
+            if self.pusher_state == "fault":
+                raise RuntimeError("pusher fault (the reason is in the pusher_node log)")
+            if self.pusher_state not in (None, "home"):
+                left_home = True
+            elif left_home and self.pusher_state == "home":
+                return
+            if time.monotonic() > t_end:
+                raise RuntimeError("the pusher did not finish in time")
+
+    def unload_on_conveyor(self):
+        c, log = self.conveyor, self.nav.get_logger().info
+        log("backing up to the conveyor ...")
+        why, moved = self.creep(-c["dock_speed"], c["dock_distance"], until_contact=True)
+        if why != "contact":
+            raise RuntimeError(f"backed up {moved:.2f} m without touching the conveyor - not pushing "
+                               "(record the dropoff station closer to it, or raise --dock-distance)")
+        if moved < 0.03:        # it never moved, so standing still does not mean "touching the conveyor"
+            raise RuntimeError("the robot did not move when backing up - not pushing "
+                               "(E-stop pressed, overloaded, or already against the conveyor)")
+        log(f"touching the conveyor after {moved:.2f} m")
+        self.push_cargo_off()
+        self.wait_weight(loaded=False, timeout=10.0)
+        log("driving clear of the conveyor ...")
+        self.creep(c["dock_speed"] * 2.0, c["clear_distance"])
+
     def run(self, loops):
         for i in range(loops):
             self.nav.get_logger().info(f"=== delivery {i + 1}/{loops} ===")
             self.go("pickup")
             self.wait_weight(loaded=True)
             self.go("dropoff")
-            self.wait_weight(loaded=False)
+            if self.conveyor:
+                self.unload_on_conveyor()
+            else:
+                self.wait_weight(loaded=False)
         self.go("home")
 
 
@@ -2833,6 +3398,14 @@ def main():
     parser.add_argument("--load-kg", type=float, default=0.3, help="weight that counts as 'loaded'")
     parser.add_argument("--hold", type=float, default=2.0, help="seconds the weight must be stable")
     parser.add_argument("--set-initial-pose", action="store_true", help="tell AMCL the robot is at 'home'")
+    parser.add_argument("--conveyor", action="store_true",
+                        help="unload at the drop-off with the pusher instead of waiting for a person")
+    parser.add_argument("--dock-distance", type=float, default=0.60,
+                        help="m: how far the robot may back up while looking for the conveyor")
+    parser.add_argument("--dock-speed", type=float, default=0.05, help="m/s: backing-up speed")
+    parser.add_argument("--clear-distance", type=float, default=0.30,
+                        help="m: how far it drives forward again after unloading")
+    parser.add_argument("--push-timeout", type=float, default=120.0, help="s: longest time for one pusher cycle")
     args, _ = parser.parse_known_args()
 
     with open(args.stations) as f:
@@ -2840,13 +3413,17 @@ def main():
     for key in ("home", "pickup", "dropoff"):
         if key not in stations:
             sys.exit(f"stations file is missing '{key}'")
+    conveyor = None
+    if args.conveyor:
+        conveyor = dict(dock_speed=args.dock_speed, dock_distance=args.dock_distance,
+                        clear_distance=args.clear_distance, push_timeout=args.push_timeout)
 
     rclpy.init()
     nav = BasicNavigator()
     if args.set_initial_pose:
         nav.setInitialPose(make_pose(nav, *stations["home"]))
     nav.waitUntilNav2Active()
-    mission = Mission(nav, stations, args.load_kg, args.hold)
+    mission = Mission(nav, stations, args.load_kg, args.hold, conveyor)
     try:
         mission.run(args.loops)
         nav.get_logger().info("mission complete")
@@ -2869,6 +3446,7 @@ if __name__ == "__main__":
 
     ros2 launch cargo_bot robot.launch.py                  # base + payload + lidar
     ros2 launch cargo_bot robot.launch.py vision:=true     # + camera / line follower
+    ros2 launch cargo_bot robot.launch.py pusher:=true     # + cargo pusher (design v3)
     ros2 launch cargo_bot robot.launch.py lidar:=false payload:=false   # just the wheels
 
 Command flow:  (teleop | Nav2 | line follower) -> /cmd_vel -> speed_limiter -> /cmd_vel_safe -> base_driver
@@ -2896,6 +3474,7 @@ def generate_launch_description():
         DeclareLaunchArgument("lidar", default_value="true"),
         DeclareLaunchArgument("payload", default_value="true"),
         DeclareLaunchArgument("vision", default_value="false"),
+        DeclareLaunchArgument("pusher", default_value="false"),
         DeclareLaunchArgument("lidar_port", default_value="/dev/rplidar"),
 
         Node(package="robot_state_publisher", executable="robot_state_publisher",
@@ -2907,6 +3486,8 @@ def generate_launch_description():
              condition=IfCondition(LaunchConfiguration("payload"))),
         Node(package="cargo_bot", executable="vision_node", parameters=[config], output="screen",
              condition=IfCondition(LaunchConfiguration("vision"))),
+        Node(package="cargo_bot", executable="pusher_node", parameters=[config], output="screen",
+             condition=IfCondition(LaunchConfiguration("pusher"))),
 
         Node(package="rplidar_ros", executable="rplidar_node", name="rplidar_node", output="screen",
              parameters=[{"serial_port": LaunchConfiguration("lidar_port"), "serial_baudrate": 115200,
@@ -3085,6 +3666,15 @@ speed_limiter:
     max_angular: 1.5
     weight_timeout: 2.0
 
+pusher_node:
+  ros__parameters:
+    duty_out: 1.0               # 0-1: motor power while pushing the cargo off
+    duty_in: 1.0                # 0-1: motor power while the blade returns
+    stroke_timeout: 45.0        # s - a stroke that takes longer is a fault (jammed, or no motor power)
+    dwell: 0.5                  # s - pause at the rear before returning
+    invert_motor: false         # from tools/test_pusher.py: true if "out" moves the blade to the FRONT
+    pwm_freq: 1000
+
 vision_node:
   ros__parameters:
     device: 0                   # /dev/video0
@@ -3175,11 +3765,12 @@ scan_to_scan_filter_chain:
 
 ```xml
 <?xml version="1.0"?>
-<!-- Cargo robot model (design v2). All numbers come from cad/robot_cad.py (converted to metres).
+<!-- Cargo robot model (design v3). All numbers come from cad/robot_cad.py (converted to metres).
      Frames: base_footprint (on the floor, under the axle centre) -> base_link (axle centre)
              X = forward, Y = left, Z = up.
      Used by the real robot (robot.launch.py) and by the Gazebo simulation (sim.launch.py, sim:=true).
-     Masses are estimates (total ~5 kg); correct them after weighing the real robot. -->
+     Masses are estimates (total ~6 kg with the pusher); correct them after weighing the real robot.
+     The pusher is part of the body mesh (blade parked); it has no joint and does not move in the model. -->
 <robot name="cargo_bot" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:arg name="sim" default="false"/>
@@ -3189,7 +3780,7 @@ scan_to_scan_filter_chain:
   <xacro:property name="wheel_width" value="0.03"/>
   <xacro:property name="wheel_y" value="0.165"/>
   <xacro:property name="wheel_mass" value="0.15"/>
-  <xacro:property name="body_mass" value="4.5"/>
+  <xacro:property name="body_mass" value="5.6"/>
   <!-- RPLIDAR orientation: if obstacles in front show up BEHIND the robot in RViz, change pi to 0.0 -->
   <xacro:property name="laser_yaw" value="${pi}"/>
 
@@ -3550,6 +4141,7 @@ setup(
             "payload_node = cargo_bot.payload_node:main",
             "speed_limiter = cargo_bot.speed_limiter:main",
             "vision_node = cargo_bot.vision_node:main",
+            "pusher_node = cargo_bot.pusher_node:main",
             "mission = cargo_bot.mission:main",
         ],
     },
@@ -3816,6 +4408,134 @@ def main():
         pass
     finally:
         cells.close()
+        hw.close_chip()
+
+
+if __name__ == "__main__":
+    main()
+```
+
+### `tools/test_pusher.py`
+
+```python
+#!/usr/bin/env python3
+"""Pusher bench test (design v3).   KEEP FINGERS AND WIRES AWAY FROM THE BLADE AND THE LEAD SCREW.
+
+  python3 tools/test_pusher.py              show the two limit switches; press each one by hand
+  python3 tools/test_pusher.py --jog out    run the blade towards the REAR for 1 s (stops on the END switch)
+  python3 tools/test_pusher.py --jog in     run the blade towards the FRONT for 1 s (stops on the HOME switch)
+  python3 tools/test_pusher.py --cycle      one full push: out to END, back to HOME, with the time of each stroke
+
+Uses invert_motor and the duty values of pusher_node in config/robot.yaml, so re-run it after changing them.
+Stop robot.launch.py first: only one program can use the GPIO pins at a time.
+"""
+import argparse
+import sys
+import time
+
+import common
+from cargo_bot import hw
+from cargo_bot.control import PusherCycle
+from cargo_bot.pins import PINS
+
+RATE = 50.0
+
+
+def watch(home, end):
+    print("Press each limit switch by hand (Ctrl+C to stop). Expected: '-' when released, 'PRESSED' when pressed.")
+    last = None
+    try:
+        while True:
+            now = (home.read(), end.read())
+            if now != last:
+                last = now
+                note = "   !! both pressed: a wire is off (C -> GND, NC -> the pin)" if all(now) else ""
+                print(f"  HOME: {'PRESSED' if now[0] else '-':8}  END: {'PRESSED' if now[1] else '-':8}{note}")
+            time.sleep(0.02)
+    except KeyboardInterrupt:
+        print()
+
+
+def jog(motor, home, end, direction, duty, seconds):
+    switch, sign, where = (end, 1, "REAR") if direction == "out" else (home, -1, "FRONT")
+    if switch.read():
+        print(f"the {'END' if direction == 'out' else 'HOME'} switch is already pressed - not moving")
+        return
+    input(f"[jog {direction}] the blade should move towards the {where}. Press Enter ...")
+    motor.set(sign * duty)
+    t_end = time.monotonic() + seconds
+    while time.monotonic() < t_end and not switch.read():
+        time.sleep(0.005)
+    motor.set(0)
+    print("  stopped on the limit switch" if switch.read() else f"  ran for {seconds:.1f} s")
+    print(f"Did it move towards the {where}? If it went the other way, set invert_motor: true under pusher_node\n"
+          "in robot.yaml. If it did not move at all, check the motor power (E-stop), wires P17-P19 and S31-S34.")
+
+
+def cycle(motor, home, end, cfg):
+    seq = PusherCycle(cfg["duty_out"], cfg["duty_in"], cfg["stroke_timeout"], cfg["dwell"])
+    seq.update(bool(home.read()), bool(end.read()), False, 0.0)
+    if seq.state != "home":
+        input("The blade is not parked. Press Enter to bring it HOME first ...")
+        seq.home()
+    else:
+        input("[cycle] the blade goes to the REAR and comes back. Bed clear? Press Enter ...")
+        seq.push()
+    started_push = seq.state == "pushing"
+    last, t_mark, dt = seq.state, time.monotonic(), 1.0 / RATE
+    while seq.state in ("pushing", "out", "returning"):
+        motor.set(seq.update(bool(home.read()), bool(end.read()), False, dt))
+        if seq.state != last:
+            if last in ("pushing", "returning"):
+                print(f"  {last}: {time.monotonic() - t_mark:.1f} s")
+            last, t_mark = seq.state, time.monotonic()
+        time.sleep(dt)
+    motor.set(0)
+    if seq.state == "fault":
+        print(f"  !! FAULT: {seq.reason}")
+    elif started_push:
+        print("  done: the blade is parked. A full stroke should take roughly 15-25 s.")
+    else:
+        print("  the blade is parked. Run --cycle again for a full push.")
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--jog", choices=("out", "in"))
+    ap.add_argument("--cycle", action="store_true")
+    ap.add_argument("--seconds", type=float, default=1.0, help="length of a --jog")
+    args = ap.parse_args()
+    cfg = common.config("pusher_node")
+
+    chip = hw.open_chip()
+    parts = []
+    try:
+        try:
+            motor = hw.Motor(chip, PINS["pusher_out"], PINS["pusher_in"], cfg.get("pwm_freq", 1000), cfg["invert_motor"])
+            parts.append(motor)
+            home = hw.DigitalIn(chip, PINS["pusher_home"], pull_down=False)
+            parts.append(home)
+            end = hw.DigitalIn(chip, PINS["pusher_end"], pull_down=False)
+            parts.append(end)
+            sense = hw.DigitalIn(chip, PINS["estop_sense"])
+            parts.append(sense)
+        except Exception as e:
+            sys.exit(f"cannot use the pusher pins: {e}\n"
+                     "  'GPIO busy' means another program is using them (stop robot.launch.py),\n"
+                     "  or SPI is still enabled on the Pi (BUILD_GUIDE.md, section 3.3).")
+        print("motor power:", "ON" if sense.read() else "OFF  (E-stop pressed, or the GPIO26 divider is missing)")
+        if args.jog:
+            duty = cfg["duty_out"] if args.jog == "out" else cfg["duty_in"]
+            jog(motor, home, end, args.jog, duty, args.seconds)
+        elif args.cycle:
+            cycle(motor, home, end, cfg)
+        else:
+            watch(home, end)
+    finally:
+        for part in parts:
+            if isinstance(part, hw.Motor):
+                part.set(0)
+            part.close()
         hw.close_chip()
 
 

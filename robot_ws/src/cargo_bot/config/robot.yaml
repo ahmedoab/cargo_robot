@@ -37,6 +37,15 @@ speed_limiter:
     max_angular: 1.5
     weight_timeout: 2.0
 
+pusher_node:
+  ros__parameters:
+    duty_out: 1.0               # 0-1: motor power while pushing the cargo off
+    duty_in: 1.0                # 0-1: motor power while the blade returns
+    stroke_timeout: 45.0        # s - a stroke that takes longer is a fault (jammed, or no motor power)
+    dwell: 0.5                  # s - pause at the rear before returning
+    invert_motor: false         # from tools/test_pusher.py: true if "out" moves the blade to the FRONT
+    pwm_freq: 1000
+
 vision_node:
   ros__parameters:
     device: 0                   # /dev/video0

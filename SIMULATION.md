@@ -11,6 +11,7 @@ This runs the cargo robot in Gazebo with the **same ROS 2 package, topics, frame
 | USB camera (read directly by `vision_node`) | Gazebo camera on `/camera/image_raw` (640 × 480, 15 Hz) |
 | `speed_limiter`, laser filter, SLAM, Nav2 | exactly the same nodes and config files |
 | Load cells, E-stop, GPIO | **not simulated**. There's no `/payload_weight`, so `speed_limiter` lets the full speed through. |
+| Pusher (design v3) | **not simulated**. The blade is part of the robot's shape, parked, and doesn't move. Run the mission without `--conveyor`. |
 
 ## 1. Install (Ubuntu 24.04 + ROS 2 Jazzy)
 
@@ -85,7 +86,7 @@ TF tree: `map → odom → base_footprint → base_link → {left_wheel_link, ri
 |---|---|
 | Size | 434 × 360 × 263 mm; Nav2 footprint 0.45 × 0.38 m |
 | Drive | differential, wheel radius 0.05 m, wheel separation 0.33 m, max 0.35 m/s in Nav2 |
-| Mass | ~5 kg without cargo (estimate in the URDF), max payload 15 kg |
+| Mass | ~6 kg without cargo, pusher included (estimate in the URDF), max payload 15 kg |
 | Lidar | `laser` at (0.153, 0, 0.20) m from `base_link`, rotated 180° (RPLIDAR's 0° points backwards) |
 | Camera | `camera_link` at (0.212, 0, 0.048) m, tilted 35° down |
 | `base_link` | centre of the drive axle, 0.05 m above the floor (`base_footprint`) |
@@ -100,8 +101,8 @@ TF tree: `map → odom → base_footprint → base_link → {left_wheel_link, ri
 | `robot_ws/src/cargo_bot/worlds/test_area.sdf` | the test room |
 | `robot_ws/src/cargo_bot/config/gz_bridge.yaml` | Gazebo ↔ ROS topic bridge |
 | `robot_ws/src/cargo_bot/launch/sim.launch.py` | starts all of the above |
-| `cad/autocad/CargoRobot_v2_drawings.pdf` | dimensioned drawings of the robot |
-| `cad/autocad/CargoRobot_v2_schematics.pdf` | electrical schematics |
+| `cad/autocad/CargoRobot_v3_drawings.pdf` | dimensioned drawings of the robot |
+| `cad/autocad/CargoRobot_v3_schematics.pdf` | electrical schematics |
 | `cad/output/robot_assembly.step` | full 3D CAD assembly |
 
 ## If something doesn't work

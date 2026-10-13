@@ -2,6 +2,7 @@
 
     ros2 launch cargo_bot robot.launch.py                  # base + payload + lidar
     ros2 launch cargo_bot robot.launch.py vision:=true     # + camera / line follower
+    ros2 launch cargo_bot robot.launch.py pusher:=true     # + cargo pusher (design v3)
     ros2 launch cargo_bot robot.launch.py lidar:=false payload:=false   # just the wheels
 
 Command flow:  (teleop | Nav2 | line follower) -> /cmd_vel -> speed_limiter -> /cmd_vel_safe -> base_driver
@@ -29,6 +30,7 @@ def generate_launch_description():
         DeclareLaunchArgument("lidar", default_value="true"),
         DeclareLaunchArgument("payload", default_value="true"),
         DeclareLaunchArgument("vision", default_value="false"),
+        DeclareLaunchArgument("pusher", default_value="false"),
         DeclareLaunchArgument("lidar_port", default_value="/dev/rplidar"),
 
         Node(package="robot_state_publisher", executable="robot_state_publisher",
@@ -40,6 +42,8 @@ def generate_launch_description():
              condition=IfCondition(LaunchConfiguration("payload"))),
         Node(package="cargo_bot", executable="vision_node", parameters=[config], output="screen",
              condition=IfCondition(LaunchConfiguration("vision"))),
+        Node(package="cargo_bot", executable="pusher_node", parameters=[config], output="screen",
+             condition=IfCondition(LaunchConfiguration("pusher"))),
 
         Node(package="rplidar_ros", executable="rplidar_node", name="rplidar_node", output="screen",
              parameters=[{"serial_port": LaunchConfiguration("lidar_port"), "serial_baudrate": 115200,

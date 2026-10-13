@@ -1,14 +1,14 @@
 """
-Electrical schematics of the cargo robot (design v2) - AutoCAD DXF + PDF.
+Electrical schematics of the cargo robot (design v3) - AutoCAD DXF + PDF.
 
 Run:   .venv\\Scripts\\python make_schematics.py
 Writes ./autocad/
-  CargoRobot_v2_schematics.dxf   3 A3 layout tabs (open in AutoCAD, Save As .dwg):
+  CargoRobot_v3_schematics.dxf   3 A3 layout tabs (open in AutoCAD, Save As .dwg):
       E01 SYSTEM BLOCK DIAGRAM   E02 POWER DISTRIBUTION   E03 CONTROL & SENSOR WIRING
-  CargoRobot_v2_schematics.pdf   the same 3 sheets (colour, A3)
+  CargoRobot_v3_schematics.pdf   the same 3 sheets (colour, A3)
   previews/E0x_*.png
 
-The pin numbers come from robot_ws/src/cargo_bot/cargo_bot/pins.py and the wire IDs (P1..P16, S1..S30)
+The pin numbers come from robot_ws/src/cargo_bot/cargo_bot/pins.py and the wire IDs (P1..P19, S1..S37)
 match the wire lists in BUILD_GUIDE.md (weeks 2 and 3).
 """
 import sys
@@ -21,13 +21,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "robot_ws" / "src" 
 from cargo_bot.pins import PINS  # noqa: E402
 
 OUT = Path(__file__).parent / "autocad"
-NAME = "CargoRobot_v2_schematics"
+NAME = "CargoRobot_v3_schematics"
 FRAME = (20, 10, 410, 287)
 TB = (230, 10, 410, 62)
 N_SHEETS = 3
-PROJECT = "AUTONOMOUS CARGO ROBOT - DESIGN v2"
+PROJECT = "AUTONOMOUS CARGO ROBOT - DESIGN v3"
 SCHOOL = "ARAB ACADEMY FOR SCIENCE, TECHNOLOGY & MARITIME TRANSPORT - GRADUATION PROJECT II"
-DATE = "29/09/2026"
+DATE = "13/10/2026"
 
 doc = ezdxf.new("R2018", setup=True, units=ezdxf.units.MM)
 # net colour (AutoCAD colour index) per layer
@@ -53,7 +53,7 @@ def setup():
 
 def net_layer(net):
     n = net.upper()
-    if n.startswith("+12V_MOTOR") or n.startswith("MOTOR_L") or n.startswith("MOTOR_R") or "M+" in n or "M-" in n:
+    if n.startswith(("+12V_MOTOR", "MOTOR_L", "MOTOR_R", "MOTOR_P")) or "M+" in n or "M-" in n:
         return "NET-12V-MOTOR"
     if n.startswith("+12V"):
         return "NET-12V"
@@ -210,7 +210,7 @@ def new_sheet(number, name, title):
     psp = doc.layouts.new(f"E{number:02d} {name}")
     psp.page_setup(size=(420, 297), margins=(0, 0, 0, 0), units="mm",
                    name="ISO_full_bleed_A3_(420.00_x_297.00_MM)", device="DWG To PDF.pc3")
-    title_block(psp, title, f"CR-V2-E{number:02d}", number)
+    title_block(psp, title, f"CR-V3-E{number:02d}", number)
     return psp
 
 
@@ -235,7 +235,7 @@ def sheet_block_diagram():
         "buck": (175, 170, 225, 198, "U1 BUCK", ["XL4015", "12 V -> 5.1 V 5 A"]),
         "pi": (250, 140, 320, 230, "RASPBERRY PI 5", ["8 GB, Ubuntu 24.04", "ROS 2 Jazzy:", "base_driver",
                                                       "payload_node", "speed_limiter", "vision_node",
-                                                      "SLAM + Nav2"]),
+                                                      "pusher_node", "SLAM + Nav2"]),
         "drv": (250, 240, 320, 268, "U2 + U3", ["2 x BTS7960", "motor drivers"]),
         "mot": (345, 240, 405, 268, "M1 + M2", ["JGB37-520 12 V", "+ Hall encoders"]),
         "hx": (345, 185, 405, 213, "4 x HX711", ["24-bit load-cell", "amplifiers"]),
@@ -243,6 +243,9 @@ def sheet_block_diagram():
         "lidar": (345, 110, 405, 136, "RPLIDAR A1M8", ["360 deg 2D lidar"]),
         "cam": (345, 78, 405, 102, "USB CAMERA", ["UVC wide-angle"]),
         "laptop": (250, 78, 320, 104, "LAPTOP", ["RViz, Nav2 goals", "teleop"]),
+        "pdrv": (125, 122, 175, 150, "U4 PUSHER DRIVER", ["BTS7960", "(third driver)"]),
+        "pmot": (125, 82, 175, 108, "M3 PUSHER MOTOR", ["JGB37-520 12 V", "T8 lead screw"]),
+        "plim": (190, 82, 240, 108, "S2 + S3", ["limit switches", "HOME, END"]),
     }
     for x0, y0, x1, y1, title, lines in B.values():
         block(psp, x0, y0, x1, y1, title, lines)
@@ -272,9 +275,20 @@ def sheet_block_diagram():
     arrow(psp, (245, 215), (250, 215), "NET-SIGNAL")
     text(psp, "E-stop sense", (222, 229), h=1.9, align=TA.TOP_CENTER, layer="NET-SIGNAL")
     text(psp, "(GPIO26 via divider)", (222, 225.5), h=1.7, align=TA.TOP_CENTER, layer="NET-SIGNAL")
+    # pusher (design v3)
+    arrow(psp, (150, 163), (150, 150), "NET-12V-MOTOR")
+    text(psp, "+12 V MOTOR (after S1)", (153, 158), h=2.0, align=TA.MIDDLE_LEFT, layer="NET-12V-MOTOR")
+    arrow(psp, (150, 122), (150, 108), "NET-12V-MOTOR")
+    text(psp, "12 V PWM", (153, 115), h=2.0, align=TA.MIDDLE_LEFT, layer="NET-12V-MOTOR")
+    arrow(psp, (250, 144), (175, 144), "NET-SIGNAL", "PWM x2", label_pos=(212, 145))
+    line(psp, [(240, 100), (245, 100), (245, 113), (265, 113), (265, 135)], "NET-SIGNAL")
+    arrow(psp, (265, 134), (265, 140), "NET-SIGNAL")
+    text(psp, "HOME + END", (247, 116), h=1.9, align=TA.BOTTOM_LEFT, layer="NET-SIGNAL")
+    line(psp, [(175, 95), (190, 95)], "SYMBOLS", color=8)
+    text(psp, "moves", (182.5, 96), h=1.7, align=TA.BOTTOM_CENTER, color=8)
     legend(psp, 28, 150)
     text(psp, "Details: E02 power distribution, E03 control & sensor wiring. Pin numbers: cargo_bot/pins.py.",
-         (28, 95), h=2.2)
+         (28, 72), h=2.2)
     return psp
 
 
@@ -319,15 +333,19 @@ def sheet_power():
     text(psp, "GND is common with the logic GND of E03", (225, 176), h=1.7)
     # E-stop -> +12 V MOTOR
     switch_h(psp, 240, 280, y_main, "S1 E-STOP", "latching, NC, 10 A", "NET-12V", nc=True)
-    line(psp, [(280, y_main), (300, y_main), (300, 118)], "NET-12V-MOTOR")
+    line(psp, [(280, y_main), (300, y_main), (300, 94)], "NET-12V-MOTOR")
     text(psp, "+12V_MOTOR", (302, 226), h=2.5, align=TA.MIDDLE_LEFT, layer="NET-12V-MOTOR")
     text(psp, "P5 / P6", (260, y_main - 10), h=1.9, layer="NET-12V")
-    # two motor drivers + motors
-    for i, (y0, ref, side, mref) in enumerate(((190, "U2", "LEFT", "M1"), (130, "U3", "RIGHT", "M2"))):
+    # three motor drivers + motors (U4 / M3 = the pusher, new in v3)
+    drivers = ((190, "U2", "LEFT", "M1", ("P7", "P9", "P11"), ("red (M1)", "white (M2)")),
+               (130, "U3", "RIGHT", "M2", ("P8", "P10", "P12"), ("red (M1)", "white (M2)")),
+               (70, "U4", "PUSHER", "M3", ("P17", "P18", "P19"), ("red", "black")))
+    for i, (y0, ref, side, mref, (w_pos, w_gnd, w_mot), colours) in enumerate(drivers):
         y1 = y0 + 30
-        dot(psp, (300, y1 - 6), "NET-12V-MOTOR")
+        if i < 2:
+            dot(psp, (300, y1 - 6), "NET-12V-MOTOR")
         line(psp, [(300, y1 - 6), (320, y1 - 6)], "NET-12V-MOTOR")
-        text(psp, "P7" if i == 0 else "P8", (305, y1 - 4.5), h=1.9, layer="NET-12V-MOTOR")
+        text(psp, w_pos, (305, y1 - 4.5), h=1.9, layer="NET-12V-MOTOR")
         rect(psp, 320, y0, 360, y1)
         text(psp, f"{ref} BTS7960", (340, y1 - 2.5), h=2.2, align=TA.TOP_CENTER)
         text(psp, f"({side} motor)", (340, y1 - 6.5), h=1.8, align=TA.TOP_CENTER)
@@ -338,15 +356,16 @@ def sheet_power():
         text(psp, "logic: E03", (340, y0 + 12), h=1.7, align=TA.MIDDLE_CENTER)
         line(psp, [(320, y0 + 5), (312, y0 + 5)], "NET-GND")
         ground(psp, (312, y0 + 5))
-        text(psp, "P9" if i == 0 else "P10", (313, y0 + 6.5), h=1.9, layer="NET-GND")
+        text(psp, w_gnd, (313, y0 + 6.5), h=1.9, layer="NET-GND")
         mc = (388, y0 + 12)
         line(psp, [(360, mc[1] + 6), (388, mc[1] + 6)], "NET-MOTOR")                   # to the top of M
         line(psp, [(360, y0 + 5), (388, y0 + 5), (388, mc[1] - 6)], "NET-MOTOR")       # to the bottom of M
         motor(psp, mc, mref, "")
-        text(psp, "red (M1)", (366, y0 + 19.5), h=1.6, layer="NET-MOTOR")
-        text(psp, "white (M2)", (366, y0 + 6.5), h=1.6, layer="NET-MOTOR")
-        text(psp, "P11" if i == 0 else "P12", (366, y0 + 12), h=1.9, layer="NET-MOTOR")
+        text(psp, colours[0], (366, y0 + 19.5), h=1.6, layer="NET-MOTOR")
+        text(psp, colours[1], (366, y0 + 6.5), h=1.6, layer="NET-MOTOR")
+        text(psp, w_mot, (366, y0 + 12), h=1.9, layer="NET-MOTOR")
     text(psp, "JGB37-520 12 V", (371, 120), h=1.7)
+    text(psp, "JGB37-520 12 V ~110 RPM", (364, 104), h=1.7)
     # E-stop sense divider
     dot(psp, (300, 118), "NET-12V-MOTOR")
     line(psp, [(300, 118), (270, 118)], "NET-12V-MOTOR")
@@ -367,13 +386,14 @@ def sheet_power():
     line(psp, [(52, 168), (48, 200)], "SYMBOLS", color=8)
     text(psp, "NOTES", (28, 138), h=2.8)
     for k, s in enumerate([
-        "1. Wire IDs P1..P16 = power wire list, BUILD_GUIDE.md week 2.",
+        "1. Wire IDs P1..P19 = power wire list, BUILD_GUIDE.md week 2.",
         "2. 16 AWG: P1-P10 (battery, fuse, switch, E-stop, drivers).",
-        "3. 20 AWG: P11-P15 (motors, buck in/out, USB-C pigtail).",
+        "3. 20 AWG: P11-P15 and P17-P19 (motors, buck, USB-C, pusher).",
         "4. Fuse F1 must be the first part after the battery +.",
         "5. The E-stop cuts motor power only; the Pi stays on",
         "   and reads the E-stop state on GPIO26 (divider R1/R2).",
         "6. Set the buck to 5.10-5.20 V BEFORE connecting the Pi.",
+        "7. U4 (pusher) is on +12V_MOTOR too: the E-stop stops it.",
     ]):
         text(psp, s, (28, 133 - k * 4.3), h=2.1)
     legend(psp, 130, 150)
@@ -396,7 +416,9 @@ def pi_nets():
     nets = {1: "3V3_A", 17: "3V3_B", 6: "GND", 9: "GND"}
     named = {"enable": "MOTOR_EN", "left_fwd": "L_RPWM", "left_rev": "L_LPWM", "right_fwd": "R_RPWM",
              "right_rev": "R_LPWM", "left_enc_a": "ENC_L_A", "left_enc_b": "ENC_L_B", "right_enc_a": "ENC_R_A",
-             "right_enc_b": "ENC_R_B", "hx711_sck": "HX_SCK", "estop_sense": "ESTOP_SENSE"}
+             "right_enc_b": "ENC_R_B", "hx711_sck": "HX_SCK", "estop_sense": "ESTOP_SENSE",
+             "pusher_out": "PUSH_RPWM", "pusher_in": "PUSH_LPWM", "pusher_home": "PUSH_HOME",
+             "pusher_end": "PUSH_END"}
     for key, net in named.items():
         nets[BCM_TO_PIN[PINS[key]]] = net
     for bcm, corner in zip(PINS["hx711_dout"], ("FL", "FR", "RL", "RR")):
@@ -492,9 +514,29 @@ def sheet_control():
             ("VCC", "3V3_B", ""),
             ("GND", "GND", ""),
         ], side="left", stub=8)
-    text(psp, "BTS7960 VCC from 3.3 V makes its", (330, 166), h=1.8)
-    text(psp, "inputs 3.3 V-logic compatible.", (330, 163), h=1.8)
-    text(psp, "Power side (B+/B-/M+/M-): see E02.", (330, 160), h=1.8)
+    text(psp, "BTS7960 VCC from 3.3 V makes its", (330, 166.5), h=1.8)
+    text(psp, "inputs 3.3 V-logic compatible.", (330, 163.5), h=1.8)
+    text(psp, "Power side (B+/B-/M+/M-): see E02.", (330, 160.5), h=1.8)
+    connector(psp, 330, 154, 36, "U4 BTS7960 (PUSHER motor)", [
+        ("RPWM", "PUSH_RPWM", ""),
+        ("LPWM", "PUSH_LPWM", ""),
+        ("R_EN", "3V3_B", ""),
+        ("L_EN", "3V3_B", ""),
+        ("R_IS", "", "not connected"),
+        ("L_IS", "", "not connected"),
+        ("VCC", "3V3_B", ""),
+        ("GND", "GND", ""),
+    ], side="left", stub=8)
+
+    # ---- pusher limit switches (left) ----
+    connector(psp, 28, 171, 38, "S2 / S3 PUSHER LIMIT SWITCHES", [
+        ("S2 NC", "PUSH_HOME", "home"),
+        ("S2 C", "GND", ""),
+        ("S3 NC", "PUSH_END", "end"),
+        ("S3 C", "GND", ""),
+    ], stub=6)
+    text(psp, "C -> GND, NC -> pin (software pull-up): 0 = not pressed,", (28, 142.5), h=1.8)
+    text(psp, "1 = pressed OR wire broken. NO terminal not used.", (28, 139.5), h=1.8)
 
     # ---- HX711 boards + load cells (bottom left) ----
     for i, corner in enumerate(("FL", "FR", "RL", "RR")):
@@ -519,18 +561,18 @@ def sheet_control():
          (28, 69.5), h=1.8)
 
     # ---- USB devices + E-stop sense (bottom right) ----
-    rect(psp, 262, 96, 292, 136)
-    text(psp, "RASPBERRY PI 5", (277, 133), h=2.0, align=TA.TOP_CENTER)
-    text(psp, "USB ports", (277, 129.5), h=1.7, align=TA.TOP_CENTER)
-    for y, port, dev in ((122, "USB 2.0", "RPLIDAR A1M8 + USB adapter (CP2102) -> /dev/rplidar"),
-                         (112, "USB 3.0", "USB camera, UVC -> /dev/video0"),
-                         (102, "USB-C", "power in: buck 5.1 V (E02)")):
-        text(psp, port, (291, y), h=1.8, align=TA.MIDDLE_RIGHT)
-        line(psp, [(292, y), (305, y)], "NET-USB" if port != "USB-C" else "NET-5V")
-        text(psp, dev, (307, y), h=1.9, align=TA.MIDDLE_LEFT, layer="NET-USB" if port != "USB-C" else "NET-5V")
-    text(psp, "ESTOP_SENSE comes from the R1/R2 divider on E02 (junction below R1).", (262, 90), h=1.9,
+    rect(psp, 240, 76, 270, 108)
+    text(psp, "RASPBERRY PI 5", (255, 106), h=2.0, align=TA.TOP_CENTER)
+    text(psp, "USB ports", (255, 102.5), h=1.7, align=TA.TOP_CENTER)
+    for y, port, dev in ((96, "USB 2.0", "RPLIDAR A1M8 + USB adapter (CP2102) -> /dev/rplidar"),
+                         (88, "USB 3.0", "USB camera, UVC -> /dev/video0"),
+                         (80, "USB-C", "power in: buck 5.1 V (E02)")):
+        text(psp, port, (269, y), h=1.8, align=TA.MIDDLE_RIGHT)
+        line(psp, [(270, y), (283, y)], "NET-USB" if port != "USB-C" else "NET-5V")
+        text(psp, dev, (285, y), h=1.9, align=TA.MIDDLE_LEFT, layer="NET-USB" if port != "USB-C" else "NET-5V")
+    text(psp, "ESTOP_SENSE comes from the R1/R2 divider on E02 (junction below R1).", (240, 70.5), h=1.9,
          layer="NET-SIGNAL")
-    text(psp, "Same net name = same wire. Wire IDs S1..S30: BUILD_GUIDE.md week 3.", (262, 85.5), h=1.9)
+    text(psp, "Same net name = same wire. Wire IDs S1..S37: BUILD_GUIDE.md week 3.", (240, 66.5), h=1.9)
     return psp
 
 

@@ -1,0 +1,16 @@
+# Removes lidar points that hit the robot itself or the cargo on its back:
+# every point inside this box (in base_link coordinates) is deleted from /scan -> /scan_filtered.
+scan_to_scan_filter_chain:
+  ros__parameters:
+    filter1:
+      name: robot_body
+      type: laser_filters/LaserScanBoxFilter
+      params:
+        box_frame: base_link
+        min_x: -0.26
+        max_x: 0.26
+        min_y: -0.21
+        max_y: 0.21
+        min_z: -1.0
+        max_z: 1.0
+        invert: false

@@ -29,6 +29,7 @@ setup(
             "payload_node = cargo_bot.payload_node:main",
             "speed_limiter = cargo_bot.speed_limiter:main",
             "vision_node = cargo_bot.vision_node:main",
+            "pusher_node = cargo_bot.pusher_node:main",
             "mission = cargo_bot.mission:main",
         ],
     },

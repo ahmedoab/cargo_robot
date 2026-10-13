@@ -1,0 +1,85 @@
+<?xml version="1.0"?>
+<!-- Gazebo (Harmonic, the simulator for ROS 2 Jazzy) additions: wheel friction, drive plugin, lidar, camera.
+     Included by cargo_bot.urdf.xacro only when xacro is called with sim:=true.
+     The simulated robot uses the SAME topics and frames as the real one:
+       /cmd_vel_safe (in, from speed_limiter)  /odom  /tf (odom -> base_footprint)  /joint_states  /scan  /camera/image_raw -->
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <gazebo reference="left_wheel_link"><mu1>1.0</mu1><mu2>1.0</mu2></gazebo>
+  <gazebo reference="right_wheel_link"><mu1>1.0</mu1><mu2>1.0</mu2></gazebo>
+  <gazebo reference="front_caster_link"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
+  <gazebo reference="rear_caster_link"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
+
+  <gazebo>
+    <!-- replaces base_driver.py: takes the speed command, drives the wheels, publishes odometry + TF -->
+    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
+      <left_joint>left_wheel_joint</left_joint>
+      <right_joint>right_wheel_joint</right_joint>
+      <wheel_separation>0.33</wheel_separation>
+      <wheel_radius>0.05</wheel_radius>
+      <max_linear_acceleration>1.0</max_linear_acceleration>
+      <topic>/cmd_vel</topic>
+      <odom_topic>/odom</odom_topic>
+      <tf_topic>/tf</tf_topic>
+      <frame_id>odom</frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
+      <odom_publish_frequency>50</odom_publish_frequency>
+    </plugin>
+    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
+      <topic>/joint_states</topic>
+    </plugin>
+  </gazebo>
+
+  <!-- RPLIDAR A1: 360 samples, 0.15-12 m, ~7 Hz -->
+  <gazebo reference="laser">
+    <sensor name="lidar" type="gpu_lidar">
+      <topic>/scan</topic>
+      <gz_frame_id>laser</gz_frame_id>
+      <update_rate>7</update_rate>
+      <always_on>true</always_on>
+      <visualize>true</visualize>
+      <lidar>
+        <scan>
+          <horizontal>
+            <samples>360</samples>
+            <resolution>1</resolution>
+            <min_angle>-3.14159</min_angle>
+            <max_angle>3.14159</max_angle>
+          </horizontal>
+        </scan>
+        <range>
+          <min>0.15</min>
+          <max>12.0</max>
+          <resolution>0.01</resolution>
+        </range>
+        <noise>
+          <type>gaussian</type>
+          <mean>0.0</mean>
+          <stddev>0.01</stddev>
+        </noise>
+      </lidar>
+    </sensor>
+  </gazebo>
+
+  <!-- USB camera: 640x480, wide angle -->
+  <gazebo reference="camera_link">
+    <sensor name="camera" type="camera">
+      <topic>/camera/image_raw</topic>
+      <gz_frame_id>camera_link</gz_frame_id>
+      <update_rate>15</update_rate>
+      <always_on>true</always_on>
+      <camera>
+        <horizontal_fov>1.75</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.02</near>
+          <far>10.0</far>
+        </clip>
+      </camera>
+    </sensor>
+  </gazebo>
+</robot>

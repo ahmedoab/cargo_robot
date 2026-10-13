@@ -1,9 +1,10 @@
 <?xml version="1.0"?>
-<!-- Cargo robot model (design v2). All numbers come from cad/robot_cad.py (converted to metres).
+<!-- Cargo robot model (design v3). All numbers come from cad/robot_cad.py (converted to metres).
      Frames: base_footprint (on the floor, under the axle centre) -> base_link (axle centre)
              X = forward, Y = left, Z = up.
      Used by the real robot (robot.launch.py) and by the Gazebo simulation (sim.launch.py, sim:=true).
-     Masses are estimates (total ~5 kg); correct them after weighing the real robot. -->
+     Masses are estimates (total ~6 kg with the pusher); correct them after weighing the real robot.
+     The pusher is part of the body mesh (blade parked); it has no joint and does not move in the model. -->
 <robot name="cargo_bot" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
   <xacro:arg name="sim" default="false"/>
@@ -13,7 +14,7 @@
   <xacro:property name="wheel_width" value="0.03"/>
   <xacro:property name="wheel_y" value="0.165"/>
   <xacro:property name="wheel_mass" value="0.15"/>
-  <xacro:property name="body_mass" value="4.5"/>
+  <xacro:property name="body_mass" value="5.6"/>
   <!-- RPLIDAR orientation: if obstacles in front show up BEHIND the robot in RViz, change pi to 0.0 -->
   <xacro:property name="laser_yaw" value="${pi}"/>
 

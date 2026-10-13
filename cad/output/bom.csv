@@ -11,8 +11,19 @@ Sensors,Camera mount (camera_mount.stl),1,3D print PETG
 Payload,"Straight-bar load cell 10 kg, 80x12.7x12.7 mm",4,buy
 Payload,HX711 module,4,buy
 Payload,Load-cell spacer (load_cell_spacer.stl),8,3D print PETG 100 %
-Payload,Cargo plate 270x280x5 (cargo_plate.dxf),1,laser-cut acrylic
-Payload,Anti-slip rubber mat for the cargo plate,1,buy
+Payload,"Cargo plate 270x280x5 (cargo_plate.dxf), left bare so the cargo can slide",1,laser-cut acrylic
+Pusher,"JGB37-520 12 V gear motor, about 110 RPM, 6 mm D-shaft (no encoder needed)",1,buy
+Pusher,BTS7960 (IBT-2) 43 A motor driver,1,buy
+Pusher,"T8 lead screw, 8 mm lead, 350 mm, with brass flange nut - cut to 310 mm",1,buy
+Pusher,"Smooth steel rod 8 mm x 400 mm (linear shaft), not cut",2,buy
+Pusher,LM8UU linear ball bearing,4,buy
+Pusher,"KFL08 flange bearing block, 8 mm bore",1,buy
+Pusher,Flexible shaft coupler 6 mm to 8 mm (D19 x L25),1,buy
+Pusher,"Lever microswitch, subminiature 20x10x6.4 mm (KW11 / SS-5GL type)",2,buy
+Pusher,"Aluminium angle 25x25x2 mm, cut to 296 mm (pusher_blade.step)",1,cut from 1 m bar
+Pusher,"Carriage (pusher_carriage_L.stl, pusher_carriage_R.stl)",2,3D print PETG
+Pusher,"Rod holder (pusher_rail_holder_A.stl x 2, pusher_rail_holder_B.stl x 1)",3,3D print PETG
+Pusher,Drive bracket (pusher_drive_bracket.stl),1,3D print PETG
 Power,3S LiPo 11.1 V 5000 mAh XT60 + balance charger + LiPo bag + voltage alarm,1,buy
 Power,XL4015 5 A buck converter + USB-C pigtail,1,buy
 Power,"Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs",1,buy
@@ -24,3 +35,4 @@ Chassis,"M6 threaded rod, cut to 130 mm",6,cut from 1 m rod
 Chassis,M6 nut + M6 washer,24,buy
 Chassis,M8 nut + M8 washer (casters),4,buy
 Hardware,"M4x12 screws + nylock nuts (motor brackets), M4/M5x16 (load cells), M3/M2.5 screws + standoffs (Pi, camera), VHB tape, velcro strap, zip ties",1,buy
+Hardware,"Pusher: M4x20 + nut + washer x 10 (rod holders, blade, drive bracket, bearing block), M4x25 + nut + washer x 1 (drive bracket, under the motor), M3x16 x 4 (T8 nut), M3x8 socket-head x 4 (motor), M3x8 x 4 (rod pinch screws), M2x10 x 4 (limit switches)",1,buy

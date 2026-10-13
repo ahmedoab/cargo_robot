@@ -21,6 +21,12 @@ PINS = {
     "hx711_dout": [25, 16, 20, 21],   # pins 22, 36, 38, 40 -> front-left, front-right, rear-left, rear-right
     # Motor-power sense (10k / 3.3k divider after the E-stop): 1 = motors powered, 0 = E-stop pressed
     "estop_sense": 26,      # pin 37
+    # Pusher (design v3): a third BTS7960 (its R_EN + L_EN are wired to 3.3 V, so it is always enabled)
+    "pusher_out": 10,       # pin 19 -> pusher BTS7960 RPWM (blade moves to the rear, pushing the cargo off)
+    "pusher_in": 9,         # pin 21 -> pusher BTS7960 LPWM (blade moves back to the front)
+    # Pusher limit switches: C -> GND, NC -> pin (pull-up in software). 0 = not pressed, 1 = pressed OR wire broken
+    "pusher_home": 4,       # pin 7  <- HOME switch (blade parked at the front)
+    "pusher_end": 6,        # pin 31 <- END switch (blade fully out at the rear)
 }
 
 CORNERS = ["front_left", "front_right", "rear_left", "rear_right"]

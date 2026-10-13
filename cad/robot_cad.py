@@ -1,5 +1,5 @@
 """
-Parametric CAD model - Phase II autonomous cargo robot, DESIGN v2 (simplified).
+Parametric CAD model - Phase II autonomous cargo robot, DESIGN v3 (v2 + rear pusher).
 
 Run:   python robot_cad.py          (needs: pip install cadquery)
 Writes ./output/
@@ -8,6 +8,14 @@ Writes ./output/
   dxf/*.dxf             the three plates, ready for the laser cutter (every hole already in them)
   views/*.svg           line drawings
   bom.csv               bill of materials
+
+New in v3 - the rear pusher, which slides the cargo off the back of the robot onto a conveyor:
+  - a blade (aluminium angle) spans the bed 3 mm above the cargo plate, so the load cells never feel it
+  - it rides on two 8 mm rods that run just outside the deck edges, on printed carriages with LM8UU bearings
+  - a T8 lead screw on the right side moves it, turned by a third JGB37 gear motor through a third BTS7960
+  - two limit switches (parked / fully out) end each stroke
+  - it bolts on: the only change to the v2 plates is 5 extra 4.5 mm holes in the top deck
+  The untouched v2 design is kept in ../backup_v2.
 
 Design choices that keep it simple to build:
   - frame: 6 x M6 threaded rod + nuts, instead of 6 printed pillars with heat-set inserts
@@ -19,7 +27,7 @@ Design choices that keep it simple to build:
   - E-stop and master switch mount through the deck, so their wiring stays inside
   - lower electronics bay (100 mm) -> lower centre of gravity, shorter wires
   - battery lies across the robot and slides out sideways for charging
-  - only two small printed parts are left (camera mount, load-cell spacers)
+  - printed parts: camera mount, load-cell spacers, and the pusher's 2 carriages, 3 rod holders, 1 drive bracket
 
 Axes: X = forward, Y = left, Z = up. Origin = floor under the middle of the drive axle. Units: mm.
 Bought parts are simplified envelopes with the right outer sizes (good for layout and clearance checks).
@@ -64,6 +72,24 @@ PI_HOLES = [(PI_POS[0] + dx, PI_POS[1] + dy) for dx in (39, -19) for dy in (-24.
 BATTERY = (50, 155, 35)          # 3S 5000 mAh LiPo lying across the robot (X, Y, Z)
 CAM_FOOT_HOLES = [(184, -13), (184, 13)]
 
+# ---- rear pusher (v3): the drive side is the right side (-Y), the E-stop side stays clear ----
+RAIL_Y = W / 2 + 13              # 8 mm guide rods, one per side, just outside the deck edges
+RAIL_LEN = 400                   # stock rod length, not cut
+SCREW_RISE = 38                  # the T8 lead screw runs this far above the right-hand rod
+SCREW_LEN = 310                  # cut from a 350 mm screw; its rear end is left free
+BLADE = (25, 2)                  # push blade: aluminium angle 25 x 25 x 2
+BLADE_LEN = 296                  # a little wider than the cargo plate, and short of the lead screw
+BLADE_GAP = 3                    # blade's lower edge above the cargo plate (it must never touch the plate)
+PUSH_HOME, PUSH_END = 62, -L / 2 # X of the pushing face: parked / fully out (flush with the rear edge)
+PUSH_OFFSET = 28                 # pushing face -> centre of the carriage's lead-screw nut
+BEARING_GAP = 46                 # between the centres of a carriage's two LM8UU bearings
+HOLDER_BOLT = 38                 # rod holder: outer end face -> its M4 bolt
+FRONT_HOLDER_X = 180             # outer end face of the front-left rod holder
+BRACKET_BOLTS = (94, 170)        # X of the drive bracket's two M4 bolts
+PUSHER_HOLES = ([(-L / 2 + HOLDER_BOLT, s * (W / 2 - 10)) for s in (-1, 1)]       # rear rod holders
+                + [(FRONT_HOLDER_X - HOLDER_BOLT, W / 2 - 10)]                      # front-left rod holder
+                + [(x, -(W / 2 - 11)) for x in BRACKET_BOLTS])                      # drive bracket (front right)
+
 # ---- derived Z levels ----
 Z_BASE = AXLE_Z + MOTOR_DROP     # underside of bottom plate = 72
 Z_LOWER = Z_BASE + BASE_T        # top of bottom plate = 78
@@ -71,6 +97,10 @@ Z_DECK = Z_LOWER + BAY_H         # underside of deck = 178
 Z_DECK_TOP = Z_DECK + DECK_T     # 183
 Z_CELL = Z_DECK_TOP + 5          # load cells sit on 5 mm spacers
 Z_CARGO = Z_CELL + CELL[2] + 5   # underside of cargo plate
+RAIL_Z = Z_DECK                  # guide rods level with the deck's underside
+SCREW_Z = RAIL_Z + SCREW_RISE    # 216
+Z_BLADE = Z_CARGO + CARGO_T + BLADE_GAP          # lower edge of the blade = 213.7
+Z_BLADE_SEAT = Z_BLADE + BLADE[0] - BLADE[1]     # underside of the blade's top leg (it rests on the carriages)
 
 
 def cell_layout(cx):
@@ -97,11 +127,17 @@ RED = (0.85, 0.10, 0.10, 1)
 YELLOW = (0.95, 0.80, 0.10, 1)
 BATT = (0.20, 0.30, 0.80, 1)
 MOTOR = (0.35, 0.35, 0.38, 1)
+ALU = (0.80, 0.82, 0.86, 1)
 
 
 # ============================== HELPERS ==============================
 def box(sx, sy, sz, cx=0, cy=0, cz=0):
     return cq.Workplane("XY").box(sx, sy, sz).translate((cx, cy, cz))
+
+
+def box2(x0, x1, y0, y1, z0, z1):
+    """Box given by its lowest and highest corner."""
+    return box(x1 - x0, y1 - y0, z1 - z0, (x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2)
 
 
 def cyl_z(d, h, cx=0, cy=0, z0=0):
@@ -112,6 +148,12 @@ def cyl_y(d, y0, y1, cx=0, cz=0):
     """Cylinder along +Y from y0 to y1 (y1 > y0)."""
     return (cq.Workplane("XY").circle(d / 2).extrude(y1 - y0)
             .rotate((0, 0, 0), (1, 0, 0), -90).translate((cx, y0, cz)))
+
+
+def cyl_x(d, x0, x1, cy=0, cz=0):
+    """Cylinder along +X from x0 to x1 (x1 > x0)."""
+    return (cq.Workplane("XY").circle(d / 2).extrude(x1 - x0)
+            .rotate((0, 0, 0), (0, 1, 0), 90).translate((x0, cy, cz)))
 
 
 def hex_nut(af, h, cx, cy, z0, hole):
@@ -177,6 +219,7 @@ def top_deck():
     p = drill(p, ROD_PTS, 6.5, z0, h)
     p = drill(p, [ESTOP_POS], 22.5, z0, h)
     p = drill(p, [SWITCH_POS], 12.2, z0, h)
+    p = drill(p, PUSHER_HOLES, 4.5, z0, h)       # pusher: 3 rod holders + drive bracket (M4)
     p = p.cut(box(12, 80, h, 83, 0, zc))         # wiring pass-through (lidar USB, load-cell wires)
     zone = CELL_ZONE[1] - CELL_ZONE[0]
     for cx in CELL_X:
@@ -293,8 +336,7 @@ for tag, s in (("front", 1), ("rear", -1)):
 # ---------- Electronics bay (on the bottom plate, z = Z_LOWER) ----------
 z = Z_LOWER
 add("electronics", "battery_3S_5000mAh", box(*BATTERY, 0, 0, z + BATTERY[2] / 2), BATT)
-for tag, y in (("L", 60), ("R", -60)):
-    x = -150
+for tag, x, y in (("L", -150, 60), ("R", -150, -60), ("P", 120, -65)):     # P = pusher motor driver
     add("electronics", f"BTS7960_{tag}_pcb", box(50, 50, 1.6, x, y, z + 1.0), PCB)
     add("electronics", f"BTS7960_{tag}_heatsink", box(40, 40, 20, x, y, z + 1.8 + 10), BLACK)
 px, py = PI_POS
@@ -378,13 +420,173 @@ for i, (x, y) in enumerate([(-90, -45), (-90, 45), (-30, -45), (-30, 45)]):   # 
 add("payload", "cargo_plate", cargo_plate(), ACRYLIC, fab=True)
 
 
+# ---------- Rear pusher (v3): a blade on a lead screw slides the cargo off the rear ----------
+# The left-hand version of every handed part is modelled; the right-hand one is its mirror image.
+X_NUT_HOME = PUSH_HOME + PUSH_OFFSET             # lead-screw nut (= rear bearing) with the blade parked
+X_BEAM_HOME = X_NUT_HOME + BEARING_GAP + 16      # front end of a carriage with the blade parked
+X_KFL = X_NUT_HOME + 5.5                         # rear face of the lead screw's bearing block
+X_PLATE = X_KFL + 40.5                           # rear face of the motor wall
+X_LUG = X_BEAM_HOME + 16                         # rear face of the drive bracket's rod holder
+HOME_REACH = FRONT_HOLDER_X - 15 - X_BEAM_HOME   # from the left carriage's front end to the HOME switch's plunger
+SCREW_X1 = X_KFL + 25.5                          # front end of the lead screw, inside the coupler
+MOTOR_DY = -7                                    # JGB37 gearbox: its centre is 7 mm inboard of the output shaft
+
+
+def pusher_carriage(face, finger=False):
+    """Left carriage with the blade's pushing face at X = face: two LM8UU bearings on the rod (pressed in
+    from the rear, stopped by the front cap), a seat for the T8 nut and an arm for the blade.
+    finger: the finger on the front end that presses the HOME switch. Only the left carriage has it;
+    on the right it would hit the drive bracket's walls."""
+    xn = face + PUSH_OFFSET
+    x0, x1 = xn - 13, xn + BEARING_GAP + 16
+    c = (box2(x0, x1, RAIL_Y - 10.5, RAIL_Y + 10.5, RAIL_Z - 10.5, RAIL_Z + 10.5)             # bearing beam
+         .union(box2(x0, xn + 1, RAIL_Y - 11, RAIL_Y + 12, RAIL_Z + 10.5, Z_BLADE_SEAT))      # nut block
+         .union(box2(face + BLADE[1], xn - 3, BLADE_LEN / 2 - 26, RAIL_Y + 12,                # arm under the blade's top leg
+                     Z_BLADE_SEAT - 12, Z_BLADE_SEAT)))
+    if finger:
+        c = c.union(box2(x1 - 12, x1 + HOME_REACH, RAIL_Y - 4, RAIL_Y + 5, RAIL_Z + 10.5, RAIL_Z + 19))
+    c = c.cut(cyl_x(15.2, x0 - 1, x1 - 3, RAIL_Y, RAIL_Z)).cut(cyl_x(10, x1 - 4, x1 + 1, RAIL_Y, RAIL_Z))
+    c = c.cut(cyl_x(10.6, x0 - 1, xn + 2, RAIL_Y, SCREW_Z))                                   # T8 nut body
+    for dy in (-5.66, 5.66):                                                                  # nut flange: 4 x M3 on a 16 mm circle
+        for dz in (-5.66, 5.66):
+            c = c.cut(cyl_x(2.6, x0 + 2, xn + 2, RAIL_Y + dy, SCREW_Z + dz))
+    return drill(c, [(x, y) for x, y in blade_bolts(face) if y > 0], 4.3, Z_BLADE_SEAT - 13, 14)
+
+
+def blade_bolts(face):
+    """XY of the 4 M4 bolts that hold the blade on the two carriage arms."""
+    return [(face + BLADE[0] / 2 + 1, s * (BLADE_LEN / 2 - d)) for s in (-1, 1) for d in (8, 20)]
+
+
+def pusher_blade(face):
+    """Aluminium angle: one leg hangs down as the pushing face, the other lies on top of the carriage arms.
+    It stops short of the lead screw, so it is a plain length of angle with 4 holes."""
+    a, t = BLADE
+    b = (box2(face, face + t, -BLADE_LEN / 2, BLADE_LEN / 2, Z_BLADE, Z_BLADE + a)            # pushing face
+         .union(box2(face, face + a, -BLADE_LEN / 2, BLADE_LEN / 2, Z_BLADE_SEAT, Z_BLADE + a)))
+    return drill(b, blade_bolts(face), 4.3, Z_BLADE_SEAT - 1, t + 2)
+
+
+def lm8uu(xc, y):
+    return cyl_x(15, xc - 12, xc + 12, y, RAIL_Z).cut(cyl_x(8, xc - 13, xc + 13, y, RAIL_Z))
+
+
+def t8_nut(xn):
+    """Brass flange nut; the flange sits on the front face of the carriage's nut block."""
+    return (cyl_x(22, xn + 1, xn + 4.5, -RAIL_Y, SCREW_Z).union(cyl_x(10.2, xn - 10.5, xn + 1, -RAIL_Y, SCREW_Z))
+            .cut(cyl_x(8, xn - 11.5, xn + 5.5, -RAIL_Y, SCREW_Z)))
+
+
+def pusher_moving(face=PUSH_HOME):
+    """(name, shape, colour) of everything that travels with the blade, pushing face at X = face."""
+    xn = face + PUSH_OFFSET
+    parts = [("pusher_blade", pusher_blade(face), ALU),
+             ("pusher_carriage_L", pusher_carriage(face, finger=True), PRINT),
+             ("pusher_carriage_R", pusher_carriage(face).mirror("XZ"), PRINT),
+             ("pusher_nut", t8_nut(xn), BRASS)]
+    for side, s in (("L", 1), ("R", -1)):
+        for i, xc in enumerate((xn, xn + BEARING_GAP)):
+            parts.append((f"pusher_bearing_{side}{i}", lm8uu(xc, s * RAIL_Y), STEEL))
+    return parts
+
+
+def rail_holder(x0):
+    """Left rod holder, outer end face at X = x0, foot pointing towards +X. It clips over the deck edge
+    (block outside, strip on top, lip underneath) and is locked by one M4 bolt through the deck."""
+    edge = W / 2
+    h = (box2(x0, x0 + 14, edge, RAIL_Y + 13, RAIL_Z - 10, RAIL_Z + 13)                       # grips the rod
+         .union(box2(x0, x0 + 14, edge - 8, edge, RAIL_Z - 8, RAIL_Z))                        # lip under the deck
+         .union(box2(x0, x0 + 28, edge - 7.5, edge, Z_DECK_TOP, Z_DECK_TOP + 8))              # strip: passes the frame-rod nut
+         .union(box2(x0 + 28, x0 + 48, edge - 18, edge, Z_DECK_TOP, Z_DECK_TOP + 8)))         # bolt pad
+    h = h.cut(cyl_x(8.1, x0 - 1, x0 + 15, RAIL_Y, RAIL_Z))
+    h = drill(h, [(x0 + HOLDER_BOLT, edge - 10)], 4.5, Z_DECK_TOP - 1, 10)
+    h = drill(h, [(x0 + 7, RAIL_Y)], 2.6, RAIL_Z - 11, 8)                                     # M3 screw pinches the rod
+    return drill(h, [(x0 + 6.9, RAIL_Y + 0.5 + d) for d in (-4.75, 4.75)], 1.7, RAIL_Z + 7, 7)   # limit switch on top (M2)
+
+
+def drive_bracket():
+    """Drive bracket, left-hand version: a base bar on the deck, a wall for the lead screw's bearing block,
+    a wall for the motor and a holder for the front end of the rod.
+    The outer half of each wall starts above the rod so the carriage can pass underneath."""
+    edge, zt = W / 2, Z_DECK_TOP
+    y_in, y_out, z_pass = edge - 22, RAIL_Y + 14, RAIL_Z + 13
+    b = (box2(X_KFL - 7.5, X_LUG + 10, y_in, edge, zt, zt + 8)                                # base bar
+         .union(box2(X_KFL + 5, X_KFL + 11, y_in, edge, zt + 8, SCREW_Z + 26))                # bearing wall
+         .union(box2(X_KFL + 5, X_KFL + 11, edge, y_out, z_pass, SCREW_Z + 26))
+         .union(box2(X_PLATE, X_PLATE + 4, y_in, edge, zt + 8, SCREW_Z + 22))                 # motor wall
+         .union(box2(X_PLATE, X_PLATE + 4, edge, y_out, z_pass, SCREW_Z + 22))
+         .union(box2(X_KFL + 11, X_PLATE, y_in, y_in + 4, zt + 8, SCREW_Z + 22))              # web joining the walls
+         .union(box2(X_LUG - 4, X_LUG + 10, y_in, edge, zt, RAIL_Z + 17.5))                   # rod holder: on the deck,
+         .union(box2(X_LUG, X_LUG + 10, edge, RAIL_Y + 13, RAIL_Z - 10, RAIL_Z + 17.5))       #   outside the edge,
+         .union(box2(X_LUG, X_LUG + 10, edge - 8, edge, RAIL_Z - 8, RAIL_Z)))                 #   lip under the deck
+    b = b.cut(cyl_x(25, X_KFL + 4, X_KFL + 12, RAIL_Y, SCREW_Z))                              # bearing block's boss
+    for dz in (-18.5, 18.5):                                                                  # its 2 bolts (M4)
+        b = b.cut(cyl_x(4.5, X_KFL + 4, X_KFL + 12, RAIL_Y, SCREW_Z + dz))
+    b = b.cut(cyl_x(13, X_PLATE - 1, X_PLATE + 5, RAIL_Y, SCREW_Z))                           # motor shaft and boss
+    for a in (90, 150, 210, 270):          # motor face: M3 on a 31 mm circle (the 2 holes next to the shaft are
+                                           # left out: screw heads there would rub on the coupler)
+        r = math.radians(a)
+        b = b.cut(cyl_x(3.3, X_PLATE - 1, X_PLATE + 5, RAIL_Y + MOTOR_DY + 15.5 * math.cos(r),
+                        SCREW_Z + 15.5 * math.sin(r)))
+    b = b.cut(cyl_x(8.1, X_LUG - 1, X_LUG + 11, RAIL_Y, RAIL_Z))
+    b = drill(b, [(x, edge - 11) for x in BRACKET_BOLTS], 4.5, zt - 1, 15)
+    return drill(b, [(X_LUG + 5, RAIL_Y)], 2.6, RAIL_Z - 11, 8)                               # M3 screw pinches the rod
+
+
+def limit_switch(x0, x1, y0, y1, z0, z1, plunger):
+    """Subminiature lever microswitch (20 x 10 x 6.4 mm body) with its plunger pressed in."""
+    return box2(x0, x1, y0, y1, z0, z1).union(box2(*plunger))
+
+
+for side, s in (("L", 1), ("R", -1)):
+    add("pusher", f"pusher_rail_{side}", cyl_x(8, -L / 2, -L / 2 + RAIL_LEN, s * RAIL_Y, RAIL_Z), STEEL)
+
+holder_b = rail_holder(-L / 2)                                       # rear left
+holder_a = holder_b.mirror("XZ")                                     # rear right, and (turned round) front left
+add("pusher", "pusher_rail_holder_rear_L", holder_b, PRINT)
+add("pusher", "pusher_rail_holder_rear_R", holder_a, PRINT)
+add("pusher", "pusher_rail_holder_front_L",
+    holder_a.rotate((0, 0, 0), (0, 0, 1), 180).translate((FRONT_HOLDER_X - L / 2, 0, 0)), PRINT)
+fabricated["pusher_rail_holder_A"] = holder_a
+fabricated["pusher_rail_holder_B"] = holder_b
+
+add("pusher", "pusher_drive_bracket", drive_bracket().mirror("XZ"), PRINT, fab=True)
+add("pusher", "pusher_lead_screw", cyl_x(8, SCREW_X1 - SCREW_LEN, SCREW_X1, -RAIL_Y, SCREW_Z), STEEL)
+add("pusher", "pusher_bearing_block_KFL08",
+    (box2(X_KFL, X_KFL + 5, RAIL_Y - 13.5, RAIL_Y + 13.5, SCREW_Z - 24, SCREW_Z + 24)
+     .union(cyl_x(24, X_KFL + 5, X_KFL + 13, RAIL_Y, SCREW_Z))
+     .cut(cyl_x(8, X_KFL - 1, X_KFL + 14, RAIL_Y, SCREW_Z))).mirror("XZ"), ALU)
+add("pusher", "pusher_coupler",
+    (cyl_x(19, X_KFL + 14, X_KFL + 39, RAIL_Y, SCREW_Z)
+     .cut(cyl_x(8, X_KFL + 13, X_KFL + 26, RAIL_Y, SCREW_Z))
+     .cut(cyl_x(6, X_KFL + 26, X_KFL + 40, RAIL_Y, SCREW_Z))).mirror("XZ"), ALU)
+add("pusher", "pusher_motor_shaft", cyl_x(6, X_KFL + 26.5, X_PLATE + 4, -RAIL_Y, SCREW_Z), STEEL)
+add("pusher", "pusher_gearmotor",
+    (cyl_x(37, X_PLATE + 4, X_PLATE + 30, RAIL_Y + MOTOR_DY, SCREW_Z)
+     .union(cyl_x(35, X_PLATE + 30, X_PLATE + 62, RAIL_Y + MOTOR_DY, SCREW_Z))).mirror("XZ"), MOTOR)
+add("pusher", "pusher_switch_home",                                  # on the front-left rod holder; the left carriage's finger presses it
+    limit_switch(FRONT_HOLDER_X - 14.2, FRONT_HOLDER_X - 4, RAIL_Y - 9.4, RAIL_Y + 10.4, RAIL_Z + 13, RAIL_Z + 19.4,
+                 (FRONT_HOLDER_X - 15, FRONT_HOLDER_X - 14.2, RAIL_Y - 1, RAIL_Y + 2, RAIL_Z + 14.7, RAIL_Z + 17.7)),
+    BLACK)
+add("pusher", "pusher_switch_end",                                   # on the rear-right rod holder; the right carriage presses it
+    limit_switch(-L / 2 + 4, -L / 2 + 14.2, RAIL_Y - 9.4, RAIL_Y + 10.4, RAIL_Z + 13, RAIL_Z + 19.4,
+                 (-L / 2 + 14.2, -L / 2 + 15, RAIL_Y - 1, RAIL_Y + 2, RAIL_Z + 14.7, RAIL_Z + 17.7)).mirror("XZ"),
+    BLACK)
+
+MOVING = [name for name, _, _ in pusher_moving()]
+for name, wp, color in pusher_moving():
+    add("pusher", name, wp, color, fab=name.startswith(("pusher_blade", "pusher_carriage")))
+
+
 # ============================== EXPORT ==============================
-def build_assembly():
-    assy = cq.Assembly(name="cargo_robot_v2")
+def build_assembly(push_face=PUSH_HOME):
+    """The whole robot. push_face = X of the blade's pushing face (PUSH_HOME = parked ... PUSH_END = fully out)."""
+    moved = {} if push_face == PUSH_HOME else {name: wp for name, wp, _ in pusher_moving(push_face)}
+    assy = cq.Assembly(name="cargo_robot_v3")
     for gname, items in groups.items():
         sub = cq.Assembly(name=gname)
         for name, wp, color in items:
-            sub.add(wp, name=name, color=cq.Color(*color))
+            sub.add(moved.get(name, wp), name=name, color=cq.Color(*color))
         assy.add(sub, name=gname)
     return assy
 
@@ -403,8 +605,21 @@ BOM = [
     ("Payload", "Straight-bar load cell 10 kg, 80x12.7x12.7 mm", 4, "buy"),
     ("Payload", "HX711 module", 4, "buy"),
     ("Payload", "Load-cell spacer (load_cell_spacer.stl)", 8, "3D print PETG 100 %"),
-    ("Payload", f"Cargo plate {CARGO[0]}x{CARGO[1]}x{CARGO_T} (cargo_plate.dxf)", 1, "laser-cut acrylic"),
-    ("Payload", "Anti-slip rubber mat for the cargo plate", 1, "buy"),
+    ("Payload", f"Cargo plate {CARGO[0]}x{CARGO[1]}x{CARGO_T} (cargo_plate.dxf), left bare so the cargo can slide", 1,
+     "laser-cut acrylic"),
+    ("Pusher", "JGB37-520 12 V gear motor, about 110 RPM, 6 mm D-shaft (no encoder needed)", 1, "buy"),
+    ("Pusher", "BTS7960 (IBT-2) 43 A motor driver", 1, "buy"),
+    ("Pusher", f"T8 lead screw, 8 mm lead, 350 mm, with brass flange nut - cut to {SCREW_LEN} mm", 1, "buy"),
+    ("Pusher", f"Smooth steel rod 8 mm x {RAIL_LEN} mm (linear shaft), not cut", 2, "buy"),
+    ("Pusher", "LM8UU linear ball bearing", 4, "buy"),
+    ("Pusher", "KFL08 flange bearing block, 8 mm bore", 1, "buy"),
+    ("Pusher", "Flexible shaft coupler 6 mm to 8 mm (D19 x L25)", 1, "buy"),
+    ("Pusher", "Lever microswitch, subminiature 20x10x6.4 mm (KW11 / SS-5GL type)", 2, "buy"),
+    ("Pusher", f"Aluminium angle {BLADE[0]}x{BLADE[0]}x{BLADE[1]} mm, cut to {BLADE_LEN} mm (pusher_blade.step)", 1,
+     "cut from 1 m bar"),
+    ("Pusher", "Carriage (pusher_carriage_L.stl, pusher_carriage_R.stl)", 2, "3D print PETG"),
+    ("Pusher", "Rod holder (pusher_rail_holder_A.stl x 2, pusher_rail_holder_B.stl x 1)", 3, "3D print PETG"),
+    ("Pusher", "Drive bracket (pusher_drive_bracket.stl)", 1, "3D print PETG"),
     ("Power", "3S LiPo 11.1 V 5000 mAh XT60 + balance charger + LiPo bag + voltage alarm", 1, "buy"),
     ("Power", "XL4015 5 A buck converter + USB-C pigtail", 1, "buy"),
     ("Power", "Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs", 1, "buy"),
@@ -417,6 +632,9 @@ BOM = [
     ("Chassis", "M8 nut + M8 washer (casters)", 4, "buy"),
     ("Hardware", "M4x12 screws + nylock nuts (motor brackets), M4/M5x16 (load cells), M3/M2.5 screws + "
                  "standoffs (Pi, camera), VHB tape, velcro strap, zip ties", 1, "buy"),
+    ("Hardware", "Pusher: M4x20 + nut + washer x 10 (rod holders, blade, drive bracket, bearing block), M4x25 + nut "
+                 "+ washer x 1 (drive bracket, under the motor), M3x16 x 4 (T8 nut), M3x8 socket-head x 4 (motor), "
+                 "M3x8 x 4 (rod pinch screws), M2x10 x 4 (limit switches)", 1, "buy"),
 ]
 
 

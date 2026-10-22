@@ -4,7 +4,7 @@
 //   Encoder     quadrature counter in the ESP32's pulse-counter hardware (x4 decoding, no CPU load)
 //   HX711Array  the 4 HX711 boards on one shared clock line
 //   Expander    MCP23017 over I2C: line sensors, motor enable, buzzer, LEDs, start button
-//   sonar::     the 3 HC-SR04 on one TRIG line; echo times measured with interrupts
+//   sonar::     the HC-SR04 in front; echo time measured with an interrupt
 //   BedServo    one servo signal (50 Hz pulses); no pulses = the servo goes limp
 //   sideMm()    VL53L0X distance to whatever is beside the robot's right side
 //   busVolts()  motor 12 V bus, through the divider
@@ -58,7 +58,7 @@ class Expander {
 namespace sonar {
 void begin();
 void update();                     // call often: pings every SONAR_PERIOD_MS
-float cm(int i);                   // 0 = left, 1 = centre, 2 = right; SONAR_MAX_CM = nothing there
+float cm();                        // distance straight ahead; SONAR_MAX_CM = nothing there
 }  // namespace sonar
 
 class BedServo {

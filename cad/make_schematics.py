@@ -8,7 +8,7 @@ Writes ./autocad/
   CargoRobot_v2_schematics.pdf   the same 4 sheets (colour, A3)
   previews/E0x_*.png
 
-The pin numbers come from firmware/cargo_robot/config.h (through wiring.py) and the wire IDs (P1..P19, S1..S40) match the
+The pin numbers come from firmware/cargo_robot/config.h (through wiring.py) and the wire IDs (P1..P19, S1..S38) match the
 wire lists in BUILD_GUIDE.md (weeks 2 and 3).
 """
 from pathlib import Path
@@ -272,7 +272,7 @@ def sheet_block_diagram():
                                               "obstacles", "tilting bed", "mission + safety"]),
         "hx": (330, 205, 400, 230, "4 x HX711", ["+ 4 x 10 kg", "load cells"]),
         "servo": (330, 165, 400, 190, "SV1 + SV2", ["60 kg.cm servos", "tilt the bed"]),
-        "sonar": (330, 125, 400, 150, "3 x HC-SR04", ["ultrasonic, front", "ECHO via 1k/2k"]),
+        "sonar": (330, 125, 400, 150, "HC-SR04", ["ultrasonic, front", "ECHO via 1k/2k"]),
         "mcp": (165, 95, 215, 135, "U4 MCP23017", ["I2C 0x20", "I/O expander"]),
         "tof": (95, 140, 145, 162, "VL53L0X", ["side distance", "I2C 0x29"]),
         "line": (95, 105, 145, 127, "LINE SENSOR", ["8 x TCRT5000"]),
@@ -303,7 +303,7 @@ def sheet_block_diagram():
     text(psp, "encoders A/B x2", (338, 239.5), h=2.0, align=TA.BOTTOM_CENTER, layer="NET-SIGNAL")
     arrow(psp, (330, 214), (300, 214), "NET-SIGNAL", "DT x4 + SCK", label_pos=(315, 208))
     arrow(psp, (300, 180), (330, 180), "NET-SIGNAL", "2 x signal")
-    arrow(psp, (330, 137), (300, 137), "NET-SIGNAL", "TRIG + ECHO x3", both=True, label_pos=(315, 139))
+    arrow(psp, (330, 137), (300, 137), "NET-SIGNAL", "TRIG + ECHO", both=True, label_pos=(315, 139))
     arrow(psp, (215, 115), (240, 115), "NET-SIGNAL", "I2C", both=True)
     line(psp, [(228, 115), (228, 151), (145, 151)], "NET-SIGNAL")
     dot(psp, (228, 115), "NET-SIGNAL")
@@ -356,7 +356,7 @@ def sheet_power():
     text(psp, "P15", (210, 200), h=1.9, layer="NET-5V")
     rect(psp, 225, 176, 280, 212)
     text(psp, "5 V BUS (WAGO)", (252.5, 209), h=2.2, align=TA.TOP_CENTER)
-    for k, s in enumerate(("ESP32 5V / VIN pin", "3 x HC-SR04 VCC", "(3.3 V for logic comes", " from the ESP32 3V3 pin)")):
+    for k, s in enumerate(("ESP32 5V / VIN pin", "HC-SR04 VCC", "(3.3 V for logic comes", " from the ESP32 3V3 pin)")):
         text(psp, s, (252.5, 204 - k * 4), h=1.8, align=TA.TOP_CENTER)
     text(psp, "5V", (226, 205), h=1.8, align=TA.MIDDLE_LEFT)
     text(psp, "GND", (226, 186), h=1.8, align=TA.MIDDLE_LEFT)
@@ -424,7 +424,7 @@ def sheet_power():
          layer="NET-SIGNAL")
     resistor_v(psp, 270, 80, 66, "R2", "2.2 k", "NET-GND")
     ground(psp, (270, 66))
-    text(psp, "S40", (272, 83), h=1.9, layer="NET-SIGNAL")
+    text(psp, "S38", (272, 83), h=1.9, layer="NET-SIGNAL")
     # LiPo alarm + notes
     rect(psp, 28, 150, 92, 168)
     text(psp, "LiPo voltage alarm", (60, 165), h=2.1, align=TA.TOP_CENTER)
@@ -466,8 +466,7 @@ def esp_nets():
         nets[str(P[key])] = net
     for gpio, corner in zip(P["PIN_HX_DT"], ("FL", "FR", "RL", "RR")):
         nets[str(gpio)] = f"HX_{corner}_DT"
-    for gpio, side in zip(P["PIN_ECHO"], ("L", "C", "R")):
-        nets[str(gpio)] = f"ECHO_{side}"
+    nets[str(P["PIN_SONAR_ECHO"])] = "SONAR_ECHO"
     return nets
 
 
@@ -553,26 +552,25 @@ def sheet_esp32():
          (28, 79), h=1.8)
     text(psp, "A cell that reads negative: swap its A+/A- (green/white), or keep sign -1 (\"cal\" sets it).",
          (28, 75.5), h=1.8)
-    # ultrasonic sensors (bottom right)
-    for i, (side, name) in enumerate((("L", "LEFT"), ("C", "CENTRE"), ("R", "RIGHT"))):
-        x0 = 238 + i * 58
-        rect(psp, x0, 100, x0 + 30, 116)
-        text(psp, f"HC-SR04 {name}", (x0 + 15, 108), h=1.9, align=TA.MIDDLE_CENTER)
-        for k, (pin, net) in enumerate((("VCC", "+5V"), ("TRIG", "SONAR_TRIG"), ("ECHO", ""), ("GND", "GND"))):
-            x = x0 + 4 + k * 7.3
-            text(psp, pin, (x, 101.5), h=1.3, align=TA.BOTTOM_CENTER)
-            line(psp, [(x, 100), (x, 95)], net_layer(net) if net else "NET-SIGNAL")
-            if net:
-                text(psp, net, (x + 0.6, 94), h=1.6, align=TA.MIDDLE_RIGHT, layer=net_layer(net), rot=90)
-        xe = x0 + 4 + 2 * 7.3
-        resistor_v(psp, xe, 95, 81, "", "1k", "NET-SIGNAL")
-        dot(psp, (xe, 81), "NET-SIGNAL")
-        line(psp, [(xe, 81), (xe + 18, 81)], "NET-SIGNAL")
-        net_label(psp, (xe + 19, 81), f"ECHO_{side}", TA.MIDDLE_LEFT, h=1.9)
-        resistor_v(psp, xe, 81, 67, "", "2k", "NET-GND")
-        ground(psp, (xe, 67))
-    text(psp, "ECHO is 5 V: the 1k / 2k divider makes it 3.3 V.", (238, 121), h=1.8)
-    text(psp, "Same net name = same wire. Wire IDs S1..S40: BUILD_GUIDE.md week 3.", (28, 70), h=1.9)
+    # ultrasonic sensor (bottom right)
+    x0 = 296
+    rect(psp, x0, 100, x0 + 30, 116)
+    text(psp, "HC-SR04 (front)", (x0 + 15, 108), h=1.9, align=TA.MIDDLE_CENTER)
+    for k, (pin, net) in enumerate((("VCC", "+5V"), ("TRIG", "SONAR_TRIG"), ("ECHO", ""), ("GND", "GND"))):
+        x = x0 + 4 + k * 7.3
+        text(psp, pin, (x, 101.5), h=1.3, align=TA.BOTTOM_CENTER)
+        line(psp, [(x, 100), (x, 95)], net_layer(net) if net else "NET-SIGNAL")
+        if net:
+            text(psp, net, (x + 0.6, 94), h=1.6, align=TA.MIDDLE_RIGHT, layer=net_layer(net), rot=90)
+    xe = x0 + 4 + 2 * 7.3
+    resistor_v(psp, xe, 95, 81, "", "1k", "NET-SIGNAL")
+    dot(psp, (xe, 81), "NET-SIGNAL")
+    line(psp, [(xe, 81), (xe + 18, 81)], "NET-SIGNAL")
+    net_label(psp, (xe + 19, 81), "SONAR_ECHO", TA.MIDDLE_LEFT, h=1.9)
+    resistor_v(psp, xe, 81, 67, "", "2k", "NET-GND")
+    ground(psp, (xe, 67))
+    text(psp, "ECHO is 5 V: the 1k / 2k divider makes it 3.3 V.", (296, 121), h=1.8)
+    text(psp, "Same net name = same wire. Wire IDs S1..S38: BUILD_GUIDE.md week 3.", (28, 70), h=1.9)
     return psp
 
 

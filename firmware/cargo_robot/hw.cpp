@@ -150,20 +150,18 @@ void Expander::out(int pin, bool on) {
 // ---------------- sonar ----------------
 namespace sonar {
 namespace {
-volatile uint32_t riseUs[3];
-volatile uint32_t widthUs[3];
-volatile bool fresh[3];
-float lastCm[3] = {SONAR_MAX_CM, SONAR_MAX_CM, SONAR_MAX_CM};
+volatile uint32_t riseUs = 0, widthUs = 0;
+volatile bool fresh = false;
+float lastCm = SONAR_MAX_CM;
 uint32_t lastPing = 0;
 
-void IRAM_ATTR onEcho(void *arg) {
-  int i = (int)(intptr_t)arg;
+void IRAM_ATTR onEcho() {
   uint32_t now = micros();
-  if (digitalRead(PIN_ECHO[i])) {
-    riseUs[i] = now;
+  if (digitalRead(PIN_SONAR_ECHO)) {
+    riseUs = now;
   } else {
-    widthUs[i] = now - riseUs[i];
-    fresh[i] = true;
+    widthUs = now - riseUs;
+    fresh = true;
   }
 }
 }  // namespace
@@ -171,25 +169,21 @@ void IRAM_ATTR onEcho(void *arg) {
 void begin() {
   pinMode(PIN_SONAR_TRIG, OUTPUT);
   digitalWrite(PIN_SONAR_TRIG, LOW);
-  for (int i = 0; i < 3; i++) {
-    pinMode(PIN_ECHO[i], INPUT);
-    attachInterruptArg(PIN_ECHO[i], onEcho, (void *)(intptr_t)i, CHANGE);
-  }
+  pinMode(PIN_SONAR_ECHO, INPUT);
+  attachInterrupt(PIN_SONAR_ECHO, onEcho, CHANGE);
 }
 
 void update() {
   if (millis() - lastPing < SONAR_PERIOD_MS) return;
   lastPing = millis();
-  for (int i = 0; i < 3; i++) {                   // results of the previous ping
-    lastCm[i] = fresh[i] ? min(widthUs[i] / 58.0f, SONAR_MAX_CM) : SONAR_MAX_CM;
-    fresh[i] = false;
-  }
-  digitalWrite(PIN_SONAR_TRIG, HIGH);             // all 3 sensors ping at once
+  lastCm = fresh ? min(widthUs / 58.0f, SONAR_MAX_CM) : SONAR_MAX_CM;   // result of the previous ping
+  fresh = false;
+  digitalWrite(PIN_SONAR_TRIG, HIGH);
   delayMicroseconds(10);
   digitalWrite(PIN_SONAR_TRIG, LOW);
 }
 
-float cm(int i) { return lastCm[i]; }
+float cm() { return lastCm; }
 }  // namespace sonar
 
 // ---------------- BedServo ----------------

@@ -347,7 +347,7 @@ def sheet_ga():
         "4. Frame: 6 mm plywood + 5 mm acrylic on 6 x M6 threaded rod.",
         f"5. Bed: tipped {rc.TIP_ANGLE} deg to the right by 2 servos on the hinge line.",
         "6. Payload: 4 x 10 kg load cells under the cargo plate; packages up to 3 kg.",
-        "7. ESP32 + 8-ch IR line sensor, 3 x HC-SR04, VL53L0X (right side).",
+        "7. ESP32 + 8-ch IR line sensor (under), HC-SR04 (front), VL53L0X (right side).",
         "8. Sheets: 01 GA, 02 layout, 03-06 plates, 07 bed, 08-09 prints, 10 BOM.",
     ], 233, 150, h=2.3)
 
@@ -370,8 +370,8 @@ def sheet_layout():
         ("WAGO power buses (+12 V main / motor / 5 V / GND)", (-85, -20), (16, 10)),
         ("Inline fuse 10 A", (45, -110), (20, 2)),
         ("Buzzer", (-110, 105), (-14, -6)),
-        ("3 x HC-SR04 ultrasonic on printed bracket", (196, 0), (8, 18)),
-        ("8-channel IR line sensor (under the front edge)", (214, 45), (-16, 12)),
+        ("HC-SR04 ultrasonic on printed bracket", (196, 0), (8, 18)),
+        ("8-channel IR line sensor (under the plate)", (rc.LINE_X, 0), (14, 26)),
         ("M6 threaded rod (x6)", (60, 135), (-14, 0)),
         ("Drive wheel D100 (motor under the plate)", (0, rc.WHEEL_Y), (-6, -30)),
         ("Motor / encoder cable slot (x2)", (40, -70), (16, -4)),
@@ -618,7 +618,7 @@ def sheet_printed_2():
     overall(sh, lfront, b, "y")
     lside.label("LINE SENSOR BRACKET - SIDE", gap=18)
     lfront.label("FROM THE FRONT", gap=18)
-    text(sh.psp, "Flange under the bottom plate: 2 x D3.4, 40 mm apart, 16 mm behind the plate's front edge.",
+    text(sh.psp, f"Flange under the bottom plate: 2 x D3.4 on the centre line, 24 mm apart (X = {rc.LINE_X} +-12).",
          (25, 188), h=2.2)
     text(sh.psp, "The sensor board hangs under the shelf: 2 x D3.0 (M3), 100 mm apart.", (25, 183.5), h=2.2)
     # ultrasonic bracket
@@ -628,7 +628,7 @@ def sheet_printed_2():
     sfront = View(so, *FRONT).place(sh, (175, 96))
     overall(sh, splan, sb, "y")
     overall(sh, sfront, sb, "z", vertical=True)
-    splan.label(f"ULTRASONIC BRACKET - PLAN (front up; side faces turned {rc.SONAR_YAW} deg)", gap=17)
+    splan.label("ULTRASONIC BRACKET - PLAN (front up)", gap=17)
     sfront.label("FROM THE FRONT - windows D16.5 for the transducers", gap=8)
     # side sensor bracket
     tb, _ = local(rc.fabricated["tof_bracket"])
@@ -672,7 +672,7 @@ def main():
         "1. Material: 6 mm birch plywood (or 5 mm aluminium), 1 off.",
         "2. Laser-cut from cad/output/dxf/bottom_plate.dxf. All dimensions in mm, +-0.2.",
         "3. Motor-bracket holes (4 x D4.5) are drilled on assembly - see BUILD_GUIDE week 1.",
-        "4. The 2 front holes at Y +-20 hold BOTH sensor brackets (one above, one below).",
+        "4. Small holes: 2 for the line-sensor bracket (underneath), 2 for the ultrasonic bracket.",
     ], (5700, 0), {("HOLE", 6.5): "M6 threaded rod", ("HOLE", 8.5): "caster stem M8",
                    ("HOLE", 3.4): "M3 sensor brackets", ("CUTOUT", (4.0, 22.0)): "battery strap",
                    ("CUTOUT", (12.0, 20.0)): "motor/encoder cables"})

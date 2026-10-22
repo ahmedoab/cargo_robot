@@ -19,9 +19,9 @@ constexpr int PIN_ENC_R_B = 39;          // marked "VN"
 // 4 x HX711 load-cell amplifiers: one shared clock, one data line each
 constexpr int PIN_HX_SCK = 5;
 constexpr int PIN_HX_DT[4] = {16, 17, 18, 19};   // front-left, front-right, rear-left, rear-right
-// 3 x HC-SR04 ultrasonic: one shared TRIG; each ECHO through a 1k / 2k divider (5 V -> 3.3 V)
+// HC-SR04 ultrasonic sensor, looking straight ahead; ECHO through a 1k / 2k divider (5 V -> 3.3 V)
 constexpr int PIN_SONAR_TRIG = 4;
-constexpr int PIN_ECHO[3] = {13, 23, 32};        // left, centre, right
+constexpr int PIN_SONAR_ECHO = 23;
 // Bed servos: signal wire only (their power comes from the 7.4 V servo buck converter)
 constexpr int PIN_SERVO_FRONT = 2;
 constexpr int PIN_SERVO_REAR = 12;       // GPIO12 must be LOW while the ESP32 starts: connect nothing else to it
@@ -45,5 +45,5 @@ constexpr float BUS_DIVIDER = (10.0f + 2.2f) / 2.2f;   // motor-bus volts per vo
 constexpr float BUS_ON_V = 7.0f;         // below this the motors have no power: E-stop pressed or battery out
 constexpr int CONTROL_HZ = 100;          // wheel speed control and line following
 constexpr int DRIVE_PWM_HZ = 20000;      // BTS7960 PWM, above hearing
-constexpr int SONAR_PERIOD_MS = 60;      // one ping of all 3 ultrasonic sensors
+constexpr int SONAR_PERIOD_MS = 60;      // one ultrasonic ping
 constexpr float SONAR_MAX_CM = 400.0f;   // reported when nothing echoes back

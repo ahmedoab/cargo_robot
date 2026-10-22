@@ -1,6 +1,6 @@
 # Cargo robot: mechanical design v2 with a tilting bed (Phase II)
 
-**Overall size:** 426 × 360 × 236 mm (L × W × H) with the bed flat.
+**Overall size:** 407 × 360 × 236 mm (L × W × H) with the bed flat.
 
 **Layout:**
 
@@ -8,7 +8,7 @@
 - The bottom plate (6 mm plywood) carries the electronics: ESP32, motor drivers, battery, two buck converters.
 - The top deck (5 mm acrylic) sits on 6 M6 threaded rods. The E-stop and master switch are at its front, the start button and two LEDs at its rear.
 - **Tilting bed:** a 6 mm plywood tilting plate carries the 4 load cells and the acrylic cargo plate. Two 60 kg·cm servos on the deck's right edge, one at each end of the bed, turn it about their shafts (the shafts are the hinge). The bed tips 40° to the right and the package slides off onto the conveyor. Flat, it rests on two printed posts.
-- **Sensors:** an 8-channel IR line sensor under the front edge, 3 HC-SR04 ultrasonic sensors at the front of the electronics bay, and a VL53L0X distance sensor under the deck's right edge (it checks that the belt is there before the bed tips).
+- **Sensors:** an 8-channel IR line sensor under the bottom plate (in front of the wheels, nothing sticks out), one HC-SR04 ultrasonic sensor at the front of the electronics bay looking ahead, and a VL53L0X distance sensor under the deck's right edge (it checks that the belt is there before the bed tips).
 
 ![The robot, bed tipped](output/views/render_tipped.png)
 
@@ -42,7 +42,7 @@ Pin numbers come from `firmware/cargo_robot/config.h`: change a pin there and re
 ## Assembly and connections
 
 - `autocad/CargoRobot_v2_assembly.pdf`: every component (bought, laser-cut, 3D-printed), the tools, and the assembly in 11 steps with a picture of each stage; then drawing sheets 01, 02 and 07.
-- `autocad/CargoRobot_v2_connections.pdf`: every wire (power P1–P19, signal S1–S40), the parts on the I/O board, the connections of each part pin by pin, then the 4 schematic sheets.
+- `autocad/CargoRobot_v2_connections.pdf`: every wire (power P1–P19, signal S1–S38), the parts on the I/O board, the connections of each part pin by pin, then the 4 schematic sheets.
 
 Both are made by `make_docs.py` from `robot_cad.py` (parts), `wiring.py` (wires) and `firmware/cargo_robot/config.h` (pin numbers).
 

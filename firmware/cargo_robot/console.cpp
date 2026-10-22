@@ -243,8 +243,7 @@ void testLine() {
 
 void testSonar() {
   monitor([] {
-    Serial.printf("left %5.0f cm   centre %5.0f cm   right %5.0f cm   (%.0f = nothing)\n", rd.sonarCm[0],
-                  rd.sonarCm[1], rd.sonarCm[2], SONAR_MAX_CM);
+    Serial.printf("ahead %5.0f cm   (%.0f = nothing there)\n", rd.sonarCm, SONAR_MAX_CM);
   });
 }
 
@@ -291,9 +290,8 @@ void status() {
   char bits[9];
   for (int i = 0; i < 8; i++) bits[i] = rd.line.black & (1 << i) ? '#' : '.';
   bits[8] = 0;
-  Serial.printf("%-7s | %4.1f V | %6.3f kg%s | line %s | sonar %3.0f %3.0f %3.0f cm | side %4d mm | bed %4.1f deg\n",
-                stateName(), rd.busV, rd.kg, rd.cellsOk ? "" : " (no HX711)", bits, rd.sonarCm[0], rd.sonarCm[1],
-                rd.sonarCm[2], rd.sideMm, rd.bedDeg);
+  Serial.printf("%-7s | %4.1f V | %6.3f kg%s | line %s | ahead %3.0f cm | side %4d mm | bed %4.1f deg\n",
+                stateName(), rd.busV, rd.kg, rd.cellsOk ? "" : " (no HX711)", bits, rd.sonarCm, rd.sideMm, rd.bedDeg);
 }
 
 void help() {

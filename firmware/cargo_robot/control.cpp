@@ -32,11 +32,8 @@ float payloadFactor(float kg, float maxKg, float minFactor, float overload) {
   return 1 - (1 - minFactor) * min(kg / maxKg, 1.0f);
 }
 
-float obstacleFactor(const float cm[3], float stopCm, float slowCm) {
-  auto ramp = [&](float d) { return constrain((d - stopCm) / (slowCm - stopCm), 0.0f, 1.0f); };
-  float centre = ramp(cm[1]);
-  float sides = max(0.5f, ramp(min(cm[0], cm[2])));
-  return min(centre, sides);
+float obstacleFactor(float cm, float stopCm, float slowCm) {
+  return constrain((cm - stopCm) / (slowCm - stopCm), 0.0f, 1.0f);
 }
 
 Line readLine(uint8_t bits, bool blackIsHigh) {

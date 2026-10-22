@@ -28,9 +28,8 @@ void twistToWheels(float v, float w, float wheelSep, float wheelRadius, float ma
 // 1.0 empty -> minFactor at maxKg -> 0.0 (refuse to move) above maxKg * overload.
 float payloadFactor(float kg, float maxKg, float minFactor, float overload);
 
-// 1.0 when the way is clear -> 0.0 at stopCm. Side sensors only slow the robot (to 50 %), never stop it,
-// so the conveyor and walls beside the line do not stop it.
-float obstacleFactor(const float cm[3], float stopCm, float slowCm);
+// 1.0 when the way ahead is clear (beyond slowCm) -> 0.0 at stopCm and closer.
+float obstacleFactor(float cm, float stopCm, float slowCm);
 
 // The 8 line sensors as a position: +1 = line under the leftmost sensor, -1 = rightmost, 0 = centred.
 struct Line {

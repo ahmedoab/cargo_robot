@@ -18,7 +18,7 @@ struct Readings {
   float kg = 0;                    // total weight on the bed, median-filtered
   bool cellsOk = false;            // the HX711s answered in the last second
   Line line;
-  float sonarCm[3] = {0, 0, 0};    // left, centre, right
+  float sonarCm = 0;               // ultrasonic, straight ahead
   int sideMm = -1;                 // right side (VL53L0X); -1 = nothing in range
   float wheelL = 0, wheelR = 0;    // rad/s
   Odometry odom;

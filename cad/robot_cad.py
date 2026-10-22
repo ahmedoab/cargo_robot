@@ -15,7 +15,7 @@ Design choices that keep it simple to build:
   - casters: 2 bought swivel casters with an M8 threaded stem - the height is set with the nuts,
     so getting all 4 wheels onto the floor takes a spanner, not shims
   - motor brackets: the standard steel bracket sold for JGB37 motors, instead of printed ones
-  - one ESP32 runs everything: wheels, encoders, load cells, line sensor, ultrasonic sensors and the bed servos
+  - one ESP32 runs everything: wheels, encoders, load cells, line sensor, ultrasonic sensor and the bed servos
   - tilting bed: two servos sit on the hinge line and turn the bed directly - no screws, levers or linkages.
     The servo shafts ARE the hinge. The bed rests on two posts when flat, so the servos only work while tipping.
   - the load cells ride on the tilting plate, so they weigh only the cargo plate and the package
@@ -83,10 +83,9 @@ REST_PTS = [(-40, 95), (40, 95)] # printed rest posts under the bed's left side
 ESP_POS = (110, 62)              # ESP32 DevKit on its screw-terminal breakout (USB end towards +Y)
 IO_POS = (110, -45)              # I/O board: MCP23017 + resistor dividers on perfboard
 BATTERY = (50, 155, 35)          # 3S 5000 mAh LiPo lying across the robot (X, Y, Z)
-LINE_X = 214                     # centre of the 8-channel IR line sensor board
-LINE_BRKT_HOLES = [(192, -20), (192, 20)]
-SONAR_HOLES = [(186, 0), (184, -48), (184, 48)]
-SONAR_YAW = 35                   # side ultrasonic sensors point this far left / right of straight ahead
+LINE_X = 98                      # centre of the 8-channel IR line sensor board, under the bottom plate
+LINE_BRKT_HOLES = [(LINE_X - 12, 0), (LINE_X + 12, 0)]
+SONAR_HOLES = [(178, -20), (178, 20)]
 TOF_X = -40                      # side distance sensor (VL53L0X), looking right (-Y)
 TOF_HOLES = [(TOF_X - 9, -141), (TOF_X + 9, -141)]
 SERVO_CABLE_SLOTS = [(150, -50), (-150, -50)]
@@ -358,11 +357,11 @@ Z_LINE_PCB = 12.4                # underside of the board; the sensors look down
 
 
 def line_sensor_bracket():
-    """Hangs from the front edge of the bottom plate; the sensor board screws under its shelf.
-    The web stays in front of X = 200 so the front caster can swivel freely."""
-    flange = span(180, 208, -30, 30, Z_BASE - 6, Z_BASE)              # bolted under the bottom plate
-    web = span(202, 208, -30, 30, Z_LINE_PCB + 1.6 + 4, Z_BASE - 6)
-    shelf = span(202, LINE_X + 12, -56, 56, Z_LINE_PCB + 1.6, Z_LINE_PCB + 1.6 + 4)   # the board hangs under it
+    """Hangs under the bottom plate between the drive wheels and the front caster; the sensor board screws under its
+    shelf. It stays behind X = LINE_X + 16, clear of the front caster however it swivels."""
+    flange = span(LINE_X - 16, LINE_X + 16, -30, 30, Z_BASE - 6, Z_BASE)   # bolted under the bottom plate
+    web = span(LINE_X - 3, LINE_X + 3, -30, 30, Z_LINE_PCB + 1.6 + 4, Z_BASE - 6)
+    shelf = span(LINE_X - 13, LINE_X + 13, -56, 56, Z_LINE_PCB + 1.6, Z_LINE_PCB + 1.6 + 4)   # the board hangs under it
     b = flange.union(web).union(shelf)
     b = drill(b, LINE_BRKT_HOLES, 3.4, Z_BASE - 8, 10)
     return drill(b, [(LINE_X, -50), (LINE_X, 50)], 3.0, Z_LINE_PCB, 8)  # M3 screws into the board's end holes
@@ -375,45 +374,29 @@ for i in range(8):                                                     # sensor 
     add("sensors", f"tcrt5000_{i + 1}", box(5.8, 10.2, 7, LINE_X, y, Z_LINE_PCB - 3.5), BLACK)
 
 
-# ---------- 3 ultrasonic sensors (HC-SR04) at the front of the bay ----------
+# ---------- Ultrasonic sensor (HC-SR04) at the front of the bay, looking straight ahead ----------
+SONAR_X = 196.5                  # middle of the holder face (3 mm thick, its front at X = 198)
 SONAR_Z = Z_LOWER + 30           # height of the transducer centres
 
 
-FACE_H = SONAR_Z + 14 - (Z_LOWER + 4)                     # holder faces stand on the 4 mm base
-
-
-def sonar_place(wp, yaw, x, y):
-    """Turn a part drawn around the origin (sensor looking along +X, centre at z = 0) by yaw and move it into place."""
-    return wp.rotate((0, 0, 0), (0, 0, 1), yaw).translate((x, y, SONAR_Z))
-
-
-SONAR_POSES = [(0, 196.5, 0), (SONAR_YAW, 182, 52), (-SONAR_YAW, 182, -52)]   # (yaw, x, y) of each face centre
-
-
 def sonar_bracket():
-    """Base plate on the bottom plate + 3 faces; each HC-SR04 sits behind its face, transducers through 2 windows."""
-    b = span(170, 200, -80, 80, Z_LOWER, Z_LOWER + 4)
-    for yaw, x, y in SONAR_POSES:
-        face = box(3, 52, FACE_H, 0, 0, 14 - FACE_H / 2)
-        for wy in (-13, 13):
-            face = face.cut(cyl_x(16.5, -3, 3, wy, 0))
-        b = b.union(sonar_place(face, yaw, x, y))
-    b = b.intersect(span(160, 200, -90, 90, Z_LOWER, SONAR_Z + 14))    # nothing past the plate's front edge
-    return drill(b, SONAR_HOLES + LINE_BRKT_HOLES, 3.4, Z_LOWER - 1, 6)
-
-
-def hc_sr04(yaw, x, y):
-    """PCB against the back of the face, the two 16 mm transducers through its windows."""
-    pcb = box(1.6, 45, 20, -2.3, 0, 0)
-    cans = cyl_x(16, -1.5, 10.5, -13, 0).union(cyl_x(16, -1.5, 10.5, 13, 0))
-    return sonar_place(pcb, yaw, x, y), sonar_place(cans, yaw, x, y)
+    """Base on the bottom plate + one upright face; the HC-SR04 sits behind it, its 2 transducers through 2 windows.
+    Two M3 bolts hold its base to the bottom plate."""
+    face = span(SONAR_X - 1.5, SONAR_X + 1.5, -26, 26, Z_LOWER + 4, SONAR_Z + 14)
+    for y in (-13, 13):
+        face = face.cut(cyl_x(16.5, SONAR_X - 3, SONAR_X + 3, y, SONAR_Z))
+    b = span(170, 200, -32, 32, Z_LOWER, Z_LOWER + 4).union(face)
+    for y0 in (-27, 24):                                               # 2 ribs behind the face, beside the board
+        rib = (cq.Workplane("XZ").polyline([(180, Z_LOWER + 4), (SONAR_X - 1.5, Z_LOWER + 4),
+                                            (SONAR_X - 1.5, SONAR_Z + 4)]).close().extrude(-3).translate((0, y0, 0)))
+        b = b.union(rib)
+    return drill(b, SONAR_HOLES, 3.4, Z_LOWER - 1, 6)
 
 
 add("sensors", "sonar_bracket", sonar_bracket(), PRINT, fab=True)
-for (yaw, x, y), tag in zip(SONAR_POSES, ("centre", "left", "right")):
-    pcb, cans = hc_sr04(yaw, x, y)
-    add("sensors", f"hc_sr04_{tag}_pcb", pcb, PCB_BLUE)
-    add("sensors", f"hc_sr04_{tag}_cans", cans, SILVER)
+add("sensors", "hc_sr04_pcb", span(SONAR_X - 3.1, SONAR_X - 1.5, -22.5, 22.5, SONAR_Z - 10, SONAR_Z + 10), PCB_BLUE)
+add("sensors", "hc_sr04_cans", cyl_x(16, SONAR_X - 1.5, SONAR_X + 10.5, -13, SONAR_Z)
+    .union(cyl_x(16, SONAR_X - 1.5, SONAR_X + 10.5, 13, SONAR_Z)), SILVER)
 
 
 # ---------- Side distance sensor (VL53L0X), under the deck's right edge, looking right ----------
@@ -644,7 +627,7 @@ BOM = [
     ("Drive", "BTS7960 (IBT-2) 43 A motor driver", 2, "buy"),
     ("Sensors", "8-channel IR line sensor array, TCRT5000, digital outputs, 3.3-5 V", 1, "buy"),
     ("Sensors", "Line sensor bracket (line_sensor_bracket.stl)", 1, "3D print PETG"),
-    ("Sensors", "HC-SR04 ultrasonic distance sensor", 3, "buy (get 4)"),
+    ("Sensors", "HC-SR04 ultrasonic distance sensor", 1, "buy (get 2)"),
     ("Sensors", "Ultrasonic sensor bracket (sonar_bracket.stl)", 1, "3D print PETG"),
     ("Sensors", "VL53L0X time-of-flight distance sensor module", 1, "buy"),
     ("Sensors", "Side sensor bracket (tof_bracket.stl)", 1, "3D print PETG"),
@@ -676,7 +659,7 @@ BOM = [
     ("Hardware", "M4x12 screws + nylock nuts (motor brackets, servo mounts, rest posts), M4x16 + nuts (horn "
                  "adapters), M4/M5x16 (load cells), M3 screws + nuts (sensor brackets), M2.5/M3 for the boards, "
                  "VHB tape, velcro strap, zip ties", 1, "buy"),
-    ("Hardware", "Resistors 1k x3, 2k x3, 10k x5, 2.2k x1, 4.7k x2, 100 nF x1, small perfboard x2", 1, "buy"),
+    ("Hardware", "Resistors 1k x1, 2k x1, 10k x5, 2.2k x1, 4.7k x2, 100 nF x1, small perfboard x2", 1, "buy"),
 ]
 
 

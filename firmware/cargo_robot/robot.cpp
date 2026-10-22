@@ -124,7 +124,7 @@ void robotUpdate() {
   rd.cellsOk = millis() - lastCellRead < 1000;
 
   sonar::update();
-  for (int i = 0; i < 3; i++) rd.sonarCm[i] = sonar::cm(i);
+  rd.sonarCm = sonar::cm();
   if (millis() - lastSide >= 20) {
     lastSide = millis();
     rd.sideMm = sideMm();

@@ -8,7 +8,7 @@ Drive,"Swivel caster 50 mm, M8 threaded stem, >= 20 kg rating",2,buy
 Drive,BTS7960 (IBT-2) 43 A motor driver,2,buy
 Sensors,"8-channel IR line sensor array, TCRT5000, digital outputs, 3.3-5 V",1,buy
 Sensors,Line sensor bracket (line_sensor_bracket.stl),1,3D print PETG
-Sensors,HC-SR04 ultrasonic distance sensor,3,buy (get 4)
+Sensors,HC-SR04 ultrasonic distance sensor,1,buy (get 2)
 Sensors,Ultrasonic sensor bracket (sonar_bracket.stl),1,3D print PETG
 Sensors,VL53L0X time-of-flight distance sensor module,1,buy
 Sensors,Side sensor bracket (tof_bracket.stl),1,3D print PETG
@@ -37,4 +37,4 @@ Chassis,"M6 threaded rod, cut to 130 mm",6,cut from 1 m rod
 Chassis,M6 nut + M6 washer,24,buy
 Chassis,M8 nut + M8 washer (casters),4,buy
 Hardware,"M4x12 screws + nylock nuts (motor brackets, servo mounts, rest posts), M4x16 + nuts (horn adapters), M4/M5x16 (load cells), M3 screws + nuts (sensor brackets), M2.5/M3 for the boards, VHB tape, velcro strap, zip ties",1,buy
-Hardware,"Resistors 1k x3, 2k x3, 10k x5, 2.2k x1, 4.7k x2, 100 nF x1, small perfboard x2",1,buy
+Hardware,"Resistors 1k x1, 2k x1, 10k x5, 2.2k x1, 4.7k x2, 100 nF x1, small perfboard x2",1,buy

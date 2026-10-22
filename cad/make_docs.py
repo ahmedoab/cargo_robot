@@ -116,14 +116,14 @@ STAGES = [
         "On each M8 stem: nut down to the caster body + washer, up through the 8.5 mm hole (X = +-160), "
         "washer + nut on top. The height is set later, with all 4 wheels on the floor.",
     ]),
-    ("Front sensors", ("line_sensor", "tcrt5000", "sonar_bracket", "hc_sr04"), [
-        "Screw the 8-channel line sensor under the shelf of the line-sensor bracket, sensors down, sensor 1 on "
-        "the robot's LEFT.",
-        "Push each HC-SR04 into the ultrasonic bracket from behind (cans through the windows); hot glue or "
-        "2 zip ties.",
-        "Ultrasonic bracket on top of the plate's front edge, line-sensor bracket under it: 2 x M3 x 20 through "
-        "both (the holes at Y = +-20), plus 3 x M3 through the ultrasonic bracket.",
-        "Check that the front caster still swivels a full turn.",
+    ("Sensors: line sensor underneath, ultrasonic in front", ("line_sensor", "tcrt5000", "sonar_bracket", "hc_sr04"), [
+        "Screw the 8-channel line sensor under the shelf of the line-sensor bracket (2 x M3), sensors down, "
+        "sensor 1 on the robot's LEFT.",
+        f"Bolt the bracket under the bottom plate, between the drive wheels and the front caster: 2 x M3 x 12 "
+        f"through the 2 holes on the centre line (X = {rc.LINE_X} +-12). The sensors end up about 5 mm above the floor.",
+        "Push the HC-SR04 into the ultrasonic bracket from behind (cans through the windows); hot glue or "
+        "2 zip ties. Bolt the bracket on top of the plate's front edge (2 x M3).",
+        "Check that the front caster still swivels a full turn without touching the line-sensor bracket.",
     ]),
     ("Electronics", ("battery", "BTS7960", "esp32", "io_board", "buck", "servo_buck", "power_bus", "inline_fuse",
                      "buzzer"), [
@@ -190,6 +190,9 @@ def render_stages(folder):
     for i, (title, prefixes, _) in enumerate(STAGES, start=1):
         if prefixes == "tipped":
             assy, focus, pos = stage_assembly(None, rc.TIP_ANGLE), (0, 0, 200), (600, -600, 520)
+        elif title.startswith("Sensors"):                      # from below: the line sensor is under the plate
+            done += prefixes
+            assy, focus, pos = stage_assembly(done), (60, 0, 50), (520, -560, -160)
         elif title.startswith("The bed"):
             assy, focus, pos = stage_assembly(prefixes), (0, 0, 215), (430, -430, 420)
         elif prefixes is None:

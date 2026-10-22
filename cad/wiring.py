@@ -42,7 +42,7 @@ MCP = "MCP23017 U4"
 L_DRV, R_DRV = "BTS7960 left U2", "BTS7960 right U3"
 L_MOT, R_MOT = "Left motor M1", "Right motor M2"
 CORNERS = ("front-left", "front-right", "rear-left", "rear-right")
-SONARS = ("left", "centre", "right")
+SONAR = "HC-SR04 (front)"
 
 POWER = [
     ("P1", "Battery BT1", "+ (XT60)", "Fuse holder F1", "in", "16 AWG red, 10 cm", "XT60 soldered"),
@@ -108,48 +108,43 @@ for i, c in enumerate(CORNERS):
 for c in CORNERS:
     for wire, pin in (("red", "E+"), ("black", "E-"), ("white", "A-"), ("green", "A+")):
         SIGNAL.append(("S23", f"Load cell {c}", wire, f"HX711 {c}", pin, "the cell's own wires", ""))
-for s in SONARS:
-    SIGNAL.append(("S24", f"HC-SR04 {s}", "VCC", "WAGO +5 V", "", J, "5 V"))
-for s in SONARS:
-    SIGNAL.append(("S25", f"HC-SR04 {s}", "GND", "GND bus", "", J, ""))
-for s in SONARS:
-    SIGNAL.append(("S26", f"HC-SR04 {s}", "TRIG", ESP, gpio("PIN_SONAR_TRIG"), J, "all 3 on one pin"))
-for i, s in enumerate(SONARS):
-    SIGNAL.append((f"S{27 + i}", f"HC-SR04 {s}", "ECHO", ESP, gpio("PIN_ECHO", i), J,
-                   "through a 1k / 2k divider (5 V -> 3.3 V)"))
 SIGNAL += [
-    ("S30", "Front servo SV1", "orange (signal)", ESP, gpio("PIN_SERVO_FRONT"), "servo lead", ""),
-    ("S31", "Rear servo SV2", "orange (signal)", ESP, gpio("PIN_SERVO_REAR"), "servo lead",
+    ("S24", SONAR, "VCC", "WAGO +5 V", "", J, "5 V"),
+    ("S25", SONAR, "GND", "GND bus", "", J, ""),
+    ("S26", SONAR, "TRIG", ESP, gpio("PIN_SONAR_TRIG"), J, ""),
+    ("S27", SONAR, "ECHO", ESP, gpio("PIN_SONAR_ECHO"), J, "through a 1k / 2k divider (5 V -> 3.3 V)"),
+    ("S28", "Front servo SV1", "orange (signal)", ESP, gpio("PIN_SERVO_FRONT"), "servo lead", ""),
+    ("S29", "Rear servo SV2", "orange (signal)", ESP, gpio("PIN_SERVO_REAR"), "servo lead",
      "nothing else on this pin (must be LOW at start-up)"),
-    ("S32", ESP, gpio("PIN_SDA") + " (SDA)", MCP, "SDA", J, "4.7k pull-up to 3V3"),
-    ("S32", ESP, gpio("PIN_SDA") + " (SDA)", "VL53L0X", "SDA", J, ""),
-    ("S33", ESP, gpio("PIN_SCL") + " (SCL)", MCP, "SCL", J, "4.7k pull-up to 3V3"),
-    ("S33", ESP, gpio("PIN_SCL") + " (SCL)", "VL53L0X", "SCL", J, ""),
-    ("S34", ESP, "3V3", "3V3 bus", "", J, "feeds every 3.3 V part"),
-    ("S34", ESP, "GND", "GND bus", "", J, ""),
-    ("S34", MCP, "VDD, RESET", "3V3 bus", "", J, ""),
-    ("S34", MCP, "VSS, A0, A1, A2", "GND bus", "", J, "address 0x20"),
-    ("S34", "VL53L0X", "VIN", "3V3 bus", "", J, ""),
-    ("S34", "VL53L0X", "GND", "GND bus", "", J, ""),
-    ("S35", "Line sensor", "VCC", "3V3 bus", "", J, ""),
-    ("S35", "Line sensor", "GND", "GND bus", "", J, ""),
+    ("S30", ESP, gpio("PIN_SDA") + " (SDA)", MCP, "SDA", J, "4.7k pull-up to 3V3"),
+    ("S30", ESP, gpio("PIN_SDA") + " (SDA)", "VL53L0X", "SDA", J, ""),
+    ("S31", ESP, gpio("PIN_SCL") + " (SCL)", MCP, "SCL", J, "4.7k pull-up to 3V3"),
+    ("S31", ESP, gpio("PIN_SCL") + " (SCL)", "VL53L0X", "SCL", J, ""),
+    ("S32", ESP, "3V3", "3V3 bus", "", J, "feeds every 3.3 V part"),
+    ("S32", ESP, "GND", "GND bus", "", J, ""),
+    ("S32", MCP, "VDD, RESET", "3V3 bus", "", J, ""),
+    ("S32", MCP, "VSS, A0, A1, A2", "GND bus", "", J, "address 0x20"),
+    ("S32", "VL53L0X", "VIN", "3V3 bus", "", J, ""),
+    ("S32", "VL53L0X", "GND", "GND bus", "", J, ""),
+    ("S33", "Line sensor", "VCC", "3V3 bus", "", J, ""),
+    ("S33", "Line sensor", "GND", "GND bus", "", J, ""),
 ]
 for i in range(8):
-    SIGNAL.append(("S36", "Line sensor", f"OUT{i + 1}", MCP, f"GPA{P['XP_LINE_FIRST'] + i}", J,
+    SIGNAL.append(("S34", "Line sensor", f"OUT{i + 1}", MCP, f"GPA{P['XP_LINE_FIRST'] + i}", J,
                    "OUT1 = leftmost" if i == 0 else ("OUT8 = rightmost" if i == 7 else "")))
 SIGNAL += [
-    ("S37", "Start button S2", "terminal 1", MCP, xp("XP_BUTTON"), J, "internal pull-up"),
-    ("S37", "Start button S2", "terminal 2", "GND bus", "", J, ""),
-    ("S38", "Green LED D1", "+ (long leg)", MCP, xp("XP_LED_GREEN"), J, "through 330 ohm"),
-    ("S38", "Green LED D1", "- (short leg)", "GND bus", "", J, ""),
-    ("S38", "Red LED D2", "+ (long leg)", MCP, xp("XP_LED_RED"), J, "through 330 ohm"),
-    ("S38", "Red LED D2", "- (short leg)", "GND bus", "", J, ""),
-    ("S39", "Buzzer module", "VCC", "3V3 bus", "", J, ""),
-    ("S39", "Buzzer module", "GND", "GND bus", "", J, ""),
-    ("S39", "Buzzer module", "I/O", MCP, xp("XP_BUZZER"), J, ""),
-    ("S40", "Bus-sense divider", "top of 10k", "WAGO +12 V MOTOR", "", J, "after the E-stop"),
-    ("S40", "Bus-sense divider", "bottom of 2.2k", "GND bus", "", J, "100 nF across the 2.2k"),
-    ("S40", "Bus-sense divider", "junction", ESP, gpio("PIN_BUS_SENSE"), J,
+    ("S35", "Start button S2", "terminal 1", MCP, xp("XP_BUTTON"), J, "internal pull-up"),
+    ("S35", "Start button S2", "terminal 2", "GND bus", "", J, ""),
+    ("S36", "Green LED D1", "+ (long leg)", MCP, xp("XP_LED_GREEN"), J, "through 330 ohm"),
+    ("S36", "Green LED D1", "- (short leg)", "GND bus", "", J, ""),
+    ("S36", "Red LED D2", "+ (long leg)", MCP, xp("XP_LED_RED"), J, "through 330 ohm"),
+    ("S36", "Red LED D2", "- (short leg)", "GND bus", "", J, ""),
+    ("S37", "Buzzer module", "VCC", "3V3 bus", "", J, ""),
+    ("S37", "Buzzer module", "GND", "GND bus", "", J, ""),
+    ("S37", "Buzzer module", "I/O", MCP, xp("XP_BUZZER"), J, ""),
+    ("S38", "Bus-sense divider", "top of 10k", "WAGO +12 V MOTOR", "", J, "after the E-stop"),
+    ("S38", "Bus-sense divider", "bottom of 2.2k", "GND bus", "", J, "100 nF across the 2.2k"),
+    ("S38", "Bus-sense divider", "junction", ESP, gpio("PIN_BUS_SENSE"), J,
      "about 2.3 V at 12.6 V; 0 V = E-stop pressed"),
 ]
 
@@ -162,7 +157,7 @@ IO_BOARD = [
     ("1 x 10k", f"MOTOR_EN ({xp('XP_MOTOR_EN')}) -> GND: motors off until the ESP32 has started"),
     ("4 x 10k", f"encoder lines GPIO {P['PIN_ENC_L_A']}, {P['PIN_ENC_L_B']}, {P['PIN_ENC_R_A']}, "
                 f"{P['PIN_ENC_R_B']} -> 3V3 (these pins have no pull-ups inside)"),
-    ("3 x (1k + 2k)", "one divider per ultrasonic ECHO: ECHO - 1k - junction - 2k - GND; junction to the ESP32"),
+    ("1k + 2k", "ultrasonic ECHO divider: ECHO - 1k - junction - 2k - GND; junction to the ESP32"),
     ("10k + 2.2k + 100 nF", f"bus sense: +12 V MOTOR - 10k - junction - 2.2k - GND; junction to GPIO "
                             f"{P['PIN_BUS_SENSE']}"),
     ("2 x 330", "in series with the green and red LEDs"),

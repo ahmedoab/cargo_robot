@@ -32,10 +32,10 @@ struct Settings {
   float kd_line = 0.15f;
   float lost_s = 0.5f;            // stop if the line is gone this long
   float mark_min = 6;             // this many sensors on black at once = a station mark
-  float stop_mm = 214;            // drive on this far after a mark: sensor bar -> middle of the bed
+  float stop_mm = 98;             // drive on this far after a mark: sensor bar -> middle of the bed
   // ---- obstacles (week 7) ----
-  float stop_cm = 25;             // centre sensor: stop below this
-  float slow_cm = 60;             // all sensors: slow down below this
+  float stop_cm = 25;             // something closer than this ahead: stop
+  float slow_cm = 60;             // ... closer than this: slow down
   float clear_s = 1.0f;           // the way must be clear this long before driving on
   // ---- tilting bed (week 4, week 8) ----
   float tip_deg = 40;             // how far the bed tips to drop the package

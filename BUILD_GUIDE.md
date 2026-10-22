@@ -48,7 +48,7 @@ Gradfinal/                      <- this folder. Put it on GitHub
 ├── BUILD_GUIDE.md              <- this guide
 ├── cad/                        <- 3D design (Python/CadQuery) -> STEP, STL, DXF files
 │   ├── robot_cad.py            <- the design; change numbers at the top, re-run
-│   ├── wiring.py               <- every wire (P1-P19, S1-S40), in one place
+│   ├── wiring.py               <- every wire (P1-P19, S1-S38), in one place
 │   ├── autocad/                <- the PDFs (and AutoCAD files):
 │   │     CargoRobot_v2_drawings.pdf     10 drawing sheets (+ CargoRobot_v2.dxf with the 3D model)
 │   │     CargoRobot_v2_schematics.pdf   4 schematic sheets (+ .dxf)
@@ -89,11 +89,11 @@ Gradfinal/                      <- this folder. Put it on GitHub
 
 | | |
 |---|---|
-| Size | 426 × 360 × 236 mm (L × W × H), bed flat |
+| Size | 407 × 360 × 236 mm (L × W × H), bed flat |
 | Frame | 6 mm plywood bottom plate + 5 mm acrylic deck, held apart by 6 M6 threaded rods |
 | Drive | 2 × 12 V gear motors with encoders (middle axle), plus 50 mm swivel casters front and rear. Differential drive, so it turns on the spot. |
 | Brain | **One ESP32** (DevKitC, 38 pins), running an Arduino program. No Raspberry Pi, no Linux, no ROS. |
-| Sensors | 8-channel IR line sensor (front, under the plate), 3 × HC-SR04 ultrasonic (front), VL53L0X distance sensor (right side), 4 × 10 kg load cells under the cargo plate |
+| Sensors | 8-channel IR line sensor (under the bottom plate, in front of the wheels), HC-SR04 ultrasonic (front, looking ahead), VL53L0X distance sensor (right side), 4 × 10 kg load cells under the cargo plate |
 | Tilting bed | A plywood tilting plate carries the load cells and the cargo plate. **Two 60 kg·cm servos** on the deck's right edge turn it about their shafts (the shafts are the hinge) to 40°; the package slides off to the right onto the conveyor. |
 | Power | 3S LiPo 11.1 V 5000 mAh → 10 A fuse → master switch. The 12 V goes through the E-stop to the motor drivers and the 7.4 V servo buck; a 5.1 V buck powers the ESP32 and the sensors. |
 | Safety | Latching E-stop cuts **motor and servo power** (the ESP32 stays on and sees it). The software also stops for obstacles, a lost line, and overload. |
@@ -111,7 +111,7 @@ flowchart LR
   ESP -- 2 × servo signal --> SERVO
   MOT -- encoder A/B --> ESP
   CELLS[4 × load cell] --> HX[4 × HX711] --> ESP
-  SONAR[3 × HC-SR04] --> ESP
+  SONAR[HC-SR04 ultrasonic] --> ESP
   ESP -- I2C --> MCP[MCP23017]
   LINE[8-ch line sensor] --> MCP
   MCP --> PANEL[button, LEDs, buzzer, motor enable]
@@ -127,7 +127,7 @@ flowchart LR
 | Raspberry Pi **+ ESP32** | **ESP32 only** | The robot no longer runs the AI or maps rooms: it follows a line, weighs, avoids obstacles and tips the bed. One ESP32 does all of that in real time, starts in 1 s and can't corrupt an SD card. |
 | RPLIDAR, SLAM (task 2.2) and Nav2 waypoints (task 2.4) | **No lidar.** An IR line sensor and station marks on the floor | A taped route is simpler and very repeatable. Task 2.2 becomes "line and station-mark tuning", task 2.4 becomes "pickup → drop-off missions". |
 | Camera + ONNX vision on the robot (task 2.3.2) | **The laptop does the vision, at the conveyor** | The camera has to look at the packages on the belt anyway; the laptop has far more computing power than the robot. |
-| Obstacle detection by lidar | **3 ultrasonic sensors** (left, centre, right) | Cheap, simple, and enough to stop for a person or a box in front. |
+| Obstacle detection by lidar | **One ultrasonic sensor** looking ahead | Cheap, simple, and enough to stop for a person or a box on the line. |
 | Unload by hand | **Tilting bed on 2 servos** | The robot delivers by itself: it tips the package onto the conveyor. |
 | E-stop cuts the whole 12 V line | E-stop cuts the **motor and servo** 12 V only | The ESP32 stays on, sees the E-stop and does not lose its place. Everything that moves still stops at once. |
 | 2020 aluminium or acrylic/MDF frame | Plywood + acrylic plates on **6 M6 threaded rods** | Cheapest and simplest: the rod is cut with a hacksaw, and the deck height is set with nuts. |
@@ -174,7 +174,7 @@ flowchart LR
 2. **Wheels in the air.** When testing motors, put the robot on a box so the drive wheels spin freely.
 3. **Keep fingers out of the bed.** The servos are strong (60 kg·cm each) and the bed's right edge closes against the servo mounts. Never hold the bed or put a hand under it while it moves.
 4. **Know where the E-stop is.** It stays within reach every time the robot moves by itself, and one person always watches the robot.
-5. **Never put more than 3.3 V on an ESP32 pin.** 5 V on a GPIO pin kills the ESP32. That's why the encoders, HX711s, line sensor and BTS7960 logic are powered from **3.3 V**, the ultrasonic ECHO lines go through dividers, and the 12 V sense line goes through a divider.
+5. **Never put more than 3.3 V on an ESP32 pin.** 5 V on a GPIO pin kills the ESP32. That's why the encoders, HX711s, line sensor and BTS7960 logic are powered from **3.3 V**, the ultrasonic ECHO line goes through a divider, and so does the 12 V sense line.
 6. **Wiring changes only with the master switch OFF** and the battery unplugged.
 7. **Fuse first:** the fuse must be the first thing after the battery's + wire.
 
@@ -216,7 +216,7 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 | E10 | Buck converter **10 A** (e.g. 300 W XL4016 module), with voltage pot | 1 | For the servos: set to 7.4 V |
 | E11 | XL4015 5 A buck converter module (with current-limit pot) | 2 | 1 spare. For the ESP32 and sensors: set to 5.1 V |
 | E12 | 8-channel IR line sensor array, TCRT5000, **digital outputs**, 3.3–5 V | 1 | One output per sensor, with an adjustment pot per sensor; about 100 mm wide |
-| E13 | HC-SR04 ultrasonic sensor | 4 | 1 spare |
+| E13 | HC-SR04 ultrasonic sensor | 2 | 1 spare |
 | E14 | VL53L0X time-of-flight distance sensor module | 1 | The common purple "GY-530" board is fine |
 | E15 | Straight-bar load cell, **10 kg**, 80 × 12.7 × 12.7 mm, 4 wires | 4 | Note the thread size of the end holes (M4 or M5) |
 | E16 | HX711 load-cell amplifier module | 5 | 1 spare |
@@ -282,7 +282,7 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
    - Material and thickness per the table above.
    - "Keep the protective film on the acrylic."
 3. When you collect them, check them against the hole tables on sheets 03–06 of `CargoRobot_v2_drawings.pdf`:
-   - **Bottom plate** (400 × 300 mm, plywood): 6 rod holes, 2 caster holes, 5 small sensor-bracket holes at the front edge, 4 battery-strap slots, 2 cable slots.
+   - **Bottom plate** (400 × 300 mm, plywood): 6 rod holes, 2 caster holes, 4 small sensor-bracket holes (2 at the front edge, 2 on the centre line further back), 4 battery-strap slots, 2 cable slots.
    - **Top deck** (400 × 300 mm, acrylic): 6 rod holes, E-stop (22.5 mm), switch and button (12.2 mm), 2 LED holes, 8 M4 holes (servo mounts and bed rests), 2 small side-sensor holes, 3 cable cut-outs.
    - **Tilting plate** (236 × 247 mm, plywood): 4 load-cell slots, 4 horn-adapter holes, 2 cable-tie slots.
    - **Cargo plate** (260 × 280 mm, acrylic): 4 load-cell slots.
@@ -333,7 +333,7 @@ Keep `cad/autocad/CargoRobot_v2_assembly.pdf` open while you work: it has the sa
 
 Collect the four plates (section 0.3). Peel the film only from the side you'll write on. Mark the top face and the **FRONT** edge on each plate with a marker:
 
-- **Bottom plate:** the 5 small sensor-bracket holes are at the front edge.
+- **Bottom plate:** the 2 small ultrasonic-bracket holes are at the front edge.
 - **Top deck:** the big 22.5 mm E-stop hole is at the front-left.
 - **Tilting plate:** the 4 single holes (horn adapters) are along its **right** edge, at the front and rear corners.
 - **Cargo plate:** it's symmetric, so any way round works.
@@ -400,9 +400,9 @@ The final height is set in section 1.5.
 
 **Step 6: Front sensors**
 
-1. **Line sensor:** screw the 8-channel sensor board under the shelf of `line_sensor_bracket`, sensors facing **down**, its pin header towards the robot (2 × M3 through the board's end holes; drill the print to suit if your board's holes differ). Sensor 1 must be on the robot's **left**.
-2. **Ultrasonic sensors:** push each HC-SR04 into `sonar_bracket` from behind so its two silver cans go through the windows. Hold each with a dab of hot glue or 2 zip ties. Pins downwards.
-3. Put the ultrasonic bracket on the **top** of the bottom plate at the front edge and the line-sensor bracket **under** it, and bolt both through the 2 shared holes (Y = ±20) with M3 × 20 + nut. Add M3 screws through the ultrasonic bracket's other 3 holes.
+1. **Line sensor:** screw the 8-channel sensor board under the shelf of `line_sensor_bracket`, sensors facing **down** (2 × M3 through the board's end holes; drill the print to suit if your board's holes differ). Sensor 1 must be on the robot's **left**.
+2. Bolt the bracket **under** the bottom plate, between the drive wheels and the front caster: 2 × M3 × 12 + nut through the 2 holes on the centre line (X = +86 and +110). The sensors end up about 5 mm above the floor, 98 mm in front of the wheels.
+3. **Ultrasonic sensor:** push the HC-SR04 into `sonar_bracket` from behind so its two silver cans go through the windows. Hold it with a dab of hot glue or 2 zip ties, pins downwards. Bolt the bracket on **top** of the bottom plate at the front edge, looking forward (2 × M3 + nut).
 4. Check that the front caster still swivels a full turn without touching the line-sensor bracket.
 
 **Step 7: Deck parts** (before the deck goes on the rods)
@@ -630,7 +630,7 @@ Sheets E03 and E04 in `cad/autocad/CargoRobot_v2_schematics.pdf` show everything
 - 2 × 4.7 kΩ pull-ups: SDA → 3.3 V, SCL → 3.3 V.
 - 1 × 10 kΩ pull-down on the MOTOR_EN line (MCP GPB0 → GND): the motors stay off until the ESP32 has started.
 - 4 × 10 kΩ pull-ups on the encoder lines (GPIO 34, 35, 36, 39 have none inside).
-- 3 ultrasonic ECHO dividers: ECHO → 1 kΩ → junction → 2 kΩ → GND; the junction goes to the ESP32.
+- The ultrasonic ECHO divider: ECHO → 1 kΩ → junction → 2 kΩ → GND; the junction goes to the ESP32.
 - The bus-sense divider: MOTOR +12 V → 10 kΩ → junction → 2.2 kΩ → GND (+ 100 nF across the 2.2 kΩ); the junction to GPIO 33.
 - 2 × 330 Ω for the LEDs.
 - Small buses (a row of linked pins, or WAGOs): **3V3** (from the ESP32's 3V3 pin), **GND**, **5V** (from the 5 V WAGO bus).
@@ -690,52 +690,44 @@ Sheets E03 and E04 in `cad/autocad/CargoRobot_v2_schematics.pdf` show everything
 | S23 | Load cell rear-right **black** | HX711 rear-right **E-** | the cell's own wires |
 | S23 | Load cell rear-right **white** | HX711 rear-right **A-** | the cell's own wires |
 | S23 | Load cell rear-right **green** | HX711 rear-right **A+** | the cell's own wires |
-| S24 | HC-SR04 left **VCC** | WAGO +5 V | 5 V |
-| S24 | HC-SR04 centre **VCC** | WAGO +5 V | 5 V |
-| S24 | HC-SR04 right **VCC** | WAGO +5 V | 5 V |
-| S25 | HC-SR04 left **GND** | GND bus |  |
-| S25 | HC-SR04 centre **GND** | GND bus |  |
-| S25 | HC-SR04 right **GND** | GND bus |  |
-| S26 | HC-SR04 left **TRIG** | ESP32 (breakout) **GPIO 4** | all 3 on one pin |
-| S26 | HC-SR04 centre **TRIG** | ESP32 (breakout) **GPIO 4** | all 3 on one pin |
-| S26 | HC-SR04 right **TRIG** | ESP32 (breakout) **GPIO 4** | all 3 on one pin |
-| S27 | HC-SR04 left **ECHO** | ESP32 (breakout) **GPIO 13** | through a 1k / 2k divider (5 V -> 3.3 V) |
-| S28 | HC-SR04 centre **ECHO** | ESP32 (breakout) **GPIO 23** | through a 1k / 2k divider (5 V -> 3.3 V) |
-| S29 | HC-SR04 right **ECHO** | ESP32 (breakout) **GPIO 32** | through a 1k / 2k divider (5 V -> 3.3 V) |
-| S30 | Front servo SV1 **orange (signal)** | ESP32 (breakout) **GPIO 2** | servo lead |
-| S31 | Rear servo SV2 **orange (signal)** | ESP32 (breakout) **GPIO 12** | servo lead; nothing else on this pin (must be LOW at start-up) |
-| S32 | ESP32 (breakout) **GPIO 21 (SDA)** | MCP23017 U4 **SDA** | 4.7k pull-up to 3V3 |
-| S32 | ESP32 (breakout) **GPIO 21 (SDA)** | VL53L0X **SDA** |  |
-| S33 | ESP32 (breakout) **GPIO 22 (SCL)** | MCP23017 U4 **SCL** | 4.7k pull-up to 3V3 |
-| S33 | ESP32 (breakout) **GPIO 22 (SCL)** | VL53L0X **SCL** |  |
-| S34 | ESP32 (breakout) **3V3** | 3V3 bus | feeds every 3.3 V part |
-| S34 | ESP32 (breakout) **GND** | GND bus |  |
-| S34 | MCP23017 U4 **VDD, RESET** | 3V3 bus |  |
-| S34 | MCP23017 U4 **VSS, A0, A1, A2** | GND bus | address 0x20 |
-| S34 | VL53L0X **VIN** | 3V3 bus |  |
-| S34 | VL53L0X **GND** | GND bus |  |
-| S35 | Line sensor **VCC** | 3V3 bus |  |
-| S35 | Line sensor **GND** | GND bus |  |
-| S36 | Line sensor **OUT1** | MCP23017 U4 **GPA0** | OUT1 = leftmost |
-| S36 | Line sensor **OUT2** | MCP23017 U4 **GPA1** |  |
-| S36 | Line sensor **OUT3** | MCP23017 U4 **GPA2** |  |
-| S36 | Line sensor **OUT4** | MCP23017 U4 **GPA3** |  |
-| S36 | Line sensor **OUT5** | MCP23017 U4 **GPA4** |  |
-| S36 | Line sensor **OUT6** | MCP23017 U4 **GPA5** |  |
-| S36 | Line sensor **OUT7** | MCP23017 U4 **GPA6** |  |
-| S36 | Line sensor **OUT8** | MCP23017 U4 **GPA7** | OUT8 = rightmost |
-| S37 | Start button S2 **terminal 1** | MCP23017 U4 **GPB4** | internal pull-up |
-| S37 | Start button S2 **terminal 2** | GND bus |  |
-| S38 | Green LED D1 **+ (long leg)** | MCP23017 U4 **GPB2** | through 330 ohm |
-| S38 | Green LED D1 **- (short leg)** | GND bus |  |
-| S38 | Red LED D2 **+ (long leg)** | MCP23017 U4 **GPB3** | through 330 ohm |
-| S38 | Red LED D2 **- (short leg)** | GND bus |  |
-| S39 | Buzzer module **VCC** | 3V3 bus |  |
-| S39 | Buzzer module **GND** | GND bus |  |
-| S39 | Buzzer module **I/O** | MCP23017 U4 **GPB1** |  |
-| S40 | Bus-sense divider **top of 10k** | WAGO +12 V MOTOR | after the E-stop |
-| S40 | Bus-sense divider **bottom of 2.2k** | GND bus | 100 nF across the 2.2k |
-| S40 | Bus-sense divider **junction** | ESP32 (breakout) **GPIO 33** | about 2.3 V at 12.6 V; 0 V = E-stop pressed |
+| S24 | HC-SR04 (front) **VCC** | WAGO +5 V | 5 V |
+| S25 | HC-SR04 (front) **GND** | GND bus |  |
+| S26 | HC-SR04 (front) **TRIG** | ESP32 (breakout) **GPIO 4** |  |
+| S27 | HC-SR04 (front) **ECHO** | ESP32 (breakout) **GPIO 23** | through a 1k / 2k divider (5 V -> 3.3 V) |
+| S28 | Front servo SV1 **orange (signal)** | ESP32 (breakout) **GPIO 2** | servo lead |
+| S29 | Rear servo SV2 **orange (signal)** | ESP32 (breakout) **GPIO 12** | servo lead; nothing else on this pin (must be LOW at start-up) |
+| S30 | ESP32 (breakout) **GPIO 21 (SDA)** | MCP23017 U4 **SDA** | 4.7k pull-up to 3V3 |
+| S30 | ESP32 (breakout) **GPIO 21 (SDA)** | VL53L0X **SDA** |  |
+| S31 | ESP32 (breakout) **GPIO 22 (SCL)** | MCP23017 U4 **SCL** | 4.7k pull-up to 3V3 |
+| S31 | ESP32 (breakout) **GPIO 22 (SCL)** | VL53L0X **SCL** |  |
+| S32 | ESP32 (breakout) **3V3** | 3V3 bus | feeds every 3.3 V part |
+| S32 | ESP32 (breakout) **GND** | GND bus |  |
+| S32 | MCP23017 U4 **VDD, RESET** | 3V3 bus |  |
+| S32 | MCP23017 U4 **VSS, A0, A1, A2** | GND bus | address 0x20 |
+| S32 | VL53L0X **VIN** | 3V3 bus |  |
+| S32 | VL53L0X **GND** | GND bus |  |
+| S33 | Line sensor **VCC** | 3V3 bus |  |
+| S33 | Line sensor **GND** | GND bus |  |
+| S34 | Line sensor **OUT1** | MCP23017 U4 **GPA0** | OUT1 = leftmost |
+| S34 | Line sensor **OUT2** | MCP23017 U4 **GPA1** |  |
+| S34 | Line sensor **OUT3** | MCP23017 U4 **GPA2** |  |
+| S34 | Line sensor **OUT4** | MCP23017 U4 **GPA3** |  |
+| S34 | Line sensor **OUT5** | MCP23017 U4 **GPA4** |  |
+| S34 | Line sensor **OUT6** | MCP23017 U4 **GPA5** |  |
+| S34 | Line sensor **OUT7** | MCP23017 U4 **GPA6** |  |
+| S34 | Line sensor **OUT8** | MCP23017 U4 **GPA7** | OUT8 = rightmost |
+| S35 | Start button S2 **terminal 1** | MCP23017 U4 **GPB4** | internal pull-up |
+| S35 | Start button S2 **terminal 2** | GND bus |  |
+| S36 | Green LED D1 **+ (long leg)** | MCP23017 U4 **GPB2** | through 330 ohm |
+| S36 | Green LED D1 **- (short leg)** | GND bus |  |
+| S36 | Red LED D2 **+ (long leg)** | MCP23017 U4 **GPB3** | through 330 ohm |
+| S36 | Red LED D2 **- (short leg)** | GND bus |  |
+| S37 | Buzzer module **VCC** | 3V3 bus |  |
+| S37 | Buzzer module **GND** | GND bus |  |
+| S37 | Buzzer module **I/O** | MCP23017 U4 **GPB1** |  |
+| S38 | Bus-sense divider **top of 10k** | WAGO +12 V MOTOR | after the E-stop |
+| S38 | Bus-sense divider **bottom of 2.2k** | GND bus | 100 nF across the 2.2k |
+| S38 | Bus-sense divider **junction** | ESP32 (breakout) **GPIO 33** | about 2.3 V at 12.6 V; 0 V = E-stop pressed |
 <!-- end -->
 
 "Front-left" etc. means: looking down at the robot, with its front pointing away from you.
@@ -749,7 +741,7 @@ These pins are defined in one place, `firmware/cargo_robot/config.h`. If you eve
 - [ ] No continuity between 3V3 and GND, 5V and GND, 7.4 V and GND.
 - [ ] No continuity between 3V3 and any 5 V, 7.4 V or 12 V bus.
 - [ ] Measure the bus-sense junction with the battery in and the E-stop released: **2.0–2.3 V**. Above 3.3 V: the resistors are swapped. Fix it before connecting GPIO 33.
-- [ ] Each ECHO junction with the HC-SR04 powered: never more than 3.4 V.
+- [ ] The ECHO junction with the HC-SR04 powered: never more than 3.4 V.
 
 ### 3.3 Bench tests [SERIAL]
 
@@ -757,7 +749,7 @@ Put the robot **on a box, wheels in the air**. Battery in, master switch ON, E-s
 
 **Test 1: Status**
 
-Type `status`. One line: state, motor-bus volts (about your battery voltage), kg, the line sensors, the 3 ultrasonic distances, the side distance, the bed angle. Any `!!` warning at power-up names the part that isn't answering.
+Type `status`. One line: state, motor-bus volts (about your battery voltage), kg, the line sensors, the distance ahead (ultrasonic), the side distance, the bed angle. Any `!!` warning at power-up names the part that isn't answering.
 
 **Test 2: Encoders → `ticks_per_rev`**
 
@@ -823,14 +815,14 @@ line
 3. If the sensors show `#` over the **floor** and `.` over the tape: `set line_black 0`.
 4. Slide the tape from left to right: `position` goes from +1 to −1.
 
-**Test 7: Ultrasonic sensors and side sensor**
+**Test 7: Ultrasonic sensor and side sensor**
 
 ```
 sonar
 tof
 ```
 
-Hold your hand 30 cm in front of each ultrasonic sensor: its number reads about 30 cm. Hold a book 10 cm from the robot's right side next to the side sensor: `tof` reads about 100 mm.
+Hold your hand 30 cm in front of the ultrasonic sensor: it reads about 30 cm. Hold a book 10 cm from the robot's right side next to the side sensor: `tof` reads about 100 mm.
 
 **Save your settings and commit:**
 
@@ -861,7 +853,7 @@ Copy the output of `list` into a text file in the project (e.g. `firmware/settin
 |---|---|
 | `config.h` | The wiring: every pin number, and a few fixed numbers |
 | `settings.h / .cpp` | The ~45 tunable numbers (`list`), stored in the ESP32's flash |
-| `hw.h / .cpp` | Drivers: motors (hardware PWM), encoders (the ESP32's pulse-counter hardware: no counts are missed), the 4 HX711s on one clock, the MCP23017, the 3 ultrasonic sensors (interrupts), the servos (50 Hz pulses), the side sensor, the bus voltage |
+| `hw.h / .cpp` | Drivers: motors (hardware PWM), encoders (the ESP32's pulse-counter hardware: no counts are missed), the 4 HX711s on one clock, the MCP23017, the ultrasonic sensor (an interrupt), the servos (50 Hz pulses), the side sensor, the bus voltage |
 | `control.h / .cpp` | Maths only: wheel PID, line position, speed factors for weight and obstacles, a median filter |
 | `robot.h / .cpp` | `robotUpdate()`: called thousands of times per second. It reads every sensor that has news, runs the wheel controllers 100 times per second, moves the bed smoothly, drives the LEDs and buzzer |
 | `console.h / .cpp` | The Serial-Monitor commands |
@@ -999,7 +991,7 @@ Drive 3 m 5 times (`drive 0.2 0 15`, stopping at the mark). Measure how far side
 - The 8 sensors give a position: +1 = line under the leftmost sensor, −1 = rightmost, 0 = centred.
 - Turning speed = (`k_line` × position + `kd_line` × how fast the position changes), scaled with the forward speed (so the path is the same when the robot slows down).
 - **Line lost** (no sensor on black) for more than `lost_s`: the robot stops and raises an alarm.
-- **Station mark** (`mark_min` = 6 or more sensors on black for 2 readings): the robot drives on `stop_mm` (214 mm: from the sensor bar to the middle of the bed) and stops, so the middle of the bed is level with the mark.
+- **Station mark** (`mark_min` = 6 or more sensors on black for 2 readings): the robot drives on `stop_mm` (98 mm: from the sensor bar to the middle of the bed) and stops, so the middle of the bed is level with the mark.
 
 ### 6.3 Tune it
 
@@ -1050,12 +1042,13 @@ Watch it with `watch` (the kg column) while you add weights, then on the track: 
 
 ### 7.2 Obstacles
 
-| What the ultrasonic sensors see | What the robot does |
+| What the ultrasonic sensor sees ahead | What the robot does |
 |---|---|
 | Nothing closer than `slow_cm` (60 cm) | full speed |
-| Something 60 → 25 cm in front of the **centre** sensor | slows down in proportion |
-| Something closer than `stop_cm` (25 cm) in front | **stops**, red LED flashes, one beep per second ("please remove the obstacle"), drives on 1 s (`clear_s`) after the way is clear |
-| Something close to a **side** sensor only | slows to 50 % at most, never stops (so the conveyor and walls beside the track don't stop it) |
+| Something 60 → 25 cm ahead | slows down in proportion |
+| Something closer than `stop_cm` (25 cm) | **stops**, red LED flashes, one beep per second ("please remove the obstacle"), drives on 1 s (`clear_s`) after the way is clear |
+
+The sensor looks straight ahead along the line, so the conveyor and walls beside the track don't stop the robot.
 
 Test it during a mission: walk in front of the robot, put a box on the track.
 
@@ -1184,7 +1177,7 @@ Load at the pickup (by hand), watch it deliver, repeat. Record a video of 5 deli
 
 ### 10.1 Cable harness
 
-1. **Label every wire** at both ends (heat-shrink labels or tape + marker) with its ID from the wire lists (P1…P19, S1…S40).
+1. **Label every wire** at both ends (heat-shrink labels or tape + marker) with its ID from the wire lists (P1…P19, S1…S38).
 2. **Route power and signals apart:**
    - power wires (red/black, motor and servo wires) along the **left** side;
    - signal wires along the **right** side;
@@ -1200,7 +1193,7 @@ Load at the pickup (by hand), watch it deliver, repeat. Record a video of 5 deli
 ### 10.2 Covers
 
 - The simplest cover is 2–3 mm acrylic or PVC-foam side panels, 400 × 100 mm, one per side (plus front/rear pieces if you want). Hold them against the outside of the rods with small zip ties through 4 mm holes, or VHB tape on the plate edges.
-- Leave openings for: the master switch, the ESP32's USB socket (left side), the ultrasonic sensors and the line sensor (front), the side sensor (right), and airflow at the motor drivers and bucks.
+- Leave openings for: the master switch, the ESP32's USB socket (left side), the ultrasonic sensor (front), the side sensor (right), and airflow at the motor drivers and bucks.
 - **Never** cover the space under the bed's right edge or the servo horns.
 
 ### 10.3 Power-on routine
@@ -1331,7 +1324,7 @@ About 12–15 slides, 15 minutes:
 | Robot snakes along the line | `k_line` too high | Lower `k_line`, raise `kd_line` a little |
 | Line lost in curves | Too fast or `k_line` too low | Lower `follow_speed`, raise `k_line` |
 | Stops at random places | It sees station marks in curves, or shadows | Raise `mark_min`; adjust the sensor pots; avoid strong sun patches |
-| "obstacle" with nothing in front | An ultrasonic sensor sees the floor or the robot | Check the centre sensor points straight ahead and level; `sonar` shows which one |
+| "obstacle" with nothing in front | The ultrasonic sensor sees the floor or the robot | Check it points straight ahead and level; `sonar` shows what it reads |
 | "nothing beside the robot's right side" at the drop-off | The side sensor doesn't see the conveyor | `tof` at the drop-off; move the mark, or the sensor, or `set tof_check 0` |
 | The robot stops at the right place but the box misses the belt | `stop_mm` or the mark's position | Move the mark, or change `stop_mm` |
 
@@ -1454,9 +1447,9 @@ constexpr int PIN_ENC_R_B = 39;          // marked "VN"
 // 4 x HX711 load-cell amplifiers: one shared clock, one data line each
 constexpr int PIN_HX_SCK = 5;
 constexpr int PIN_HX_DT[4] = {16, 17, 18, 19};   // front-left, front-right, rear-left, rear-right
-// 3 x HC-SR04 ultrasonic: one shared TRIG; each ECHO through a 1k / 2k divider (5 V -> 3.3 V)
+// HC-SR04 ultrasonic sensor, looking straight ahead; ECHO through a 1k / 2k divider (5 V -> 3.3 V)
 constexpr int PIN_SONAR_TRIG = 4;
-constexpr int PIN_ECHO[3] = {13, 23, 32};        // left, centre, right
+constexpr int PIN_SONAR_ECHO = 23;
 // Bed servos: signal wire only (their power comes from the 7.4 V servo buck converter)
 constexpr int PIN_SERVO_FRONT = 2;
 constexpr int PIN_SERVO_REAR = 12;       // GPIO12 must be LOW while the ESP32 starts: connect nothing else to it
@@ -1480,7 +1473,7 @@ constexpr float BUS_DIVIDER = (10.0f + 2.2f) / 2.2f;   // motor-bus volts per vo
 constexpr float BUS_ON_V = 7.0f;         // below this the motors have no power: E-stop pressed or battery out
 constexpr int CONTROL_HZ = 100;          // wheel speed control and line following
 constexpr int DRIVE_PWM_HZ = 20000;      // BTS7960 PWM, above hearing
-constexpr int SONAR_PERIOD_MS = 60;      // one ping of all 3 ultrasonic sensors
+constexpr int SONAR_PERIOD_MS = 60;      // one ultrasonic ping
 constexpr float SONAR_MAX_CM = 400.0f;   // reported when nothing echoes back
 ```
 
@@ -1521,10 +1514,10 @@ struct Settings {
   float kd_line = 0.15f;
   float lost_s = 0.5f;            // stop if the line is gone this long
   float mark_min = 6;             // this many sensors on black at once = a station mark
-  float stop_mm = 214;            // drive on this far after a mark: sensor bar -> middle of the bed
+  float stop_mm = 98;             // drive on this far after a mark: sensor bar -> middle of the bed
   // ---- obstacles (week 7) ----
-  float stop_cm = 25;             // centre sensor: stop below this
-  float slow_cm = 60;             // all sensors: slow down below this
+  float stop_cm = 25;             // something closer than this ahead: stop
+  float slow_cm = 60;             // ... closer than this: slow down
   float clear_s = 1.0f;           // the way must be clear this long before driving on
   // ---- tilting bed (week 4, week 8) ----
   float tip_deg = 40;             // how far the bed tips to drop the package
@@ -1643,7 +1636,7 @@ void settingsList(Print &out) {
 //   Encoder     quadrature counter in the ESP32's pulse-counter hardware (x4 decoding, no CPU load)
 //   HX711Array  the 4 HX711 boards on one shared clock line
 //   Expander    MCP23017 over I2C: line sensors, motor enable, buzzer, LEDs, start button
-//   sonar::     the 3 HC-SR04 on one TRIG line; echo times measured with interrupts
+//   sonar::     the HC-SR04 in front; echo time measured with an interrupt
 //   BedServo    one servo signal (50 Hz pulses); no pulses = the servo goes limp
 //   sideMm()    VL53L0X distance to whatever is beside the robot's right side
 //   busVolts()  motor 12 V bus, through the divider
@@ -1697,7 +1690,7 @@ class Expander {
 namespace sonar {
 void begin();
 void update();                     // call often: pings every SONAR_PERIOD_MS
-float cm(int i);                   // 0 = left, 1 = centre, 2 = right; SONAR_MAX_CM = nothing there
+float cm();                        // distance straight ahead; SONAR_MAX_CM = nothing there
 }  // namespace sonar
 
 class BedServo {
@@ -1872,20 +1865,18 @@ void Expander::out(int pin, bool on) {
 // ---------------- sonar ----------------
 namespace sonar {
 namespace {
-volatile uint32_t riseUs[3];
-volatile uint32_t widthUs[3];
-volatile bool fresh[3];
-float lastCm[3] = {SONAR_MAX_CM, SONAR_MAX_CM, SONAR_MAX_CM};
+volatile uint32_t riseUs = 0, widthUs = 0;
+volatile bool fresh = false;
+float lastCm = SONAR_MAX_CM;
 uint32_t lastPing = 0;
 
-void IRAM_ATTR onEcho(void *arg) {
-  int i = (int)(intptr_t)arg;
+void IRAM_ATTR onEcho() {
   uint32_t now = micros();
-  if (digitalRead(PIN_ECHO[i])) {
-    riseUs[i] = now;
+  if (digitalRead(PIN_SONAR_ECHO)) {
+    riseUs = now;
   } else {
-    widthUs[i] = now - riseUs[i];
-    fresh[i] = true;
+    widthUs = now - riseUs;
+    fresh = true;
   }
 }
 }  // namespace
@@ -1893,25 +1884,21 @@ void IRAM_ATTR onEcho(void *arg) {
 void begin() {
   pinMode(PIN_SONAR_TRIG, OUTPUT);
   digitalWrite(PIN_SONAR_TRIG, LOW);
-  for (int i = 0; i < 3; i++) {
-    pinMode(PIN_ECHO[i], INPUT);
-    attachInterruptArg(PIN_ECHO[i], onEcho, (void *)(intptr_t)i, CHANGE);
-  }
+  pinMode(PIN_SONAR_ECHO, INPUT);
+  attachInterrupt(PIN_SONAR_ECHO, onEcho, CHANGE);
 }
 
 void update() {
   if (millis() - lastPing < SONAR_PERIOD_MS) return;
   lastPing = millis();
-  for (int i = 0; i < 3; i++) {                   // results of the previous ping
-    lastCm[i] = fresh[i] ? min(widthUs[i] / 58.0f, SONAR_MAX_CM) : SONAR_MAX_CM;
-    fresh[i] = false;
-  }
-  digitalWrite(PIN_SONAR_TRIG, HIGH);             // all 3 sensors ping at once
+  lastCm = fresh ? min(widthUs / 58.0f, SONAR_MAX_CM) : SONAR_MAX_CM;   // result of the previous ping
+  fresh = false;
+  digitalWrite(PIN_SONAR_TRIG, HIGH);
   delayMicroseconds(10);
   digitalWrite(PIN_SONAR_TRIG, LOW);
 }
 
-float cm(int i) { return lastCm[i]; }
+float cm() { return lastCm; }
 }  // namespace sonar
 
 // ---------------- BedServo ----------------
@@ -1990,9 +1977,8 @@ void twistToWheels(float v, float w, float wheelSep, float wheelRadius, float ma
 // 1.0 empty -> minFactor at maxKg -> 0.0 (refuse to move) above maxKg * overload.
 float payloadFactor(float kg, float maxKg, float minFactor, float overload);
 
-// 1.0 when the way is clear -> 0.0 at stopCm. Side sensors only slow the robot (to 50 %), never stop it,
-// so the conveyor and walls beside the line do not stop it.
-float obstacleFactor(const float cm[3], float stopCm, float slowCm);
+// 1.0 when the way ahead is clear (beyond slowCm) -> 0.0 at stopCm and closer.
+float obstacleFactor(float cm, float stopCm, float slowCm);
 
 // The 8 line sensors as a position: +1 = line under the leftmost sensor, -1 = rightmost, 0 = centred.
 struct Line {
@@ -2052,11 +2038,8 @@ float payloadFactor(float kg, float maxKg, float minFactor, float overload) {
   return 1 - (1 - minFactor) * min(kg / maxKg, 1.0f);
 }
 
-float obstacleFactor(const float cm[3], float stopCm, float slowCm) {
-  auto ramp = [&](float d) { return constrain((d - stopCm) / (slowCm - stopCm), 0.0f, 1.0f); };
-  float centre = ramp(cm[1]);
-  float sides = max(0.5f, ramp(min(cm[0], cm[2])));
-  return min(centre, sides);
+float obstacleFactor(float cm, float stopCm, float slowCm) {
+  return constrain((cm - stopCm) / (slowCm - stopCm), 0.0f, 1.0f);
 }
 
 Line readLine(uint8_t bits, bool blackIsHigh) {
@@ -2108,7 +2091,7 @@ struct Readings {
   float kg = 0;                    // total weight on the bed, median-filtered
   bool cellsOk = false;            // the HX711s answered in the last second
   Line line;
-  float sonarCm[3] = {0, 0, 0};    // left, centre, right
+  float sonarCm = 0;               // ultrasonic, straight ahead
   int sideMm = -1;                 // right side (VL53L0X); -1 = nothing in range
   float wheelL = 0, wheelR = 0;    // rad/s
   Odometry odom;
@@ -2261,7 +2244,7 @@ void robotUpdate() {
   rd.cellsOk = millis() - lastCellRead < 1000;
 
   sonar::update();
-  for (int i = 0; i < 3; i++) rd.sonarCm[i] = sonar::cm(i);
+  rd.sonarCm = sonar::cm();
   if (millis() - lastSide >= 20) {
     lastSide = millis();
     rd.sideMm = sideMm();
@@ -2599,8 +2582,7 @@ void testLine() {
 
 void testSonar() {
   monitor([] {
-    Serial.printf("left %5.0f cm   centre %5.0f cm   right %5.0f cm   (%.0f = nothing)\n", rd.sonarCm[0],
-                  rd.sonarCm[1], rd.sonarCm[2], SONAR_MAX_CM);
+    Serial.printf("ahead %5.0f cm   (%.0f = nothing there)\n", rd.sonarCm, SONAR_MAX_CM);
   });
 }
 
@@ -2647,9 +2629,8 @@ void status() {
   char bits[9];
   for (int i = 0; i < 8; i++) bits[i] = rd.line.black & (1 << i) ? '#' : '.';
   bits[8] = 0;
-  Serial.printf("%-7s | %4.1f V | %6.3f kg%s | line %s | sonar %3.0f %3.0f %3.0f cm | side %4d mm | bed %4.1f deg\n",
-                stateName(), rd.busV, rd.kg, rd.cellsOk ? "" : " (no HX711)", bits, rd.sonarCm[0], rd.sonarCm[1],
-                rd.sonarCm[2], rd.sideMm, rd.bedDeg);
+  Serial.printf("%-7s | %4.1f V | %6.3f kg%s | line %s | ahead %3.0f cm | side %4d mm | bed %4.1f deg\n",
+                stateName(), rd.busV, rd.kg, rd.cellsOk ? "" : " (no HX711)", bits, rd.sonarCm, rd.sideMm, rd.bedDeg);
 }
 
 void help() {

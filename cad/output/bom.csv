@@ -1,32 +1,40 @@
-Group,Item,Qty,Notes
-Control,"ESP32 DevKit, 38-pin (ESP32-WROOM-32)",1,the AGV brain; buy a spare
-Control,MCP23017 I2C expander module,1,"8 line sensors, 2 limit switches, LEDs"
-Control,Perfboard 70 x 90 mm + female headers,2,logic board (ESP32 + MCP23017) and stepper board
-Drive,"JGB37-520 12 V gear motor with Hall encoder, 60-100 rpm, 6 mm D shaft",2,
-Drive,Wheel 100 x 30 mm with 6 mm D-shaft hub,2,
-Drive,Dual motor driver Cytron MDD10A (or 2 x BTS7960),1,PWM + DIR per motor
-Drive,"Metal ball caster, 1 inch ball, about 30 mm tall, 2 mounting holes 26-36 mm apart",2,other heights: change CASTER_H and re-run
-Sensors,8-channel IR line sensor array (TCRT5000 type) with digital outputs,1,
-Sensors,HC-SR04 ultrasonic sensor,3,+1 spare. 1k/2k divider on each ECHO
-Sensors,VL53L0X time-of-flight distance sensor module,1,side-facing: gap to the conveyor
-Payload,Bar load cell 5 kg (80 x 12.7 x 12.7 mm),1,
-Payload,HX711 load cell amplifier,1,
-Pusher,"NEMA17 stepper, 40 N.cm or more, 34-48 mm long, 5 mm shaft",1,
-Pusher,TMC2209 stepper driver (or A4988) + 100 uF capacitor,1,
-Pusher,"GT2 20-tooth pulley, 5 mm bore",1,
-Pusher,"GT2 20-tooth idler pulley, 5 mm bore (toothless or toothed)",1,
-Pusher,"GT2 belt, 6 mm wide, open, 1 m",1,uses about 0.55 m
-Pusher,Smooth rod 8 mm x 300 mm,2,
-Pusher,LM8UU linear bearing,4,
-Pusher,Lever microswitch 20 x 10 x 6.4 mm (KW11 / SS-5GL type),2,home and end
-Power,"3S LiPo 11.1 V 5000 mAh (about 155 x 50 x 35 mm), XT60 + balance charger + LiPo bag",1,
-Power,"Buck converter 12 V -> 5 V, 5 A (XL4015)",1,ESP32 and sensors
-Power,"Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs",1,
-Power,"Emergency stop 22 mm, latching, NC contact",1,
-Power,"Toggle switch 12 mm panel mount, 12 V DC 15 A",1,
-Panel,"LED 5 mm green + red, active buzzer 12 mm, push button 16 mm (optional)",1,
-Hardware,"M4 x 16 bolts + nuts (tile seams, pods, motor mounts, battery tray)",40,
-Hardware,"M4 x 30 bolts + nuts (motor clamps), M4 x 20 (bridge, rod holders)",12,
-Hardware,"M3 x 10/16 bolts + nuts, M3 self-tapping screws x 12, M3 standoffs",1,one assortment box
-Hardware,M5 x 25 bolt + nut + 4 washers (belt idler),1,
-Hardware,"M2 x 10 screws (limit switches), zip ties, velcro strap 20 mm",1,
+Group,Item,Qty,Make/Buy
+Compute,"ESP32 DevKitC 38-pin (ESP32-WROOM-32, USB) + 38-pin screw-terminal breakout board",1,buy (get 2)
+Compute,MCP23017 I2C 16-bit I/O expander module (address 0x20),1,buy
+Drive,JGB37-520 12V 170 RPM gear motor with Hall encoder (6 wires),2,buy
+Drive,Steel mounting bracket for 37 mm gear motor (+ its M3 screws),2,buy
+Drive,Wheel 100 mm x 30 mm with 6 mm D-shaft hub,2,buy
+Drive,"Swivel caster 50 mm, M8 threaded stem, >= 20 kg rating",2,buy
+Drive,BTS7960 (IBT-2) 43 A motor driver,2,buy
+Sensors,"8-channel IR line sensor array, TCRT5000, digital outputs, 3.3-5 V",1,buy
+Sensors,Line sensor bracket (line_sensor_bracket.stl),1,3D print PETG
+Sensors,HC-SR04 ultrasonic distance sensor,3,buy (get 4)
+Sensors,Ultrasonic sensor bracket (sonar_bracket.stl),1,3D print PETG
+Sensors,VL53L0X time-of-flight distance sensor module,1,buy
+Sensors,Side sensor bracket (tof_bracket.stl),1,3D print PETG
+Payload,"Straight-bar load cell 10 kg, 80x12.7x12.7 mm",4,buy
+Payload,HX711 module,4,buy
+Payload,Load-cell spacer (load_cell_spacer.stl),8,3D print PETG 100 %
+Payload,Cargo plate 260x280x5 (cargo_plate.dxf),1,laser-cut acrylic
+Tilting bed,Tilting plate 236x247x6 (tilt_plate.dxf),1,laser-cut 6 mm plywood
+Tilting bed,"Servo 60 kg.cm, metal gears, 180 deg, 6-8.4 V, 25T spline, about 65x30x48 mm (e.g. DS5160)",2,buy
+Tilting bed,"25T aluminium disc servo horn, about 38 mm (often included with the servo)",2,buy
+Tilting bed,Servo mount (servo_mount_front.stl + servo_mount_rear.stl),2,3D print PETG
+Tilting bed,Horn adapter (horn_adapter_front.stl + horn_adapter_rear.stl),2,3D print PETG 100 %
+Tilting bed,Bed rest post (bed_rest.stl) + 18 mm self-adhesive rubber pad 2 mm,2,3D print PETG
+Tilting bed,"Buck converter 10 A (e.g. 300 W XL4016 module), set to 7.4 V for the servos",1,buy
+Power,3S LiPo 11.1 V 5000 mAh XT60 + balance charger + LiPo bag + voltage alarm,1,buy
+Power,XL4015 5 A buck converter (5.1 V for the ESP32 and sensors),1,buy
+Power,"Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs",1,buy
+Power,"Emergency stop 22 mm panel-mount, latching, NC contact block",1,buy
+Power,"Toggle switch 12 mm panel-mount, 12 V DC >= 15 A",1,buy
+Controls,"Push button 12 mm panel-mount, momentary, normally open (start)",1,buy
+Controls,"5 mm LED green + red, with panel clips, + 330 ohm resistors",1,buy
+Controls,"Active buzzer module, 3-pin, 3.3-5 V",1,buy
+Chassis,Bottom plate 400x300x6 (bottom_plate.dxf),1,laser-cut 6 mm plywood
+Chassis,Top deck 400x300x5 (top_deck.dxf),1,laser-cut 5 mm acrylic
+Chassis,"M6 threaded rod, cut to 130 mm",6,cut from 1 m rod
+Chassis,M6 nut + M6 washer,24,buy
+Chassis,M8 nut + M8 washer (casters),4,buy
+Hardware,"M4x12 screws + nylock nuts (motor brackets, servo mounts, rest posts), M4x16 + nuts (horn adapters), M4/M5x16 (load cells), M3 screws + nuts (sensor brackets), M2.5/M3 for the boards, VHB tape, velcro strap, zip ties",1,buy
+Hardware,"Resistors 1k x3, 2k x3, 10k x5, 2.2k x1, 4.7k x2, 100 nF x1, small perfboard x2",1,buy

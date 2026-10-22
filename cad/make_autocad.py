@@ -1,14 +1,14 @@
 """
-AutoCAD version of the cargo robot design (v3): 3D model + A3 drawing set in one DXF file.
+AutoCAD version of the cargo robot design (v2, tilting bed): 3D model + A3 drawing set in one DXF file.
 
 Run:   .venv\\Scripts\\python make_autocad.py
 Writes ./autocad/
-  CargoRobot_v3.dxf   open it in AutoCAD (File > Open, "Files of type: DXF"), then Save As .dwg
+  CargoRobot_v2.dxf   open it in AutoCAD (File > Open, "Files of type: DXF"), then Save As .dwg
       Model tab   : the 3D model (layers 3D-*) - use Orbit / View Cube, visual style "Shaded"
-      Layout tabs : 8 A3 sheets ready to plot (DWG To PDF):
+      Layout tabs : 10 A3 sheets ready to plot (DWG To PDF):
                     01 GENERAL ARRANGEMENT   02 LAYOUT (DECK REMOVED)   03 BOTTOM PLATE   04 TOP DECK
-                    05 CARGO PLATE   06 PRINTED PARTS   07 PUSHER   08 BILL OF MATERIALS
-  CargoRobot_v3_drawings.pdf   the same 8 sheets as a PDF (true A3 scale) - print or share without AutoCAD
+                    05 TILTING PLATE   06 CARGO PLATE   07 TILTING BED   08-09 PRINTED PARTS   10 BILL OF MATERIALS
+  CargoRobot_v2_drawings.pdf   the same 10 sheets as a PDF (true A3 scale) - print or share without AutoCAD
   previews/*.png      picture of every sheet
 
 Everything is generated from robot_cad.py, so the drawings always match the model.
@@ -34,10 +34,10 @@ OUT = Path(__file__).parent / "autocad"
 FRAME = (20, 10, 410, 287)            # ISO 5457 A3 frame (20 mm binding margin)
 TB = (230, 10, 410, 62)               # title block
 VP_C, VP_S = (215, 148.5), (390, 277)  # paper-space viewport covering the frame
-N_SHEETS = 8
-PROJECT = "AUTONOMOUS CARGO ROBOT - DESIGN v3"
+N_SHEETS = 10
+PROJECT = "AUTONOMOUS CARGO ROBOT - DESIGN v2"
 SCHOOL = "ARAB ACADEMY FOR SCIENCE, TECHNOLOGY & MARITIME TRANSPORT - GRADUATION PROJECT II"
-DATE = "13/10/2026"
+DATE = "22/10/2026"
 
 dd = DxfDocument(dxfversion="AC1032", setup=True, doc_units=ezdxf.units.MM)
 doc, msp = dd.document, dd.msp
@@ -67,8 +67,8 @@ def setup_document():
         ("3D-ELECTRONICS", 3, 25, "Continuous", True),
         ("3D-SENSORS", 5, 25, "Continuous", True),
         ("3D-CONTROLS", 1, 25, "Continuous", True),
+        ("3D-TILT", 150, 25, "Continuous", True),
         ("3D-PAYLOAD", 30, 25, "Continuous", True),
-        ("3D-PUSHER", 40, 25, "Continuous", True),
     ]:
         doc.layers.add(name, color=color, lineweight=lw, linetype=lt, plot=plot)
 
@@ -261,17 +261,18 @@ def ground_line(view, x0, x1):
     msp.add_line(a, b, dxfattribs={"layer": "2D-VISIBLE"})
 
 
-def parts(filter_=None):
+def parts(filter_=None, bed_angle=0.0):
     shapes = []
-    for items in rc.groups.values():
+    for gname, items in rc.groups.items():
         for name, wp, _ in items:
             if filter_ is None or filter_(name):
-                shapes.extend(wp.vals())
+                shapes.extend((rc.tipped(wp, bed_angle) if gname == "payload" else wp).vals())
     return cq.Compound.makeCompound(shapes)
 
 
 SIDE, FRONT, PLAN = ((0, -1, 0), (1, 0, 0)), ((1, 0, 0), (0, 1, 0)), ((0, 0, 1), (1, 0, 0))
 ISO = ((1, -1, 0.8), (1, 1, 0))
+BED_NAMES = {name for name, _, _ in rc.groups["payload"]}
 
 
 # ============================== 3D model ==============================
@@ -291,25 +292,38 @@ def model_3d():
     vport.dxf.target = (0, 0, 130)
 
 
+def balloons(sh, view, items, z):
+    """Numbered balloons with leaders; items = [(name, (x, y) on the robot, (dx, dy) balloon offset on paper)]."""
+    for i, (name, (x, y), (dx, dy)) in enumerate(items, start=1):
+        pc = sh.paper(view.m((x, y, z)))
+        pb = (pc[0] + dx, pc[1] + dy)
+        sh.psp.add_circle(pc, 0.6, dxfattribs={"layer": "BALLOONS"})
+        d = ((pc[0] - pb[0]) ** 2 + (pc[1] - pb[1]) ** 2) ** 0.5
+        k = 4.0 / d
+        line(sh.psp, (pb[0] + (pc[0] - pb[0]) * k, pb[1] + (pc[1] - pb[1]) * k), pc, "BALLOONS")
+        sh.psp.add_circle(pb, 4.0, dxfattribs={"layer": "BALLOONS"})
+        text(sh.psp, str(i), pb, h=3.0, align=TA.MIDDLE_CENTER, layer="BALLOONS")
+
+
 # ============================== sheet 01: general arrangement ==============================
 def sheet_ga():
-    sh = Sheet(1, "GENERAL ARRANGEMENT", "GENERAL ARRANGEMENT", 5, (3000, 0), "CR-V3-001")
+    sh = Sheet(1, "GENERAL ARRANGEMENT", "GENERAL ARRANGEMENT", 5, (3000, 0), "CR-V2-001")
     whole = parts()
     bb = whole.BoundingBox()
     side = View(whole, *SIDE).place(sh, (165, 205))
     front = View(whole, *FRONT).place(sh, (68, 205))
     plan = View(whole, *PLAN).place(sh, (165, 116))
-    iso = View(whole, *ISO).place(sh, (322, 214))
+    iso = View(parts(bed_angle=rc.TIP_ANGLE), *ISO).place(sh, (322, 214))
     ground_line(side, bb.xmin - 20, bb.xmax + 20)
     ground_line(front, bb.ymin - 20, bb.ymax + 20)
     s = sh.s
     half_w = rc.WHEEL_Y + rc.WHEEL_W / 2                 # outside of the tyres
-    top = rc.Z_DECK_TOP + 80                             # top of the lidar
+    top = rc.Z_CARGO + rc.CARGO_T                        # top of the cargo plate
     # side view
-    sh.dim(side.m((-rc.L / 2, 0, rc.Z_LOWER)), side.m((bb.xmax, 0, 89)),
+    sh.dim(side.m((-rc.L / 2, 0, rc.Z_LOWER)), side.m((bb.xmax, 0, 30)),
            (0, side.m((0, 0, top))[1] + 9 * s), dec=0)
     x_right = side.m((bb.xmax, 0, 0))[0]
-    for k, (px, z) in enumerate([(200, rc.Z_BASE), (200, rc.Z_DECK_TOP), (rc.LIDAR_X + 13, top)]):
+    for k, (px, z) in enumerate([(200, rc.Z_BASE), (200, rc.Z_DECK_TOP), (rc.CARGO[0] / 2, top)]):
         sh.dim(side.m((bb.xmax, 0, 0)), side.m((px, 0, z)), (x_right + (8 + 7 * k) * s, 0), vertical=True, dec=0)
     sh.diameter(side.m((0, 0, rc.AXLE_Z)), rc.WHEEL_D / 2, location=side.m((75, 0, -14)))
     # plan view
@@ -325,72 +339,56 @@ def sheet_ga():
     side.label("SIDE VIEW (from the right)  FRONT -->", gap=9)
     front.label("FRONT VIEW", gap=23)
     plan.label("PLAN VIEW  FRONT -->", gap=16)
-    iso.label("ISOMETRIC VIEW")
+    iso.label(f"ISOMETRIC VIEW - BED TIPPED {rc.TIP_ANGLE} deg")
     sh.note([
         "1. All dimensions in mm. Weights and loads in kg.",
         "2. Drive: 2 x JGB37-520 12 V 170 RPM gear motors, wheels D100 x 30.",
         "3. Casters: 2 x 50 mm swivel, M8 threaded stem (height set by nuts).",
         "4. Frame: 6 mm plywood + 5 mm acrylic on 6 x M6 threaded rod.",
-        "5. Payload: 4 x 10 kg load cells under the cargo plate, max 15 kg.",
-        "6. Sensors: RPLIDAR A1M8 (front), USB camera tilted 35 deg down.",
-        "7. Pusher: blade on a T8 lead screw pushes the cargo off the rear",
-        "   (shown parked; sheet 07).",
-        "8. Sheets: 01 GA, 02 layout, 03-05 plates, 06 prints, 07 pusher, 08 BOM.",
+        f"5. Bed: tipped {rc.TIP_ANGLE} deg to the right by 2 servos on the hinge line.",
+        "6. Payload: 4 x 10 kg load cells under the cargo plate; packages up to 3 kg.",
+        "7. ESP32 + 8-ch IR line sensor, 3 x HC-SR04, VL53L0X (right side).",
+        "8. Sheets: 01 GA, 02 layout, 03-06 plates, 07 bed, 08-09 prints, 10 BOM.",
     ], 233, 150, h=2.3)
 
 
 # ============================== sheet 02: layout with the deck removed ==============================
 def sheet_layout():
-    sh = Sheet(2, "LAYOUT (DECK REMOVED)", "LAYOUT - DECK REMOVED", 2, (4700, 0), "CR-V3-002")
-    hidden_parts = ("top_deck", "estop", "switch", "rplidar", "lidar", "load_cell", "cell_spacer", "hx711", "cargo",
-                    "pusher")
-    body = parts(lambda n: not n.startswith(hidden_parts))
-    plan = View(body, (0, 0, 1), (0, -1, 0)).place(sh, (118, 172))      # front of the robot points UP
-    plan.label("PLAN VIEW - DECK, CARGO PLATE, LIDAR AND PUSHER REMOVED (front of robot at the top)", gap=9)
+    sh = Sheet(2, "LAYOUT (DECK REMOVED)", "LAYOUT - DECK REMOVED", 2, (4700, 0), "CR-V2-002")
+    on_deck = ("top_deck", "estop", "switch", "button", "led_", "tof", "vl53l0x", "servo", "bed_rest")
+    body = parts(lambda n: not n.startswith(on_deck) and n not in BED_NAMES)
+    plan = View(body, (0, 0, 1), (0, -1, 0)).place(sh, (118, 170))      # front of the robot points UP
+    plan.label("PLAN VIEW - DECK AND BED REMOVED (front of robot at the top)", gap=9)
     items = [
-        ("3S LiPo battery 5000 mAh (lies across, slides out sideways)", (0, 0), (18, 10)),
+        ("3S LiPo battery 5000 mAh (lies across, slides out sideways)", (0, 0), (20, 14)),
         ("BTS7960 motor driver - left motor", (-150, 60), (-16, -12)),
         ("BTS7960 motor driver - right motor", (-150, -60), (16, -12)),
-        ("BTS7960 motor driver - pusher motor", (120, -65), (16, 12)),
-        ("Raspberry Pi 5 on M2.5 standoffs", (120, 65), (-18, 10)),
-        ("Buck converter 12 V -> 5.1 V", (-60, 85), (-16, 8)),
-        ("WAGO power buses (+12 V main / motor / GND)", (-60, -85), (16, 8)),
-        ("Inline fuse 10 A", (45, -110), (18, 0)),
-        ("USB camera on printed mount", (212, 0), (14, 6)),
+        ("ESP32 DevKit on a screw-terminal breakout (USB to the left)", rc.ESP_POS, (-22, 4)),
+        ("I/O board: MCP23017 + resistor dividers", rc.IO_POS, (20, 6)),
+        ("Buck converter 12 V -> 5.1 V (ESP32, sensors)", (-60, 85), (-12, 16)),
+        ("Buck converter 12 V -> 7.4 V (bed servos)", (-72, -95), (22, 6)),
+        ("WAGO power buses (+12 V main / motor / 5 V / GND)", (-85, -20), (16, 10)),
+        ("Inline fuse 10 A", (45, -110), (20, 2)),
+        ("Buzzer", (-110, 105), (-14, -6)),
+        ("3 x HC-SR04 ultrasonic on printed bracket", (196, 0), (8, 18)),
+        ("8-channel IR line sensor (under the front edge)", (214, 45), (-16, 12)),
         ("M6 threaded rod (x6)", (60, 135), (-14, 0)),
-        ("Drive wheel D100 (motor under the plate)", (0, rc.WHEEL_Y), (0, -34)),
-        ("Motor / encoder cable slot (x2)", (40, -70), (14, -8)),
-        ("Battery strap slots (x4)", (31, 45), (-12, 14)),
+        ("Drive wheel D100 (motor under the plate)", (0, rc.WHEEL_Y), (-6, -30)),
+        ("Motor / encoder cable slot (x2)", (40, -70), (16, -4)),
+        ("Battery strap slots (x4)", (31, 45), (-12, 16)),
     ]
-    for i, (name, (x, y), (dx, dy)) in enumerate(items, start=1):
-        pc = sh.paper(plan.m((x, y, rc.Z_LOWER)))
-        pb = (pc[0] + dx, pc[1] + dy)
-        sh.psp.add_circle(pc, 0.6, dxfattribs={"layer": "BALLOONS"})
-        d = ((pc[0] - pb[0]) ** 2 + (pc[1] - pb[1]) ** 2) ** 0.5
-        k = 4.0 / d
-        line(sh.psp, (pb[0] + (pc[0] - pb[0]) * k, pb[1] + (pc[1] - pb[1]) * k), pc, "BALLOONS")
-        sh.psp.add_circle(pb, 4.0, dxfattribs={"layer": "BALLOONS"})
-        text(sh.psp, str(i), pb, h=3.0, align=TA.MIDDLE_CENTER, layer="BALLOONS")
+    balloons(sh, plan, items, rc.Z_LOWER)
     table(sh.psp, 232, 280, [10, 166], ["No.", "COMPONENT"], [[str(i), n] for i, (n, _, _) in enumerate(items, 1)],
-          row_h=6.5, h=2.4)
+          row_h=6.0, h=2.3)
     sh.note([
-        "Small boards are held with VHB tape; the Pi on M2.5 standoffs.",
-        "Keep 10 cm slack on every wire that goes up to the deck.",
-        "Wiring: see BUILD_GUIDE.md, weeks 2 and 3.",
-    ], 232, 184, h=2.3)
+        "Small boards are held with VHB tape.",
+        "Keep 10 cm slack on every wire that goes up to the deck or the bed.",
+        "Wiring: see BUILD_GUIDE.md weeks 2 and 3, and the schematics E01-E04.",
+    ], 232, 168, h=2.3)
 
 
-# ============================== sheets 03-05: plates ==============================
-PURPOSE = {
-    ("HOLE", 6.5): "M6 threaded rod", ("HOLE", 8.5): "caster stem M8", ("HOLE", 2.7): "Raspberry Pi M2.5",
-    ("HOLE", 3.4): "camera mount M3", ("HOLE", 22.5): "E-stop 22 mm", ("HOLE", 12.2): "master switch",
-    ("HOLE", 4.5): "pusher bracket M4",
-    ("SLOT", (5.5, 23.5)): "load-cell screws", ("CUTOUT", (4.0, 22.0)): "battery strap",
-    ("CUTOUT", (12.0, 20.0)): "motor/encoder cables", ("CUTOUT", (12.0, 80.0)): "wiring pass-through",
-}
-
-
-def plate_features(face):
+# ============================== sheets 03-06: plates ==============================
+def plate_features(face, purpose):
     feats = []
     for w in face.innerWires():
         edges = w.Edges()
@@ -398,17 +396,17 @@ def plate_features(face):
         c = ((bb.xmin + bb.xmax) / 2, (bb.ymin + bb.ymax) / 2)
         if len(edges) == 1 and edges[0].geomType() == "CIRCLE":
             d = round(2 * edges[0].radius(), 1)
-            feats.append(("HOLE", c, d, PURPOSE.get(("HOLE", d), "")))
+            feats.append(("HOLE", c, d, purpose.get(("HOLE", d), "")))
         else:
             kind = "SLOT" if any(e.geomType() == "CIRCLE" for e in edges) else "CUTOUT"
             size = (round(bb.xlen, 1), round(bb.ylen, 1))
-            feats.append((kind, c, size, PURPOSE.get((kind, tuple(sorted(size))), "")))
+            feats.append((kind, c, size, purpose.get((kind, tuple(sorted(size))), "")))
     order = {"HOLE": 0, "SLOT": 1, "CUTOUT": 2}
     feats.sort(key=lambda f: (order[f[0]], round(f[1][0], 1), round(f[1][1], 1)))
     return feats
 
 
-def sheet_plate(number, name, dwg_no, wp, z_mid, notes, model_center):
+def sheet_plate(number, name, dwg_no, wp, z_mid, notes, model_center, purpose):
     sh = Sheet(number, name, name, 2, model_center, dwg_no)
     face = wp.translate((0, 0, -z_mid)).section().faces().val()
     bb = face.BoundingBox()
@@ -425,7 +423,7 @@ def sheet_plate(number, name, dwg_no, wp, z_mid, notes, model_center):
     text(sh.psp, "DATUM 0,0", sh.paper(m(bb.xmin + 2, bb.ymin - 2 * s)), h=2.0, align=TA.TOP_LEFT)
     text(sh.psp, "FRONT -->", sh.paper(m(bb.xmax, bb.ymax + 3 * s)), h=2.5, align=TA.BOTTOM_RIGHT)
     rows, counters = [], {"HOLE": 0, "SLOT": 0, "CUTOUT": 0}
-    for kind, (x, y), size, purpose in plate_features(face):
+    for kind, (x, y), size, why in plate_features(face, purpose):
         counters[kind] += 1
         fid = {"HOLE": "H", "SLOT": "S", "CUTOUT": "C"}[kind] + str(counters[kind])
         if kind == "HOLE":
@@ -439,45 +437,158 @@ def sheet_plate(number, name, dwg_no, wp, z_mid, notes, model_center):
                 size_s += f" (R{min(size) / 2:g})"
         lx, ly = sh.paper(m(x + off * 0.7 + 1.5, y + off * 0.7 + 1.5))
         text(sh.psp, fid, (lx, ly), h=2.2)
-        rows.append([fid, f"{x - bb.xmin:.1f}", f"{y - bb.ymin:.1f}", size_s, purpose])
-    y_end = table(sh.psp, 250, 280, [12, 22, 22, 42, 57], ["ID", "X", "Y", "SIZE", "FOR"], rows, row_h=5.6, h=2.3)
+        rows.append([fid, f"{x - bb.xmin:.1f}", f"{y - bb.ymin:.1f}", size_s, why])
+    y_end = table(sh.psp, 250, 280, [12, 22, 22, 42, 57], ["ID", "X", "Y", "SIZE", "FOR"], rows, row_h=5.2, h=2.2)
     text(sh.psp, "X, Y = centre of the feature from DATUM 0,0 (H = hole, S = slot, C = cut-out)",
          (250, y_end - 5), h=2.0)
     sh.note(notes, 25, 82, h=2.3)
 
 
-# ============================== sheet 06: printed parts ==============================
+# ============================== sheet 07: the tilting bed ==============================
+def sheet_bed():
+    sh = Sheet(7, "TILTING BED", "TILTING BED - SERVO HINGE", 2, (9700, 0), "CR-V2-007")
+    keep = ("top_deck", "servo_rear", "servo_mount_rear", "bed_rest")
+
+    def bed_shape(angle):
+        """Front view of the deck, the rear servo and the bed (the front servo and its mount left out)."""
+        shapes = []
+        for gname, items in rc.groups.items():
+            for name, wp, _ in items:
+                if name in BED_NAMES and not name.endswith("_front"):
+                    shapes.extend(rc.tipped(wp, angle).vals())
+                elif name.startswith(keep):
+                    shapes.extend(wp.vals())
+        return cq.Compound.makeCompound(shapes)
+
+    flat = View(bed_shape(0), *FRONT, hidden=True).place(sh, (118, 236))
+    tip = View(bed_shape(rc.TIP_ANGLE), *FRONT, hidden=True).place(sh, (318, 186))
+    s = sh.s
+    ax = (0, rc.Y_AX, rc.Z_AX)
+    for v in (flat, tip):                                              # centre mark on the hinge axis
+        cx, cy = v.m(ax)
+        for a, b in (((cx - 9, cy), (cx + 9, cy)), ((cx, cy - 9), (cx, cy + 9))):
+            msp.add_line(a, b, dxfattribs={"layer": "CENTER"})
+    deck_edge = (0, -rc.W / 2, rc.Z_DECK_TOP)
+    top = rc.Z_CARGO + rc.CARGO_T
+    # flat: axis position and heights above the deck
+    y_deck = flat.m(deck_edge)[1]
+    sh.dim(flat.m(deck_edge), flat.m(ax), (0, y_deck - 8 * s), dec=0)
+    sh.dim(flat.m(ax), flat.m((0, 0, rc.Z_AX)), (0, y_deck - 15 * s), dec=0)
+    xl = flat.m((0, -rc.W / 2, 0))[0]
+    sh.dim(flat.m(deck_edge), flat.m(ax), (xl - 8 * s, 0), vertical=True, dec=0)
+    sh.dim(flat.m(deck_edge), flat.m((0, -rc.CARGO[1] / 2, top)), (xl - 16 * s, 0), vertical=True, dec=1)
+    flat.label("BED FLAT - FROM THE FRONT (front servo not shown)", gap=26)
+    # tipped: angle and where the package leaves the bed
+    r = math.radians(rc.TIP_ANGLE)
+    edge_flat = cq.Vector(0, -rc.CARGO[1] / 2, top)
+    rel = edge_flat - cq.Vector(*ax)
+    edge = cq.Vector(0, rc.Y_AX + rel.y * math.cos(r) - rel.z * math.sin(r),
+                     rc.Z_AX + rel.y * math.sin(r) + rel.z * math.cos(r))
+    p_edge = tip.m(edge.toTuple())
+    msp.add_line(p_edge, tip.m((0, edge.y + 150, edge.z)), dxfattribs={"layer": "CENTER"})
+    msp.add_angular_dim_cra(center=p_edge, radius=110, start_angle=0, end_angle=rc.TIP_ANGLE, distance=0.1,
+                            dimstyle="EZ_CURVED", override={**dim_override(s), "dimdec": 0},
+                            dxfattribs={"layer": "DIMENSIONS"}).render()
+    xl_t = tip.m((0, edge.y, 0))[0]
+    sh.dim(tip.m(deck_edge), p_edge, (xl_t - 8 * s, 0), vertical=True, dec=0)
+    tip.label(f"BED TIPPED {rc.TIP_ANGLE} deg - THE PACKAGE SLIDES OFF TO THE RIGHT", gap=22)
+    out_y, up_z = rc.W / 2 + edge.y, edge.z - rc.Z_DECK_TOP
+    text(sh.psp, f"(the right edge of the cargo plate ends up {-out_y:.0f} mm outside the deck, {up_z:.0f} mm above it)", (318, 90),
+         h=2.2, align=TA.MIDDLE_CENTER)
+    sh.note([
+        "1. Two servos on the deck's right edge share one axis: their shafts ARE the hinge",
+        "   (front and rear end of the bed, mirror images). No hinge, screw or lever.",
+        "2. A printed horn adapter on each end of the tilting plate screws to the servo's",
+        "   aluminium disc horn (4 x M3). The load cells ride on the tilting plate.",
+        "3. Flat, the bed rests on 2 printed posts and the servos are switched off.",
+        f"4. To unload, the ESP32 turns both servos slowly (20 deg/s) to {rc.TIP_ANGLE} deg, waits",
+        "   until the load cells read empty, then lowers the bed and switches them off.",
+        "5. No anti-slip mat: a cardboard box slides on acrylic from about 20 deg.",
+    ], 25, 184, h=2.2, title="HOW IT WORKS")
+    rows = [[f"{kg} kg", f"{rc.hinge_torque(kg):.1f} N.m", f"{100 * rc.hinge_torque(kg) / rc.SERVO_STALL_NM:.0f} %"]
+            for kg in (1, 3, 5)]
+    text(sh.psp, "TORQUE AT THE START OF THE TIP (both servos, 20 cm box)", (25, 140), h=2.6)
+    table(sh.psp, 25, 136, [30, 34, 40], ["PACKAGE", "TORQUE", "OF 2 x 60 kg.cm"], rows, row_h=5.6, h=2.3)
+    sh.note([
+        "Servo: 60 kg.cm at 7.4 V, metal gears, 180 deg, 25T spline,",
+        "about 65 x 30 x 48 mm (e.g. DS5160). Check its tab holes:",
+        f"{rc.SERVO['hole_l']} x {rc.SERVO['hole_w']} mm here (SERVO in robot_cad.py).",
+        "Supply: 7.4 V from its own 10 A buck converter, after the E-stop.",
+        "Signal: front servo GPIO 2, rear servo GPIO 12 (schematic E03).",
+        f"Hinge axis: {rc.Z_AX:.0f} mm above the floor, {-rc.Y_AX:.0f} mm right of the centre line.",
+    ], 25, 104, h=2.2, title="SERVOS")
+
+
+# ============================== sheets 08-09: printed parts ==============================
 def local(wp):
     shape = cq.Compound.makeCompound(wp.vals())
     bb = shape.BoundingBox()
     return shape.translate(cq.Vector(-bb.xmin, -bb.ymin, -bb.zmin)), bb
 
 
-def sheet_printed():
-    sh = Sheet(6, "PRINTED PARTS", "PRINTED PARTS", 1, (6400, -1400), "CR-V3-006")
-    cm, cbb = local(rc.fabricated["camera_mount"])
-    side = View(cm, *SIDE, hidden=True).place(sh, (118, 218))
-    front = View(cm, *FRONT, hidden=True).place(sh, (48, 218))
-    plan = View(cm, *PLAN, hidden=True).place(sh, (118, 150))
-    View(cm, *ISO).place(sh, (190, 215))
-    b = cm.BoundingBox()
-    sh.dim(plan.m((0, 0, 0)), plan.m((b.xlen, 0, 0)), (0, plan.m((0, 0, 0))[1] - 8))
-    sh.dim(plan.m((b.xlen, 0, 0)), plan.m((b.xlen, b.ylen, 0)), (plan.m((b.xlen, 0, 0))[0] + 8, 0), vertical=True)
-    sh.dim(side.m((b.xlen, 0, 0)), side.m((b.xlen, 0, b.zlen)), (side.m((b.xlen, 0, 0))[0] + 8, 0), vertical=True)
-    hx, hy = rc.CAM_FOOT_HOLES[0][0] - cbb.xmin, rc.CAM_FOOT_HOLES[0][1] - cbb.ymin
-    hy2 = rc.CAM_FOOT_HOLES[1][1] - cbb.ymin
-    sh.dim(plan.m((0, hy, 0)), plan.m((hx, hy, 0)), (0, plan.m((0, b.ylen, 0))[1] + 6))
-    sh.dim(plan.m((hx, hy, 0)), plan.m((hx, hy2, 0)), (plan.m((0, 0, 0))[0] - 7, 0), vertical=True)
-    sh.diameter(plan.m((hx, hy2, 0)), 1.7, 135)
-    side.label("CAMERA MOUNT - SIDE", gap=8)
-    front.label("FRONT", gap=8)
-    plan.label("PLAN", gap=16)
-    text(sh.psp, "Holder face tilted 35 deg down. Drill 2 mm holes to suit the camera board.",
-         (25, 104), h=2.3)
+def overall(sh, v, b, along, base_gap=7, vertical=False):
+    """Overall size of a part (b = its bounding box in local coordinates) along X, Y or Z,
+    drawn below the view (horizontal) or to its left (vertical)."""
+    q = {"x": (b.xlen, 0, 0), "y": (0, b.ylen, 0), "z": (0, 0, b.zlen)}[along]
+    pp, pq = v.m((0, 0, 0)), v.m(q)
+    cx, cy = sh.model(v.paper_center)
+    if vertical:
+        sh.dim(pp, pq, (cx - v.size[0] / 2 - base_gap * sh.s, 0), vertical=True, dec=0)
+    else:
+        sh.dim(pp, pq, (0, cy - v.size[1] / 2 - base_gap * sh.s), dec=0)
 
+
+def sheet_printed_1():
+    sh = Sheet(8, "PRINTED PARTS 1", "PRINTED PARTS (1/2) - BED", 1, (11000, -1400), "CR-V2-008")
+    # servo mount (front; the rear one is its mirror image)
+    sm, sbb = local(rc.fabricated["servo_mount_front"])
+    b = sm.BoundingBox()
+    face = View(sm, (-1, 0, 0), (0, -1, 0), hidden=True).place(sh, (72, 246))   # from the bed side
+    side = View(sm, (0, 1, 0), (-1, 0, 0), hidden=True).place(sh, (156, 246))
+    plan = View(sm, *PLAN, hidden=True).place(sh, (172, 150))
+    View(sm, *ISO).place(sh, (78, 160))
+    overall(sh, face, b, "y")
+    overall(sh, face, b, "z", vertical=True)
+    overall(sh, plan, b, "x")
+    overall(sh, plan, b, "y", vertical=True)
+    yc = rc.Y_AX - rc.SERVO["shaft"] + rc.SERVO["L"] / 2 - sbb.ymin
+    hy = (yc - rc.SERVO["hole_l"] / 2, yc + rc.SERVO["hole_l"] / 2)
+    hz = (rc.Z_AX - rc.SERVO["hole_w"] / 2 - sbb.zmin, rc.Z_AX + rc.SERVO["hole_w"] / 2 - sbb.zmin)
+    sh.dim(face.m((0, hy[0], hz[1])), face.m((0, hy[1], hz[1])), (0, face.m((0, 0, b.zlen))[1] + 6), dec=0)
+    sh.dim(face.m((0, hy[0], hz[0])), face.m((0, hy[0], hz[1])),
+           (face.m((0, 0, 0))[0] + 7, 0), vertical=True, dec=0)
+    face.label("SERVO MOUNT (front) - FROM THE BED SIDE", gap=15)
+    side.label("SIDE", gap=8)
+    plan.label("PLAN", gap=15)
+    text(sh.psp, "4 x D4.5: servo tabs (M4 + nut).", (25, 116), h=2.3)
+    text(sh.psp, "3 x D4.5: bolts to the deck. Rear mount = mirror image.", (25, 111), h=2.3)
+    # horn adapter (front)
+    ha, _ = local(rc.fabricated["horn_adapter_front"])
+    hb = ha.BoundingBox()
+    hface = View(ha, (1, 0, 0), (0, 1, 0), hidden=True).place(sh, (258, 246))
+    hside = View(ha, (0, 1, 0), (-1, 0, 0), hidden=True).place(sh, (316, 246))
+    View(ha, *ISO).place(sh, (372, 246))
+    overall(sh, hface, hb, "y")
+    overall(sh, hface, hb, "z", vertical=True)
+    overall(sh, hside, hb, "x")
+    hface.label("HORN ADAPTER (front) - FROM THE SERVO", gap=15)
+    text(sh.psp, "4 x D2.8 on a D24 circle: the horn's M3 screws cut their own thread.", (316, 203), h=2.1,
+         align=TA.MIDDLE_CENTER)
+    text(sh.psp, "2 x D4.5: M4 bolts down through the tilting plate.  Rear = mirror.", (316, 198.5), h=2.1,
+         align=TA.MIDDLE_CENTER)
+    # bed rest post
+    br, _ = local(rc.fabricated["bed_rest"])
+    bb_ = br.BoundingBox()
+    bside = View(br, *SIDE, hidden=True).place(sh, (262, 165))
+    overall(sh, bside, bb_, "x")
+    overall(sh, bside, bb_, "z", vertical=True)
+    bside.label("BED REST (2 off)", gap=15)
+    text(sh.psp, "D4.5 through; M4 nut pocket at the top,", (262, 136), h=2.1, align=TA.MIDDLE_CENTER)
+    text(sh.psp, "under the 2 mm rubber pad", (262, 132), h=2.1, align=TA.MIDDLE_CENTER)
+    # load-cell spacer
     sp, _ = local(rc.fabricated["load_cell_spacer"])
-    splan = View(sp, *PLAN).place(sh, (318, 236))
-    sside = View(sp, *SIDE).place(sh, (318, 206))
+    splan = View(sp, *PLAN).place(sh, (355, 172))
+    sside = View(sp, *SIDE).place(sh, (355, 150))
     zone = rc.CELL_ZONE[1] - rc.CELL_ZONE[0]
     L_, W_ = rc.SPACER_LEN, rc.CELL[1]
     sh.dim(splan.m((0, 0, 0)), splan.m((L_, 0, 0)), (0, splan.m((0, 0, 0))[1] - 6))
@@ -485,90 +596,68 @@ def sheet_printed():
     a, bx = (L_ - zone - 5.5) / 2, (L_ + zone + 5.5) / 2
     sh.dim(splan.m((a, W_ / 2, 0)), splan.m((bx, W_ / 2, 0)), (0, splan.m((0, W_, 0))[1] + 5))
     sh.dim(sside.m((L_, 0, 0)), sside.m((L_, 0, 5)), (sside.m((L_, 0, 0))[0] + 6, 0), vertical=True)
-    text(sh.psp, "LOAD-CELL SPACER (8 off), slot 5.5 wide", (318, 192), h=3.0, align=TA.MIDDLE_CENTER)
+    text(sh.psp, "LOAD-CELL SPACER (8 off), slot 5.5 wide", (355, 134), h=2.6, align=TA.MIDDLE_CENTER)
     sh.note([
-        "1. Material PETG, 0.2 mm layers, 4 walls.",
-        "2. Camera mount: 1 off, 40 % infill, supports on build plate only.",
-        "3. Load-cell spacer: 8 off, 100 % infill, print flat.",
-        "4. Pusher prints (2 carriages, 3 rod holders, 1 drive bracket): sheet 07.",
-        "5. STL files: cad/output/parts/",
+        "1. Material PETG, 0.2 mm layers, 4 walls. STL files: cad/output/parts/",
+        "2. Servo mounts: 1 + 1 (front + rear), 40 % infill, foot flat on the bed.",
+        "3. Horn adapters: 1 + 1, 100 % infill, round wall flat on the bed.",
+        "4. Bed rests: 2 off, 40 % infill. Spacers: 8 off, 100 % infill, flat.",
     ], 25, 96, h=2.3)
 
 
-# ============================== sheet 07: pusher ==============================
-def sheet_pusher():
-    sh = Sheet(7, "PUSHER", "PUSHER ASSEMBLY", 2, (9000, 0), "CR-V3-007")
-    shown = parts(lambda n: n.startswith(("pusher", "top_deck", "cargo_plate")))
-    plan = View(shown, *PLAN).place(sh, (136, 154))
-    s, half = sh.s, rc.L / 2
-    # the blade fully out, as a dashed outline
-    out = cq.Compound.makeCompound(rc.pusher_blade(rc.PUSH_END).vals())
-    ghost, _ = hlr(out, *PLAN)
-    add_edges(ghost, "2D-HIDDEN", plan.offset)
-    # stroke, usable bed, blade width, rod spacing
-    y_low = plan.m((0, -rc.RAIL_Y - 14, 0))[1]
-    sh.dim(plan.m((rc.PUSH_END, 0, 0)), plan.m((rc.PUSH_HOME, 0, 0)), (0, y_low - 18 * s), dec=0)
-    sh.dim(plan.m((rc.CARGO_X - rc.CARGO[0] / 2, 0, 0)), plan.m((rc.PUSH_HOME, 0, 0)), (0, y_low - 25 * s), dec=0)
-    x_left = plan.m((-half, 0, 0))[0]
-    sh.dim(plan.m((-half, -rc.BLADE_LEN / 2, 0)), plan.m((-half, rc.BLADE_LEN / 2, 0)), (x_left - 6 * s, 0),
-           vertical=True, dec=0)
-    sh.dim(plan.m((-half, -rc.RAIL_Y, 0)), plan.m((-half, rc.RAIL_Y, 0)), (x_left - 12 * s, 0), vertical=True, dec=0)
-    plan.label("PLAN VIEW  FRONT -->   deck, cargo plate and pusher only; blade parked, dashed = fully out", gap=32)
-    # detail: the drive end, seen from the right
-    clip = cq.Workplane("XY").box(175, 60, 100).translate((117.5, -155, 205)).val()
-    detail = View(shown.intersect(clip), *SIDE).place(sh, (325, 108))
-    x_right = detail.m((205, 0, 0))[0]
-    sh.dim(detail.m((205, 0, rc.RAIL_Z)), detail.m((205, 0, rc.SCREW_Z)), (x_right + 8 * s, 0), vertical=True, dec=0)
-    detail.label("DETAIL - DRIVE END (seen from the right)  FRONT -->", gap=7)
-    xn, yr = rc.X_NUT_HOME, rc.RAIL_Y
-    items = [
-        ("Push blade: aluminium angle 25x25x2, 296 long", "1", (rc.PUSH_HOME + 12, 60), (-14, 12)),
-        ("Carriage, printed (L with the switch finger, R with the nut), 2 x LM8UU each", "2", (xn + 30, yr), (-4, 13)),
-        ("Guide rod: smooth steel D8 x 400", "2", (-90, yr), (0, 12)),
-        ("Rod holder, printed (A: rear right + front left, B: rear left)", "3", (-half + 7, yr), (-6, 14)),
-        ("Lead screw T8, lead 8, cut to 310", "1", (-60, -yr), (0, -12)),
-        ("Brass T8 flange nut (in the right carriage)", "1", (xn + 3, -yr), (-22, -12)),
-        ("Drive bracket, printed", "1", (rc.X_KFL + 20, -yr + 30), (6, 16)),
-        ("KFL08 flange bearing block (takes the push force)", "1", (rc.X_KFL + 4, -yr), (-8, -14)),
-        ("Flexible coupler 6 / 8 mm", "1", (rc.X_KFL + 26, -yr), (4, -14)),
-        ("Gear motor JGB37-520 12 V, about 110 RPM", "1", (rc.X_PLATE + 35, -yr - rc.MOTOR_DY), (16, 6)),
-        ("Limit switch HOME, on the front-left rod holder (pressed when parked)", "1",
-         (rc.FRONT_HOLDER_X - 9, yr), (14, 8)),
-        ("Limit switch END, on the rear-right rod holder (pressed when fully out)", "1", (-half + 9, -yr), (-10, -13)),
-    ]
-    for i, (_, _, (x, y), (dx, dy)) in enumerate(items, start=1):
-        pc = sh.paper(plan.m((x, y, 0)))
-        pb = (pc[0] + dx, pc[1] + dy)
-        sh.psp.add_circle(pc, 0.6, dxfattribs={"layer": "BALLOONS"})
-        d = ((pc[0] - pb[0]) ** 2 + (pc[1] - pb[1]) ** 2) ** 0.5
-        k = 3.5 / d
-        line(sh.psp, (pb[0] + (pc[0] - pb[0]) * k, pb[1] + (pc[1] - pb[1]) * k), pc, "BALLOONS")
-        sh.psp.add_circle(pb, 3.5, dxfattribs={"layer": "BALLOONS"})
-        text(sh.psp, str(i), pb, h=2.6, align=TA.MIDDLE_CENTER, layer="BALLOONS")
-    y_end = table(sh.psp, 255, 280, [9, 128, 13], ["No.", "COMPONENT", "QTY"],
-                  [[str(i), n, q] for i, (n, q, _, _) in enumerate(items, 1)], row_h=5.8, h=2.3)
+def sheet_printed_2():
+    sh = Sheet(9, "PRINTED PARTS 2", "PRINTED PARTS (2/2) - SENSORS", 1, (12000, -1400), "CR-V2-009")
+    # line sensor bracket
+    lb, _ = local(rc.fabricated["line_sensor_bracket"])
+    b = lb.BoundingBox()
+    lside = View(lb, *SIDE, hidden=True).place(sh, (62, 240))
+    lfront = View(lb, *FRONT, hidden=True).place(sh, (158, 240))
+    View(lb, *ISO).place(sh, (318, 238))
+    overall(sh, lside, b, "x")
+    overall(sh, lside, b, "z", vertical=True)
+    overall(sh, lfront, b, "y")
+    lside.label("LINE SENSOR BRACKET - SIDE", gap=18)
+    lfront.label("FROM THE FRONT", gap=18)
+    text(sh.psp, "Flange under the bottom plate: 2 x D3.4, 40 mm apart, 16 mm behind the plate's front edge.",
+         (25, 188), h=2.2)
+    text(sh.psp, "The sensor board hangs under the shelf: 2 x D3.0 (M3), 100 mm apart.", (25, 183.5), h=2.2)
+    # ultrasonic bracket
+    so, _ = local(rc.fabricated["sonar_bracket"])
+    sb = so.BoundingBox()
+    splan = View(so, (0, 0, 1), (0, -1, 0), hidden=True).place(sh, (175, 160))     # front of the robot up
+    sfront = View(so, *FRONT).place(sh, (175, 96))
+    overall(sh, splan, sb, "y")
+    overall(sh, sfront, sb, "z", vertical=True)
+    splan.label(f"ULTRASONIC BRACKET - PLAN (front up; side faces turned {rc.SONAR_YAW} deg)", gap=17)
+    sfront.label("FROM THE FRONT - windows D16.5 for the transducers", gap=8)
+    # side sensor bracket
+    tb, _ = local(rc.fabricated["tof_bracket"])
+    tbb = tb.BoundingBox()
+    tface = View(tb, (0, -1, 0), (1, 0, 0), hidden=True).place(sh, (296, 150))
+    tside = View(tb, (-1, 0, 0), (0, -1, 0), hidden=True).place(sh, (340, 150))
+    View(tb, *ISO).place(sh, (384, 150))
+    overall(sh, tface, tbb, "x")
+    overall(sh, tface, tbb, "z", vertical=True)
+    overall(sh, tside, tbb, "y")
+    tface.label("SIDE SENSOR BRACKET (VL53L0X)", gap=15)
+    text(sh.psp, "Hangs under the deck (2 x M3); 10 x 8 window for the sensor.", (340, 110), h=2.1,
+         align=TA.MIDDLE_CENTER)
     sh.note([
-        f"1. Stroke {rc.PUSH_HOME - rc.PUSH_END:.0f} mm; the blade ends flush with the rear edge.",
-        f"2. The blade clears the cargo plate by {rc.BLADE_GAP} mm: it must never touch it",
-        "   (the plate rests on the load cells).",
-        "3. Everything stays below 245 mm, under the lidar's scan plane.",
-        "4. Holders and bracket clip over the deck edge; 5 x M4 through the deck.",
-        "5. Leave the cargo plate bare (no anti-slip mat) so the cargo slides.",
-        "6. Conveyor: belt 180-205 mm above the floor, with a backstop",
-        "   taller than 260 mm so the lidar can see it.",
-        "7. Printed parts: PETG, 4 walls, 40 % infill. STL: cad/output/parts/",
-    ], 255, y_end - 10, h=2.3)
+        "1. Material PETG, 0.2 mm layers, 4 walls, 40 % infill. STL: cad/output/parts/",
+        "2. Line sensor bracket: flange flat on the bed, supports under the shelf.",
+        "3. Ultrasonic bracket: base flat on the bed, no supports.",
+        "4. Side sensor bracket: top flange flat on the bed, no supports.",
+    ], 25, 48, h=2.3)
 
 
-
-# ============================== sheet 08: bill of materials ==============================
+# ============================== sheet 10: bill of materials ==============================
 def sheet_bom():
-    sh = Sheet(8, "BILL OF MATERIALS", "BILL OF MATERIALS", 0, (0, 0), "CR-V3-008")
+    sh = Sheet(10, "BILL OF MATERIALS", "BILL OF MATERIALS", 0, (0, 0), "CR-V2-010")
     rows = []
     for i, (group, item, qty, how) in enumerate(rc.BOM, start=1):
-        rows.append([str(i), group, textwrap.wrap(item, 104), str(qty), textwrap.wrap(how, 30)])
-    table(sh.psp, 25, 281, [9, 20, 205, 12, 58], ["No.", "GROUP", "DESCRIPTION", "QTY", "MAKE / BUY"],
-          rows, row_h=4.9, h=2.0)
+        rows.append([str(i), group, textwrap.wrap(item, 104), str(qty), textwrap.wrap(how, 26)])
+    table(sh.psp, 25, 282, [9, 23, 226, 11, 52], ["No.", "GROUP", "DESCRIPTION", "QTY", "MAKE / BUY"],
+          rows, row_h=5.0, h=2.1)
 
 
 # ============================== main ==============================
@@ -579,29 +668,41 @@ def main():
     model_3d()
     sheet_ga()
     sheet_layout()
-    sheet_plate(3, "BOTTOM PLATE", "CR-V3-003", rc.fabricated["bottom_plate"], rc.Z_BASE + rc.BASE_T / 2, [
+    sheet_plate(3, "BOTTOM PLATE", "CR-V2-003", rc.fabricated["bottom_plate"], rc.Z_BASE + rc.BASE_T / 2, [
         "1. Material: 6 mm birch plywood (or 5 mm aluminium), 1 off.",
         "2. Laser-cut from cad/output/dxf/bottom_plate.dxf. All dimensions in mm, +-0.2.",
         "3. Motor-bracket holes (4 x D4.5) are drilled on assembly - see BUILD_GUIDE week 1.",
-    ], (5700, 0))
-    sheet_plate(4, "TOP DECK", "CR-V3-004", rc.fabricated["top_deck"], rc.Z_DECK + rc.DECK_T / 2, [
+        "4. The 2 front holes at Y +-20 hold BOTH sensor brackets (one above, one below).",
+    ], (5700, 0), {("HOLE", 6.5): "M6 threaded rod", ("HOLE", 8.5): "caster stem M8",
+                   ("HOLE", 3.4): "M3 sensor brackets", ("CUTOUT", (4.0, 22.0)): "battery strap",
+                   ("CUTOUT", (12.0, 20.0)): "motor/encoder cables"})
+    sheet_plate(4, "TOP DECK", "CR-V2-004", rc.fabricated["top_deck"], rc.Z_DECK + rc.DECK_T / 2, [
         "1. Material: 5 mm clear acrylic (keep the protective film), 1 off.",
         "2. Laser-cut from cad/output/dxf/top_deck.dxf. All dimensions in mm, +-0.2.",
-        "3. Lidar holes (4 x D2.7) are drilled on assembly, using the lidar as template.",
-        "4. The 5 x D4.5 holes are new in v3 (pusher). Deck already cut to v2? Drill them by hand.",
-    ], (6700, 0))
-    sheet_plate(5, "CARGO PLATE", "CR-V3-005", rc.fabricated["cargo_plate"], rc.Z_CARGO + rc.CARGO_T / 2, [
-        "1. Material: 5 mm clear acrylic, 1 off. Leave it bare: the cargo must slide (no mat).",
+        "3. Every hole is cut by the laser; nothing is drilled by hand.",
+    ], (6700, 0), {("HOLE", 6.5): "M6 threaded rod", ("HOLE", 22.5): "E-stop 22 mm",
+                   ("HOLE", 12.2): "switch / start button", ("HOLE", 6.2): "5 mm LED clip",
+                   ("HOLE", 4.5): "M4: servo mount / bed rest", ("HOLE", 3.4): "M3: side sensor",
+                   ("CUTOUT", (12.0, 16.0)): "servo cable", ("CUTOUT", (10.0, 30.0)): "load-cell wires"})
+    sheet_plate(5, "TILTING PLATE", "CR-V2-005", rc.fabricated["tilt_plate"], rc.Z_TILT + rc.TILT_T / 2, [
+        "1. Material: 6 mm birch plywood, 1 off.",
+        "2. Laser-cut from cad/output/dxf/tilt_plate.dxf. All dimensions in mm, +-0.2.",
+        "3. The bottom edge here (Y = 0) is the RIGHT edge of the robot: it lies on the hinge axis.",
+    ], (7700, 0), {("HOLE", 4.5): "M4 horn adapter", ("SLOT", (5.5, 23.5)): "load cells, fixed ends",
+                   ("CUTOUT", (2.5, 4.0)): "cable tie"})
+    sheet_plate(6, "CARGO PLATE", "CR-V2-006", rc.fabricated["cargo_plate"], rc.Z_CARGO + rc.CARGO_T / 2, [
+        "1. Material: 5 mm clear acrylic, 1 off. No anti-slip mat: the package must slide off.",
         "2. Laser-cut from cad/output/dxf/cargo_plate.dxf. All dimensions in mm, +-0.2.",
-        "3. Rests only on the 4 load cells (slots S1-S4). Same plate as v2.",
-    ], (7700, 0))
-    sheet_printed()
-    sheet_pusher()
+        "3. Rests only on the 4 load cells (slots S1-S4).",
+    ], (8700, 0), {("SLOT", (5.5, 23.5)): "load cells, loaded ends"})
+    sheet_bed()
+    sheet_printed_1()
+    sheet_printed_2()
     sheet_bom()
     doc.layouts.delete("Layout1")
     doc.layouts.set_active_layout("01 GENERAL ARRANGEMENT")
     doc.header["$TILEMODE"] = 0
-    path = OUT / "CargoRobot_v3.dxf"
+    path = OUT / "CargoRobot_v2.dxf"
     doc.saveas(path)
     print("wrote", path)
 
@@ -619,7 +720,7 @@ def export_pdf_and_previews():
     from matplotlib.backends.backend_pdf import PdfPages
 
     cfg = Configuration(color_policy=ColorPolicy.BLACK, background_policy=BackgroundPolicy.WHITE)
-    pdf_path = OUT / "CargoRobot_v3_drawings.pdf"
+    pdf_path = OUT / "CargoRobot_v2_drawings.pdf"
     with PdfPages(pdf_path) as pdf:
         for layout in doc.layouts:
             if not layout.is_any_paperspace:

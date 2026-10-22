@@ -1,8 +1,8 @@
 # Cargo Robot: Complete Build Guide (Phase II)
 
-**From today, Monday 28 September 2026, to the final defense (week of 14 December 2026).**
+**From Monday 28 September 2026 to the final defense (week of 14 December 2026).**
 
-This guide covers the whole build: parts, tools, fabrication, assembly, every wire, Raspberry Pi setup, all the code, calibration, mapping, autonomous navigation, testing and the final report. Follow it top to bottom.
+This guide covers the whole build: parts, tools, fabrication, assembly, every wire, the ESP32 firmware, calibration, line following, the tilting bed, testing and the final report. Follow it top to bottom.
 
 ![The robot](cad/output/views/render_iso.png)
 
@@ -17,14 +17,14 @@ This guide covers the whole build: parts, tools, fabrication, assembly, every wi
 - [Week 0: Decisions, shopping, laptop setup (28 Sep – 4 Oct)](#week-0--decisions-shopping-laptop-setup-28-sep--4-oct)
 - [Week 1: Fabrication & mechanical assembly (5 – 11 Oct)](#week-1--fabrication--mechanical-assembly-5--11-oct)
 - [Week 2: Power & safety wiring (12 – 18 Oct)](#week-2--power--safety-wiring-12--18-oct)
-- [Week 3: Raspberry Pi setup, signal wiring, bench tests (19 – 25 Oct)](#week-3--raspberry-pi-setup-signal-wiring-bench-tests-19--25-oct)
-- [Week 4: ROS 2 package, robot model, lidar, camera (26 Oct – 1 Nov)](#week-4--ros-2-package-robot-model-lidar-camera-26-oct--1-nov)
+- [Week 3: ESP32 setup, signal wiring, bench tests (19 – 25 Oct)](#week-3--esp32-setup-signal-wiring-bench-tests-19--25-oct)
+- [Week 4: The firmware and the tilting bed (26 Oct – 1 Nov)](#week-4--the-firmware-and-the-tilting-bed-26-oct--1-nov)
 - [Week 5: Driving: motor control, PID, odometry (2 – 8 Nov)](#week-5--driving-motor-control-pid-odometry-2--8-nov)
-- [Week 6: SLAM: mapping the test area (9 – 15 Nov)](#week-6--slam-mapping-the-test-area-9--15-nov)
-- [Week 7: Payload logic & vision (16 – 22 Nov)](#week-7--payload-logic--vision-16--22-nov)
-- [Week 8: Autonomous navigation & delivery missions (23 – 29 Nov)](#week-8--autonomous-navigation--delivery-missions-23--29-nov)
+- [Week 6: Line following and station marks (9 – 15 Nov)](#week-6--line-following-and-station-marks-9--15-nov)
+- [Week 7: Payload logic & obstacles (16 – 22 Nov)](#week-7--payload-logic--obstacles-16--22-nov)
+- [Week 8: Delivery missions (23 – 29 Nov)](#week-8--delivery-missions-23--29-nov)
 - [Week 9: Field testing & metrics (30 Nov – 6 Dec)](#week-9--field-testing--metrics-30-nov--6-dec)
-- [Week 10: Cable harness, covers, auto-start (7 – 13 Dec)](#week-10--cable-harness-covers-auto-start-7--13-dec)
+- [Week 10: Cable harness, covers, final checks (7 – 13 Dec)](#week-10--cable-harness-covers-final-checks-7--13-dec)
 - [Week 11: Report, video, presentation, demo (14 – 20 Dec)](#week-11--report-video-presentation-demo-14--20-dec)
 - [Troubleshooting](#troubleshooting)
 - [Appendix A: Skills crash course](#appendix-a--skills-crash-course)
@@ -35,56 +35,53 @@ This guide covers the whole build: parts, tools, fabrication, assembly, every wi
 ## 0. How to use this guide
 
 - **Each week has:** a goal, numbered steps with checkboxes `- [ ]`, and a **"Done when"** test. Don't start the next week until the "Done when" test passes (or you know exactly why it doesn't).
-- **Where each command runs:**
-  - **[PI]**: in a terminal on the Raspberry Pi (you'll reach it over SSH from your laptop).
-  - **[LAPTOP]**: on your Ubuntu laptop.
-  - **[WINDOWS]**: in PowerShell on a Windows laptop.
-- **Commands:** type grey command boxes exactly as shown, one line at a time. Lines starting with `#` are comments; you don't type them.
-- **You don't need to type any code.** All of it is already in the project folder (see [Appendix B](#appendix-b--full-source-code)); this guide explains it and shows how to run it.
-- **New to a skill?** If a step needs something you've never done (SSH, soldering, crimping, using a multimeter, git), read [Appendix A](#appendix-a--skills-crash-course) first.
+- **Where things happen:**
+  - **[LAPTOP]**: in the Arduino IDE on your laptop (Windows, macOS or Linux), with the ESP32 plugged in by USB.
+  - **[SERIAL]**: a command typed into the Arduino IDE's **Serial Monitor** (115200 baud, line ending "Newline"). The robot answers there.
+- **You don't need to type any code.** All of it is already in the project folder (see [Appendix B](#appendix-b--full-source-code)); this guide explains it and shows how to use it.
+- **New to a skill?** If a step needs something you've never done (soldering, crimping, using a multimeter, git), read [Appendix A](#appendix-a--skills-crash-course) first.
 
 ### The project folder
 
 ```
-Gradfinal/                      <- this folder. Put it on GitHub; on the Pi it lives in ~/cargo_robot
+Gradfinal/                      <- this folder. Put it on GitHub
 ├── BUILD_GUIDE.md              <- this guide
-├── PUSHER_IMPACT.md            <- what the pusher (design v3) adds and costs, compared with design v2
-├── HW & Time plan.pdf          <- your Phase II plan
 ├── cad/                        <- 3D design (Python/CadQuery) -> STEP, STL, DXF files
 │   ├── robot_cad.py            <- the design; change numbers at the top, re-run
-│   ├── autocad/                <- AutoCAD files + PDFs: CargoRobot_v3 (3D model + 8 drawing sheets), CargoRobot_v3_schematics (3 sheets)
+│   ├── wiring.py               <- every wire (P1-P19, S1-S40), in one place
+│   ├── autocad/                <- the PDFs (and AutoCAD files):
+│   │     CargoRobot_v2_drawings.pdf     10 drawing sheets (+ CargoRobot_v2.dxf with the 3D model)
+│   │     CargoRobot_v2_schematics.pdf   4 schematic sheets (+ .dxf)
+│   │     CargoRobot_v2_assembly.pdf     list of components + assembly step by step, with pictures
+│   │     CargoRobot_v2_connections.pdf  every connection: wire lists, each part's pins, the schematics
 │   └── output/                 <- robot_assembly.step, parts/*.stl, dxf/*.dxf, views/*.png, bom.csv
-├── backup_v2/                  <- untouched copy of design v2 (no pusher): CAD, drawings, guide, code
-├── conveyor/                   <- 3D model of a drop-off conveyor that fits the pusher (for simulation only)
-├── SIMULATION.md               <- how to run the robot in Gazebo (no hardware needed)
-├── robot_ws/src/cargo_bot/     <- the ROS 2 package that runs on the robot
-│   ├── cargo_bot/              <- Python code: drivers, nodes, mission
-│   ├── config/                 <- settings (robot.yaml, laser filter, Nav2, SLAM)
-│   ├── launch/                 <- robot.launch.py, sim.launch.py, slam.launch.py, nav.launch.py
-│   ├── urdf/, meshes/          <- robot model for RViz / TF / Gazebo
-│   └── worlds/                 <- simulated test room
-└── tools/                      <- bench-test and setup scripts (run without ROS)
+├── firmware/cargo_robot/       <- the ESP32 program (Arduino IDE)
+│   ├── cargo_robot.ino         <- the mission and the safety rules
+│   ├── config.h                <- the wiring: every pin number (single source of truth)
+│   ├── settings.h / .cpp       <- tunable numbers, kept in the ESP32's flash
+│   ├── robot.h / .cpp          <- the robot's parts and live readings, wheel control, bed motion
+│   ├── hw.h / .cpp             <- drivers: motors, encoders, load cells, I/O expander, ultrasonic, servos
+│   ├── control.h / .cpp        <- maths: wheel PID, line position, speed factors
+│   └── console.h / .cpp        <- Serial-Monitor commands: bench tests, calibration, settings
+└── backup_v2/                  <- design v2 as it was before the tilting bed (Raspberry Pi version)
 ```
 
 ### Words you will meet
 
 | Word | Meaning |
 |---|---|
-| **ROS 2 (Jazzy)** | The robot software framework. Programs ("nodes") talk to each other by publishing messages on named "topics". |
-| **Node** | One running program, e.g. `base_driver`. |
-| **Topic** | A named channel, e.g. `/cmd_vel` (speed commands), `/scan` (lidar), `/odom` (wheel odometry). |
-| **Launch file** | Starts many nodes at once with their settings. |
-| **TF** | The tree of coordinate frames (`map → odom → base_footprint → base_link → laser`). |
-| **Odometry** | Where the robot thinks it is, from counting wheel rotations. It drifts over time. |
-| **SLAM** | Building a map with the lidar while driving around. |
-| **AMCL** | Finding where the robot is on a saved map. |
-| **Nav2** | The navigation system: plans a path and drives it while avoiding obstacles. |
-| **Costmap** | Nav2's grid of "how dangerous is each cell". |
-| **GPIO** | The Pi's 40-pin header; each pin can be a 3.3 V digital input or output. |
+| **ESP32** | The robot's computer: a small board with a dual-core processor, Wi-Fi and lots of pins. It runs one program (the firmware) from power-on. |
+| **Firmware** | The program on the ESP32 (`firmware/cargo_robot/`). You upload it from the Arduino IDE. |
+| **Arduino IDE** | The program on your laptop that compiles and uploads the firmware, and has the Serial Monitor. |
+| **Serial Monitor** | A text window in the Arduino IDE: the robot prints there and you type commands to it. |
+| **GPIO** | A pin of the ESP32; each one can be a 3.3 V digital input or output. |
 | **PWM** | Switching a pin on and off very fast; the on-percentage ("duty") sets motor power. |
 | **Encoder** | A sensor on the motor that sends pulses as it turns. It gives the wheel speed and distance. |
 | **HX711** | A tiny amplifier + 24-bit ADC that reads one load cell. |
-| **SSH** | Logging into the Pi's terminal from your laptop over Wi-Fi. |
+| **Servo** | A motor with a gearbox and an angle sensor inside: you send it an angle (as a pulse 500–2500 µs long, 50 times per second) and it turns there. Two of them tip the bed. |
+| **I2C** | A 2-wire bus (SDA, SCL). The MCP23017 and the VL53L0X share it. |
+| **MCP23017** | An I/O expander: 16 extra pins over I2C, for the slow signals (line sensors, LEDs, buzzer, button). |
+| **Station mark** | A short strip of black tape across the line. The robot stops at it: one at the pickup, one at the drop-off (the conveyor). |
 
 ---
 
@@ -92,58 +89,50 @@ Gradfinal/                      <- this folder. Put it on GitHub; on the Pi it l
 
 | | |
 |---|---|
-| Size | 434 × 360 × 263 mm (L × W × H) |
-| Frame | 6 mm plywood bottom plate + 5 mm acrylic deck, held apart by 6 M6 threaded rods. A 5 mm acrylic cargo plate sits on 4 load cells. |
+| Size | 426 × 360 × 236 mm (L × W × H), bed flat |
+| Frame | 6 mm plywood bottom plate + 5 mm acrylic deck, held apart by 6 M6 threaded rods |
 | Drive | 2 × 12 V gear motors with encoders (middle axle), plus 50 mm swivel casters front and rear. Differential drive, so it turns on the spot. |
-| Brain | Raspberry Pi 5 (8 GB) running Ubuntu 24.04 + ROS 2 Jazzy. **No ESP32**: the Pi drives the motors, reads the encoders and reads the load cells directly. |
-| Sensors | RPLIDAR A1M8 (360° 2D lidar), USB wide-angle camera (line following + station markers), 4 × 10 kg load cells under the cargo bed |
-| Power | 3S LiPo 11.1 V 5000 mAh → 10 A fuse → master switch. The 12 V goes to the motors through the E-stop; a 5 V buck converter powers the Pi. |
-| Unloading | **Rear pusher (new in design v3):** a blade on a lead screw slides the cargo off the back of the bed onto a conveyor. It adds a third 12 V gear motor, a third BTS7960 and 2 limit switches. It's an add-on: the robot works the same without it. |
-| Safety | Latching E-stop cuts **motor power only**, drive motors and pusher (the Pi stays on and sees it on GPIO26). Software also stops the motors if commands stop arriving or the cargo is overloaded. |
-| Max payload | 15 kg (software limit, adjustable). Speed drops smoothly to 50 % at full load. |
-| Autonomous speed | 0.35 m/s |
+| Brain | **One ESP32** (DevKitC, 38 pins), running an Arduino program. No Raspberry Pi, no Linux, no ROS. |
+| Sensors | 8-channel IR line sensor (front, under the plate), 3 × HC-SR04 ultrasonic (front), VL53L0X distance sensor (right side), 4 × 10 kg load cells under the cargo plate |
+| Tilting bed | A plywood tilting plate carries the load cells and the cargo plate. **Two 60 kg·cm servos** on the deck's right edge turn it about their shafts (the shafts are the hinge) to 40°; the package slides off to the right onto the conveyor. |
+| Power | 3S LiPo 11.1 V 5000 mAh → 10 A fuse → master switch. The 12 V goes through the E-stop to the motor drivers and the 7.4 V servo buck; a 5.1 V buck powers the ESP32 and the sensors. |
+| Safety | Latching E-stop cuts **motor and servo power** (the ESP32 stays on and sees it). The software also stops for obstacles, a lost line, and overload. |
+| Packages | Up to **3 kg**, up to 20 × 20 × 20 cm. Speed drops smoothly to 50 % at 3 kg; it refuses to move above 3.6 kg. |
+| Speed | 0.2 m/s following the line (adjustable) |
 
 ```mermaid
 flowchart LR
   BAT[3S LiPo 11.1 V] --> FUSE[10 A fuse] --> SW[Master switch] --> BUS12[12 V main bus]
-  BUS12 --> BUCK[Buck 12→5.1 V] --> PI[Raspberry Pi 5]
+  BUS12 --> BUCK[Buck 12→5.1 V] --> ESP[ESP32]
   BUS12 --> ESTOP[E-stop NC] --> MBUS[12 V motor bus] --> DRV[2 × BTS7960] --> MOT[2 × gear motor + encoder]
-  MBUS -. divider .-> PI
-  PI -- PWM + enable --> DRV
-  MOT -- encoder A/B --> PI
-  MBUS --> PDRV[BTS7960 pusher] --> PMOT[Pusher motor + lead screw]
-  PI -- PWM --> PDRV
-  LIMS[2 × limit switch] --> PI
-  CELLS[4 × load cell] --> HX[4 × HX711] --> PI
-  LIDAR[RPLIDAR A1] -- USB --> PI
-  CAM[USB camera] -- USB --> PI
-  PI -- Wi-Fi / ROS 2 --> LAP[Laptop: RViz]
+  MBUS --> SBUCK[Buck 12→7.4 V] --> SERVO[2 × bed servo]
+  MBUS -. divider .-> ESP
+  ESP -- PWM --> DRV
+  ESP -- 2 × servo signal --> SERVO
+  MOT -- encoder A/B --> ESP
+  CELLS[4 × load cell] --> HX[4 × HX711] --> ESP
+  SONAR[3 × HC-SR04] --> ESP
+  ESP -- I2C --> MCP[MCP23017]
+  LINE[8-ch line sensor] --> MCP
+  MCP --> PANEL[button, LEDs, buzzer, motor enable]
+  ESP -- I2C --> TOF[VL53L0X side sensor]
 ```
 
-### What changed compared to the Phase II PDF (tell your supervisor)
+**The whole system** has two more parts that are **not in this guide** (they are a separate project): the conveyor belt with its own ESP32, and a laptop with a camera that reads the logo on each package and tells the conveyor where to send it. The robot's only job at the conveyor is to stop beside it and tip the package onto the belt.
 
-| PDF | This guide | Why |
+### What changed compared to the Phase II plan (tell your supervisor)
+
+| Phase II plan | This guide | Why |
 |---|---|---|
-| Raspberry Pi **+ ESP32** | **Raspberry Pi only** | Fewer parts, no firmware to write, no serial bridge. The Pi handles encoders and HX711s fine at this robot's speeds. Tasks 1.3 and 2.1.1 become "Pi driver code" (already written). |
-| E-stop cuts the whole 12 V line | E-stop cuts **only the motor 12 V** | Cutting the Pi's power corrupts its SD card and forces a 1-minute reboot. The motors still stop instantly, and the software sees the E-stop. |
-| 2020 aluminium or acrylic/MDF frame | Plywood + acrylic plates on **6 M6 threaded rods** | Cheapest and simplest: the rod is cut with a hacksaw, and the deck height is set with nuts. No aluminium profiles and no printing. |
-| Heavy-duty omni-wheel casters | **50 mm swivel casters with an M8 threaded stem** | Bolt straight on. The caster height is adjusted with a nut, so all 4 wheels can be made to touch the floor. Omni wheels would need a custom mount and shims. |
-| Pi Camera V2/V3 **or** USB camera | **USB camera** | Works out of the box on Ubuntu 24.04 + ROS 2. The Pi camera on a Pi 5 under Ubuntu needs a custom-built camera library. |
-| 12 V 300–500 RPM motors | **12 V 170 RPM** (same JGB37-520 size) | 300–500 RPM with 100 mm wheels means 1.6–2.6 m/s top speed and little torque. 170 RPM gives about 0.9 m/s and roughly 3× the torque for carrying cargo. |
-
-### What's new in design v3: the rear pusher
-
-Design v3 is design v2 plus a way to unload by itself: the robot backs up to a conveyor and pushes the cargo off the rear of the bed.
-
-![The pusher fully out](cad/output/views/render_pusher_out.png)
-
-- **What it is:** an aluminium blade across the bed, 3 mm above the cargo plate, on two 8 mm guide rods that run just outside the deck edges. A lead screw on the right side moves it 262 mm in about 20 seconds.
-- **It's an add-on.** Every step it needs is marked **Pusher** in this guide. Everything else is the same as v2, and the robot drives, weighs and navigates without it. If parts are late or time is short, skip the Pusher steps and bolt it on later: it needs 5 extra 4.5 mm holes in the top deck, and nothing else on the chassis changes.
-- **What it costs you:** `PUSHER_IMPACT.md` (next to this guide) compares v3 with v2: parts, wiring, pins, code, build time and the new things that can go wrong. Read it before you commit to building it.
-- **The conveyor has to suit the robot:** see [section 8.7](#87-unload-onto-a-conveyor-with-the-pusher-design-v3).
-- **The untouched v2 design** is in `backup_v2/`.
-
-> The pusher has been designed and collision-checked in CAD, and its software has been tested with a simulated mechanism. It has **not** been built or run on the real robot yet. Expect to adjust fits and positions when you build it.
+| Raspberry Pi **+ ESP32** | **ESP32 only** | The robot no longer runs the AI or maps rooms: it follows a line, weighs, avoids obstacles and tips the bed. One ESP32 does all of that in real time, starts in 1 s and can't corrupt an SD card. |
+| RPLIDAR, SLAM (task 2.2) and Nav2 waypoints (task 2.4) | **No lidar.** An IR line sensor and station marks on the floor | A taped route is simpler and very repeatable. Task 2.2 becomes "line and station-mark tuning", task 2.4 becomes "pickup → drop-off missions". |
+| Camera + ONNX vision on the robot (task 2.3.2) | **The laptop does the vision, at the conveyor** | The camera has to look at the packages on the belt anyway; the laptop has far more computing power than the robot. |
+| Obstacle detection by lidar | **3 ultrasonic sensors** (left, centre, right) | Cheap, simple, and enough to stop for a person or a box in front. |
+| Unload by hand | **Tilting bed on 2 servos** | The robot delivers by itself: it tips the package onto the conveyor. |
+| E-stop cuts the whole 12 V line | E-stop cuts the **motor and servo** 12 V only | The ESP32 stays on, sees the E-stop and does not lose its place. Everything that moves still stops at once. |
+| 2020 aluminium or acrylic/MDF frame | Plywood + acrylic plates on **6 M6 threaded rods** | Cheapest and simplest: the rod is cut with a hacksaw, and the deck height is set with nuts. |
+| Heavy-duty omni-wheel casters | **50 mm swivel casters with an M8 threaded stem** | Bolt straight on; the height is adjusted with a nut, so all 4 wheels can be made to touch the floor. |
+| 12 V 300–500 RPM motors | **12 V 170 RPM** (same JGB37-520 size) | 300–500 RPM with 100 mm wheels means 1.6–2.6 m/s top speed and little torque. 170 RPM gives about 0.9 m/s and roughly 3× the torque. |
 
 ---
 
@@ -151,26 +140,24 @@ Design v3 is design v2 plus a way to unload by itself: the robot backs up to a c
 
 | Week | Dates (2026) | Goal | Done when |
 |---|---|---|---|
-| 0 | 28 Sep – 4 Oct | Approvals, **order everything**, laptop + GitHub ready | Parts ordered, DXF files at the laser shop, laptop runs ROS 2 |
-| 1 | 5 – 11 Oct | Cut, print and assemble the mechanics | Rolling chassis with all 4 wheels on the floor |
-| 2 | 12 – 18 Oct | Power & safety wiring + bench tests | 12 V / 5 V rails measured, E-stop kills motor power, Pi boots from the battery |
-| 3 | 19 – 25 Oct | Pi OS + ROS 2, signal wiring, motor/encoder/load-cell tests | `test_motors`, `test_encoders`, `test_hx711` all pass |
-| 4 | 26 Oct – 1 Nov | ROS 2 package, robot model, lidar, camera | Laser scan + robot model visible in RViz on the laptop |
-| 5 | 2 – 8 Nov | Driving: teleop, PID, odometry calibration | Robot drives a 1 m square and ends within 5 cm |
-| 6 | 9 – 15 Nov | SLAM map of the test area | Clean map saved (`lab.yaml` + `lab.pgm`) |
-| 7 | 16 – 22 Nov | Payload topic, speed scaling, line following, markers | Robot follows a tape line and slows down when loaded |
-| 8 | 23 – 29 Nov | Nav2 + delivery mission | Full pickup → drop-off → home mission works 3 times in a row |
+| 0 | 28 Sep – 4 Oct | Approvals, **order everything**, laptop + GitHub ready | Parts ordered, DXF files at the laser shop, Arduino IDE uploads to an ESP32 |
+| 1 | 5 – 11 Oct | Cut, print and assemble the mechanics, including the tilting bed | Rolling chassis with all 4 wheels on the floor; the bed swings freely by hand |
+| 2 | 12 – 18 Oct | Power & safety wiring + bench tests | 12 V / 5.1 V / 7.4 V measured, E-stop kills motor and servo power, ESP32 runs from the battery |
+| 3 | 19 – 25 Oct | Firmware uploaded, signal wiring, bench tests | `enc`, `motortest`, `hx`, `line`, `sonar`, `tof` all pass |
+| 4 | 26 Oct – 1 Nov | Servo calibration, tipping tests | The bed tips a 3 kg box off 10 times out of 10 |
+| 5 | 2 – 8 Nov | Driving: PID, odometry calibration | Robot drives 3 m straight and ends within 5 cm |
+| 6 | 9 – 15 Nov | Line following, station marks | Follows the track for 10 laps and stops on every mark |
+| 7 | 16 – 22 Nov | Speed by weight, obstacles | Robot slows when loaded, refuses when overloaded, stops for obstacles |
+| 8 | 23 – 29 Nov | Delivery mission | Pickup → drop-off (tip) → pickup works 5 times in a row |
 | 9 | 30 Nov – 6 Dec | Field tests & measurements | All test tables filled in |
-| 10 | 7 – 13 Dec | Cable harness, covers, auto-start | Clean, labelled wiring; robot starts by itself at power-on |
+| 10 | 7 – 13 Dec | Cable harness, covers, final checks | Clean, labelled wiring; covers on |
 | 11 | 14 – 20 Dec | Report, video, slides, demo rehearsal | Report submitted, video recorded, 2 full rehearsals done |
 
-> **Parts can be late.** If they are, do Week 3's Pi setup (sections 3.1–3.4) and Week 4's software build early. Those only need the Pi and a phone charger.
-
-> **Pusher steps** are in week 0 (parts and prints), week 1 (step 12), week 2 (wires P17–P19), week 3 (wires S31–S37 and test 5), week 8 (section 8.7) and week 9 (test T8). Together they add roughly a week of work for one person; `PUSHER_IMPACT.md` has the breakdown.
+> **Parts can be late.** If they are, install the Arduino IDE and upload the firmware to a bare ESP32 early (section 3.1): the Serial Monitor commands work without anything connected, and you learn them before the robot exists.
 
 **Suggested split for a team of 3–4:**
 
-- **Mechanical lead:** weeks 1 and 10.
+- **Mechanical lead:** weeks 1, 4 and 10.
 - **Electrical lead:** weeks 2 and 3 (wiring).
 - **Software lead:** weeks 3–8.
 - **Everyone:** weeks 9 and 11. One person owns the report from week 5 onwards and writes each week's section as it happens.
@@ -185,105 +172,96 @@ Design v3 is design v2 plus a way to unload by itself: the robot backs up to a c
    - A puffy (swollen) battery is dead: stop using it.
    - Store it at 3.8 V per cell (the charger's "storage" mode).
 2. **Wheels in the air.** When testing motors, put the robot on a box so the drive wheels spin freely.
-3. **Know where the E-stop is.** It stays within reach every time the robot moves by itself, and one person always watches the robot.
-4. **Never put more than 3.3 V on a Pi GPIO pin.** 5 V on a GPIO pin kills the Pi. That's why the encoders, HX711s and BTS7960 logic are all powered from **3.3 V**, and why the 12 V sense line goes through a divider.
-5. **Wiring changes only with the master switch OFF** and the battery unplugged.
-6. **Shut the Pi down before switching off the master switch:** run `sudo shutdown now` and wait for the green LED to stop blinking.
+3. **Keep fingers out of the bed.** The servos are strong (60 kg·cm each) and the bed's right edge closes against the servo mounts. Never hold the bed or put a hand under it while it moves.
+4. **Know where the E-stop is.** It stays within reach every time the robot moves by itself, and one person always watches the robot.
+5. **Never put more than 3.3 V on an ESP32 pin.** 5 V on a GPIO pin kills the ESP32. That's why the encoders, HX711s, line sensor and BTS7960 logic are powered from **3.3 V**, the ultrasonic ECHO lines go through dividers, and the 12 V sense line goes through a divider.
+6. **Wiring changes only with the master switch OFF** and the battery unplugged.
 7. **Fuse first:** the fuse must be the first thing after the battery's + wire.
-8. **Keep clear of the pusher.** The blade and the bare lead screw on the right side pull in fingers, sleeves and loose wires. Nobody touches the bed while the blade moves. The E-stop stops it.
 
 ---
 
 ## Week 0 — Decisions, shopping, laptop setup (28 Sep – 4 Oct)
 
-**Goal:** by Sunday everything is ordered, the plates are at the laser shop, and your laptop runs ROS 2.
+**Goal:** by Sunday everything is ordered, the plates are at the laser shop, and your laptop uploads programs to an ESP32.
 
 ### 0.1 Get approval from your supervisor (Monday)
 
-Show the drawings, either as `cad/autocad/CargoRobot_v3_drawings.pdf` or the same file opened in AutoCAD. Also show the table "What changed compared to the Phase II PDF" in section 1. Then ask:
+Show the drawings, either as `cad/autocad/CargoRobot_v2_drawings.pdf` or the same file opened in AutoCAD, the schematics `cad/autocad/CargoRobot_v2_schematics.pdf`, and the component list in `cad/autocad/CargoRobot_v2_assembly.pdf`. Also show the table "What changed compared to the Phase II plan" in section 1. Then ask:
 
-- [ ] Is it OK to drop the ESP32 and run everything on the Raspberry Pi?
-- [ ] Is it OK that the E-stop cuts motor power only (not the Pi)?
-- [ ] Is it OK to use a USB camera instead of the Pi Camera?
+- [ ] Is it OK to drop the Raspberry Pi and the lidar, and run the robot on one ESP32 with line following?
+- [ ] Is it OK that the AI vision runs on a laptop at the conveyor, not on the robot?
+- [ ] Is it OK that the E-stop cuts motor and servo power only (not the ESP32)?
 - [ ] Is it OK to use 170 RPM motors instead of 300–500 RPM?
 - [ ] Is it OK to use swivel casters with threaded stems instead of omni-wheel casters?
-- [ ] Can the SD card and cooling fan stay? (The PDF asked this.) Answer: **both are needed**. The Pi can't boot without a storage card, and a Pi 5 running SLAM + Nav2 overheats and slows down without its fan.
-- [ ] Is an ML model required for "vision classification"? The simple, reliable plan here uses printed ArUco markers to identify stations; an optional ONNX model is described in week 7.
-- [ ] What is the maximum payload you must demonstrate? (The software limit is 15 kg; change it in `config/robot.yaml`.)
-- [ ] Where is the test area, and can you put tape lines and markers on its floor?
-- [ ] **Pusher:** must the robot unload by itself onto a conveyor? If yes: how high is the belt, and can the conveyor be given a backstop board (section 8.7)? If no, skip every **Pusher** step in this guide.
+- [ ] What is the heaviest package you must demonstrate? (This design tips up to 3 kg; change `max_kg` in the settings if your limit is lower.)
+- [ ] Where is the test area, and can you put tape lines and station marks on its floor?
 
 ### 0.2 Shopping list
 
-Buy locally what you can; online orders from abroad can take 2–4 weeks. **Order the lidar and motors first.** Quantities include a few spares where parts are cheap and easy to break.
+Buy locally what you can; online orders from abroad can take 2–4 weeks. **Order the servos and motors first.** Quantities include a few spares where parts are cheap and easy to break. `cad/output/bom.csv` has the same list in short form.
 
 **Electronics**
 
 | # | Item | Qty | What to check when buying |
 |---|---|---|---|
-| E1 | Raspberry Pi 5, 8 GB (a Pi 4 8 GB also works) | 1 | |
-| E2 | Official Raspberry Pi 5 Active Cooler | 1 | Pi 4: any fan + heatsink case |
-| E3 | microSD card 64 GB, A2 class (SanDisk Extreme / Samsung EVO Plus) | 2 | Second card is for backups |
+| E1 | ESP32 DevKitC, 38 pins (ESP32-WROOM-32, USB) | 2 | One spare. Get the **38-pin** board, not the 30-pin one: the pin numbers in this guide are for it. |
+| E2 | 38-pin ESP32 screw-terminal breakout board | 1 | Wires screw in instead of loose jumpers |
+| E3 | MCP23017 I2C I/O expander module | 1 | Any module with the A0–A2 address pins brought out |
 | E4 | JGB37-520 12 V gear motor **170 RPM** with Hall encoder (6 wires) | 2 | Shaft 6 mm D-shaped. The 6-wire cable usually has 2 motor wires + VCC, GND, A, B. Ask the seller for the gear ratio and encoder pulses per revolution (usually 11 PPR). |
 | E5 | Wheel 100 mm diameter, ~30 mm wide, for 6 mm D-shaft (with hub/coupling + set screw) | 2 | Rubber tyre |
-| E6 | Swivel caster, **50 mm** wheel, **M8 threaded stem** (≥ 25 mm long), ≥ 20 kg rating, rubber/PU wheel | 2 | Height from the floor to the top of its swivel body **60–70 mm** (the nuts make up the rest of the 72 mm). Get 4 M8 nuts + washers if none come with them. |
+| E6 | Swivel caster, **50 mm** wheel, **M8 threaded stem** (≥ 25 mm long), ≥ 20 kg rating, rubber/PU wheel | 2 | Height from the floor to the top of its swivel body **60–70 mm** (the nuts make up the rest of the 72 mm). |
 | E7 | BTS7960 43 A motor driver module ("IBT-2") | 2 | |
-| E8 | RPLIDAR A1M8 (with its USB adapter board + cable) | 1 | The kit includes the USB adapter |
-| E9 | USB camera module, UVC, 32 × 32 mm board, wide-angle (≥ 100°) M12 lens, 640×480 @ 30 fps | 1 | "UVC" means no driver needed. Get a USB cable ≥ 50 cm. |
-| E10 | Straight-bar load cell, **10 kg**, 80 × 12.7 × 12.7 mm, 4 wires | 4 | Note the thread size of the end holes (M4 or M5) |
-| E11 | HX711 load-cell amplifier module | 5 | 1 spare |
-| E12 | 3S LiPo 11.1 V 5000 mAh, ≥ 20 C, XT60 plug | 1 (2 is better) | A second battery saves your demo day |
-| E13 | LiPo balance charger (IMAX B6 / ISDT / SkyRC class) + power supply | 1 | |
-| E14 | LiPo fire-safe bag | 1 | |
-| E15 | LiPo voltage alarm (1–8 S buzzer, plugs into the balance lead) | 1 | |
-| E16 | XL4015 5 A buck converter module (with current-limit pot) | 2 | 1 spare |
-| E17 | USB-C male cable with bare wire ends ("USB-C pigtail"), 20 AWG | 1 | Or cut a good USB-C cable |
-| E18 | Inline blade-fuse holder (14 AWG) + 10 A blade fuses | 1 + 5 | |
-| E19 | Master switch: panel toggle switch, **12 V DC ≥ 15 A**, 12 mm mounting hole | 1 | The DC rating matters, not the AC rating |
-| E20 | Emergency-stop mushroom button, **22 mm panel-mount**, latching, with an **NC contact block** (10 A) | 1 | "NC" = normally closed: power flows until pressed. No enclosure box needed: it mounts through the deck. |
-| E21 | XT60 connector pairs | 4 | |
-| E22 | WAGO 221 lever connectors: 221-415 (5-way) × 6, 221-413 (3-way) × 6 | 12 | Makes power buses without soldering |
-| E23 | Raspberry Pi GPIO screw-terminal breakout HAT (40-pin) | 1 | Wires screw in instead of loose jumpers |
-| E24 | Resistors 10 kΩ and 3.3 kΩ (¼ W) | 5 each | E-stop sense divider |
-| E25 | Small perfboard (5 × 7 cm) | 2 | |
-| E26 | Silicone wire 16 AWG red + black | 2 m each | Battery, fuse, switch, E-stop, drivers |
-| E27 | Silicone wire 20 AWG red + black | 3 m each | Buck converter, motors, pusher |
-| E28 | Jumper wires female-female and male-female, 20 cm | 40 each | Signals |
-| E29 | 4-core cable (or 4 jumper wires) 50 cm | 4 | Load cells → HX711s → Pi |
-| E30 | Ferrule kit + ferrule crimper | 1 | For every wire going into a screw terminal |
-| E31 | Heat-shrink assortment, zip ties, spiral wrap, 20 mm velcro strap (1 m), double-sided foam tape | 1 | |
-| E32 | Brass standoff kit M2.5 (for the Pi and the lidar) | 1 | |
-| E33 | VHB (strong double-sided foam) tape, 19 mm | 1 roll | Holds the small boards (drivers, buck, HX711s) without drilling |
-| E34 | **Pusher:** JGB37-520 12 V gear motor, about **110 RPM** (ratio 1:90), 6 mm D-shaft | 1 | No encoder needed. Body no longer than 60 mm, or it sticks out past the front of the deck. A spare 170 RPM drive motor also works: faster, but with less push force in reserve. |
-| E35 | **Pusher:** BTS7960 43 A motor driver module ("IBT-2") | 1 | The same module as E7 |
-| E36 | **Pusher:** lever microswitch, subminiature size (KW11-3Z / SS-5GL type: body 20 × 10 × 6.4 mm, two mounting holes 9.5 mm apart) | 3 | 1 spare. It needs C and NC terminals. Get the kind with a short metal **lever**: the lever gives it a few millimetres of overtravel. |
-| E37 | **Pusher:** 2-core signal cable (or 2 jumper wires twisted together) | 2 m | Limit switches → Pi |
+| E8 | **Servo 60 kg·cm**, metal gears, digital, 180°, 6–8.4 V, 25T spline, about 65 × 30 × 48 mm (e.g. **DS5160**) | 2 | Both the same model. Check it comes with an aluminium disc horn; if not, add E9. |
+| E9 | 25T aluminium disc servo horn, about 38 mm | 2 | Only if the servos come without one |
+| E10 | Buck converter **10 A** (e.g. 300 W XL4016 module), with voltage pot | 1 | For the servos: set to 7.4 V |
+| E11 | XL4015 5 A buck converter module (with current-limit pot) | 2 | 1 spare. For the ESP32 and sensors: set to 5.1 V |
+| E12 | 8-channel IR line sensor array, TCRT5000, **digital outputs**, 3.3–5 V | 1 | One output per sensor, with an adjustment pot per sensor; about 100 mm wide |
+| E13 | HC-SR04 ultrasonic sensor | 4 | 1 spare |
+| E14 | VL53L0X time-of-flight distance sensor module | 1 | The common purple "GY-530" board is fine |
+| E15 | Straight-bar load cell, **10 kg**, 80 × 12.7 × 12.7 mm, 4 wires | 4 | Note the thread size of the end holes (M4 or M5) |
+| E16 | HX711 load-cell amplifier module | 5 | 1 spare |
+| E17 | 3S LiPo 11.1 V 5000 mAh, ≥ 20 C, XT60 plug | 1 (2 is better) | A second battery saves your demo day |
+| E18 | LiPo balance charger (IMAX B6 / ISDT / SkyRC class) + power supply | 1 | |
+| E19 | LiPo fire-safe bag | 1 | |
+| E20 | LiPo voltage alarm (1–8 S buzzer, plugs into the balance lead) | 1 | |
+| E21 | Inline blade-fuse holder (14 AWG) + 10 A blade fuses | 1 + 5 | |
+| E22 | Master switch: panel toggle switch, **12 V DC ≥ 15 A**, 12 mm mounting hole | 1 | The DC rating matters, not the AC rating |
+| E23 | Emergency-stop mushroom button, **22 mm panel-mount**, latching, with an **NC contact block** (10 A) | 1 | "NC" = normally closed: power flows until pressed |
+| E24 | Push button, 12 mm panel-mount, momentary, normally open | 1 | The start button |
+| E25 | 5 mm LEDs green + red, with 5 mm panel clips (6 mm hole) | 1 each | |
+| E26 | Active buzzer module, 3 pins, 3.3–5 V | 1 | |
+| E27 | XT60 connector pairs | 4 | |
+| E28 | WAGO 221 lever connectors: 221-415 (5-way) × 8, 221-413 (3-way) × 6 | 14 | Makes power buses without soldering |
+| E29 | Resistors (¼ W): 1 kΩ × 3, 2 kΩ × 3, 10 kΩ × 5, 2.2 kΩ × 1, 4.7 kΩ × 2, 330 Ω × 2; capacitor 100 nF × 1 | 1 set | Dividers and pull resistors |
+| E30 | Small perfboard (5 × 7 cm) | 2 | The I/O board |
+| E31 | Silicone wire 16 AWG red + black | 3 m each | Battery, fuse, switch, E-stop, drivers, servo supply |
+| E32 | Silicone wire 20 AWG red + black | 2 m each | Bucks, motors |
+| E33 | Jumper wires female-female and male-female, 20 cm | 40 each | Signals |
+| E34 | 4-core cable 50 cm | 4 | Load cells → HX711s |
+| E35 | Servo extension leads, 30 cm | 2 | Servo → I/O board |
+| E36 | Ferrule kit + ferrule crimper | 1 | For every wire going into a screw terminal |
+| E37 | Heat-shrink assortment, zip ties, spiral wrap, 20 mm velcro strap (1 m), double-sided foam tape | 1 | |
+| E38 | VHB (strong double-sided foam) tape, 19 mm | 1 roll | Holds the small boards without drilling |
+| E39 | USB cable (USB-A or USB-C to micro-USB, matching your ESP32), ≥ 1 m, **data** cable | 1 | Some cheap cables only charge: try it before the build |
 
 **Mechanical**
 
 | # | Item | Qty | Notes |
 |---|---|---|---|
-| M1 | Laser cutting: `bottom_plate.dxf` in **6 mm plywood** (or 5 mm aluminium, CNC/waterjet) | 1 | Carries all the weight. **Not acrylic** (it cracks). |
-| M2 | Laser cutting: `top_deck.dxf` in 5 mm acrylic (or 6 mm plywood) | 1 | |
-| M3 | Laser cutting: `cargo_plate.dxf` in 5 mm acrylic | 1 | |
-| M4 | 3D prints: `camera_mount.stl` × 1 and `load_cell_spacer.stl` × 8, in PETG (about 50 g, 3 hours) | 1 set | Any printer: a friend's, the university lab, or a print shop |
-| M4b | **Pusher:** 3D prints: `pusher_carriage_L.stl`, `pusher_carriage_R.stl`, `pusher_rail_holder_A.stl` × 2, `pusher_rail_holder_B.stl`, `pusher_drive_bracket.stl`, in PETG (about 150 g, 10–12 hours) | 1 set | The biggest piece is 90 × 50 × 74 mm |
-| M5 | **M6 threaded rod**, 1 m (zinc-plated steel) | 1 | Cut into 6 pieces of 130 mm |
-| M6 | M6 nuts + M6 washers | 26 each | 24 needed (4 per rod) |
-| M7 | Steel mounting bracket for 37 mm gear motors (often sold with the motor, including its M3 screws) | 2 | |
-| M8 | M4 × 12 screws + M4 nylock nuts + washers | 6 each | Motor brackets → bottom plate (4 needed) |
+| M1 | Laser cutting: `bottom_plate.dxf` and `tilt_plate.dxf` in **6 mm plywood** | 1 each | They carry the weight. **Not acrylic** (it cracks). |
+| M2 | Laser cutting: `top_deck.dxf` and `cargo_plate.dxf` in 5 mm acrylic | 1 each | |
+| M3 | 3D prints (PETG): `servo_mount_front`, `servo_mount_rear`, `horn_adapter_front`, `horn_adapter_rear`, `bed_rest` × 2, `load_cell_spacer` × 8, `line_sensor_bracket`, `sonar_bracket`, `tof_bracket` (about 250 g, 12 hours) | 1 set | Any printer with a 200 × 200 mm bed. Settings in section 1.2. |
+| M4 | **M6 threaded rod**, 1 m (zinc-plated steel) | 1 | Cut into 6 pieces of 130 mm |
+| M5 | M6 nuts + M6 washers | 26 each | 24 needed (4 per rod) |
+| M6 | Steel mounting bracket for 37 mm gear motors (often sold with the motor, including its M3 screws) | 2 | |
+| M7 | M4 × 12 screws + M4 nylock nuts + washers | 20 each | Motor brackets (4), servo mounts (6), servo tabs (8), bed rests (2) |
+| M8 | M4 × 20 screws + nuts | 4 | Horn adapters through the tilting plate |
 | M9 | Screws for the load cells: M4 × 16 or M5 × 16 (match the cells' threads) + washers | 16 each | 2 per cell end |
-| M10 | M3 × 12 screws + nuts | 4 | Camera mount |
-| M11 | Blue thread-locker | 1 | Wheel set screws |
-| M12 | Anti-slip rubber mat, ~27 × 28 cm | 0 or 1 | **Only if you build without the pusher.** With the pusher the plate stays bare, so the cargo can slide off. |
-| M13 | Black matte tape 19 mm or 50 mm (line) + white/light floor, masking tape | 1 roll each | Line following + marking stations |
-| M14 | **Pusher:** T8 lead screw with **8 mm lead** (sold as "T8×8", or "pitch 2 mm, 4 starts"), 350 mm long, with its brass flange nut | 1 | You cut it to 310 mm; a 300 mm one is too short |
-| M15 | **Pusher:** smooth steel rod ("linear shaft") 8 mm × 400 mm | 2 | Used at full length. It's hardened: don't try to saw it. |
-| M16 | **Pusher:** LM8UU linear ball bearing | 4 | |
-| M17 | **Pusher:** KFL08 flange bearing block, 8 mm bore, two bolt holes about 37 mm apart | 1 | Takes the push force |
-| M18 | **Pusher:** flexible shaft coupler 6 mm → 8 mm (about 19 mm diameter × 25 mm) | 1 | Motor shaft → lead screw |
-| M19 | **Pusher:** aluminium angle 25 × 25 × 2 mm, 1 m | 1 | You cut 296 mm off it: the blade |
-| M20 | **Pusher:** screws: M4 × 20 + nut + washer × 10, M4 × 25 + nut + washer × 1, M3 × 16 × 4, M3 × 8 **socket-head** × 4, M3 × 8 × 4, M2 × 10 × 4 | 1 set | Rod holders, blade, drive bracket, bearing block; T8 nut; motor (tightened with a hex key); rod pinch screws; limit switches |
+| M10 | M3 × 10 screws (servo horns, self-tapping into the print) | 8 | Often included with the horn |
+| M11 | M3 × 20 screws + nuts | 6 | Sensor brackets |
+| M12 | Blue thread-locker | 1 | Wheel set screws, horn screws |
+| M13 | Self-adhesive rubber pads, 18 mm, 2 mm thick | 2 | On the bed rests |
+| M14 | Black matte tape 19 mm or 50 mm (line) + white/light floor, masking tape | 1 roll each | Line following + station marks |
 
 **Tools you need:**
 
@@ -291,146 +269,94 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 - Multimeter (with a 10 A range)
 - Wire stripper, side cutters, ferrule crimper
 - Hacksaw and a file (to cut the threaded rod)
-- Drill with bits 2.7 and 4.5 mm (the only holes you drill yourself: motor brackets in plywood, lidar screws in acrylic; for the pusher also 4 holes in the aluminium blade, and 5 in the deck if it was cut from the v2 file)
-- Spanners 10 mm (M6 nuts) and 13 mm (M8 caster nuts), hex keys, screwdrivers
-- Heat gun or lighter, marker, tape measure, square ruler
+- Drill with a 4.5 mm bit (the only holes you drill yourself: motor brackets in plywood)
+- Spanners 7 mm (M4), 10 mm (M6 nuts) and 13 mm (M8 caster nuts), hex keys, screwdrivers
+- Heat gun or lighter, marker, tape measure, square ruler, protractor (or a phone angle app)
 - A known reference weight for calibration: 2 kg of rice or sugar weighed on a kitchen scale is fine
 
 ### 0.3 Send the plates to the laser shop (Monday/Tuesday)
 
-1. Files: `cad/output/dxf/bottom_plate.dxf`, `top_deck.dxf`, `cargo_plate.dxf`.
+1. Files: `cad/output/dxf/bottom_plate.dxf`, `tilt_plate.dxf`, `top_deck.dxf`, `cargo_plate.dxf`.
 2. Tell the shop:
    - "Units are millimetres, cut every line, 1 piece each."
    - Material and thickness per the table above.
    - "Keep the protective film on the acrylic."
-3. When you collect them, check:
-   - **Bottom plate** (400 × 300 mm, plywood):
-     - holes: 6 × 6.5 mm (rods), 2 × 8.5 mm (casters), 4 × 2.7 mm (Pi), 2 × 3.4 mm (camera)
-     - slots: 4 small battery-strap slots and 2 cable slots
-   - **Top deck** (400 × 300 mm, acrylic):
-     - holes: 6 × 6.5 mm (rods), 22.5 mm (E-stop), 12.2 mm (switch), 5 × 4.5 mm near the side edges (pusher)
-     - slots: a long wiring slot, and 4 round-ended load-cell slots
-   - **Cargo plate** (270 × 280 mm, acrylic): 4 round-ended load-cell slots.
+3. When you collect them, check them against the hole tables on sheets 03–06 of `CargoRobot_v2_drawings.pdf`:
+   - **Bottom plate** (400 × 300 mm, plywood): 6 rod holes, 2 caster holes, 5 small sensor-bracket holes at the front edge, 4 battery-strap slots, 2 cable slots.
+   - **Top deck** (400 × 300 mm, acrylic): 6 rod holes, E-stop (22.5 mm), switch and button (12.2 mm), 2 LED holes, 8 M4 holes (servo mounts and bed rests), 2 small side-sensor holes, 3 cable cut-outs.
+   - **Tilting plate** (236 × 247 mm, plywood): 4 load-cell slots, 4 horn-adapter holes, 2 cable-tie slots.
+   - **Cargo plate** (260 × 280 mm, acrylic): 4 load-cell slots.
 
-> **Deck already cut from the v2 file?** Keep it. The 5 pusher holes are the only difference: drill them by hand in week 1, step 12. The bottom plate and the cargo plate are the same in v2 and v3.
+### 0.4 Get the parts printed
 
-### 0.4 Get the two small prints made
+All printed parts are in `cad/output/parts/` (settings in [section 1.2](#12-3d-printing)). About 12 hours of printing. Anyone with a printer can do it.
 
-`camera_mount.stl` and 8 × `load_cell_spacer.stl`: about 3 hours of printing in total (settings in [section 1.2](#12-3d-printing)). Anyone with a printer can do it.
-
-**Pusher:** six more prints (2 carriages, 3 rod holders, 1 drive bracket), about 10–12 hours in total. Print one carriage first and check the fits before printing the rest (section 1.2).
+> **Before printing the servo mounts, check your servo.** No seller lists the tab-hole spacing of the DS5160-type servo; the mount assumes 74 mm along the servo and 18 mm across. Measure yours with a ruler (hole centre to hole centre). If it differs, change `hole_l` / `hole_w` in `SERVO` at the top of `cad/robot_cad.py` and run the four CAD commands in [A.8](#a8-regenerating-the-cad-files), or simply drill the holes in the print to match.
 
 ### 0.5 Set up your laptop
 
-You need a laptop running **Ubuntu 24.04**. It runs RViz, the visual tool that shows the map, laser scan and robot, and lets you click navigation goals. ROS 2 Jazzy only supports Ubuntu 24.04.
-
-**Option A (recommended): dual-boot Ubuntu 24.04 next to Windows**
-
-1. [WINDOWS] Back up your files.
-2. If BitLocker is on: Control Panel → BitLocker → **Suspend protection**.
-3. Download "Ubuntu 24.04 LTS Desktop" from ubuntu.com. Write it to an 8 GB+ USB stick with **Rufus** or **balenaEtcher**.
-4. Make room for Ubuntu: Windows Disk Management → right-click C: → **Shrink Volume** → shrink by at least 60 GB.
-5. Reboot and open the boot menu (usually F12, F9 or Esc) → boot from the USB stick.
-6. Choose **Install Ubuntu** → **Install alongside Windows**. Afterwards the computer asks which OS to start each time it boots.
-
-**Option B: no Ubuntu laptop.** You can do everything over SSH from Windows PowerShell and view data with **Foxglove** (a desktop app for Windows) connected to `foxglove_bridge` on the Pi (installed in week 3). Clicking navigation goals is less convenient than in RViz, so use option A if you can.
-
-**Install ROS 2 Jazzy desktop [LAPTOP]:**
-
-```bash
-sudo apt update && sudo apt install -y software-properties-common curl git
-sudo add-apt-repository -y universe
-export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
-curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb"
-sudo dpkg -i /tmp/ros2-apt-source.deb
-sudo apt update && sudo apt upgrade -y
-sudo apt install -y ros-jazzy-desktop ros-dev-tools ros-jazzy-navigation2 ros-jazzy-nav2-bringup \
-     ros-jazzy-teleop-twist-keyboard ros-jazzy-rqt-image-view
-echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
-echo "export ROS_DOMAIN_ID=42" >> ~/.bashrc
-source ~/.bashrc
-```
-
-> If any of these commands fails, open **docs.ros.org → Jazzy → Installation → Ubuntu (deb packages)**. It has the current official version of the same steps.
-
-Test it:
-
-```bash
-rviz2          # a window with a grid should open; close it
-```
-
-Also install **VS Code** from code.visualstudio.com with the **Remote - SSH** extension. It lets you edit files that live on the Pi as if they were on your laptop.
+1. Install **Arduino IDE 2** from arduino.cc/en/software (Windows, macOS or Linux).
+2. **Add the ESP32 boards:** *File → Preferences → Additional boards manager URLs*: paste `https://espressif.github.io/arduino-esp32/package_esp32_index.json` → OK.
+3. *Tools → Board → Boards Manager* → search **esp32** → install **"esp32 by Espressif Systems"** (version 3.x). It is a big download (about 500 MB).
+4. *Tools → Manage Libraries* → search **VL53L0X** → install **"VL53L0X by Pololu"**. That is the only extra library.
+5. Plug in an ESP32 with the USB cable.
+   - **Windows:** if no new COM port appears (*Tools → Port*), install the USB driver for the chip printed next to the USB socket: CP2102 → "CP210x VCP driver" from silabs.com; CH340 → "CH341SER" from wch-ic.com.
+6. Test: *File → Examples → 01.Basics → Blink*. *Tools → Board → esp32 → **ESP32 Dev Module***, *Tools → Port* → the ESP32's port → **Upload**. The blue LED on the board blinks.
 
 ### 0.6 Put the project on GitHub
 
 1. Create a free GitHub account for each team member. One person creates a **private** repository called `cargo_robot` and adds the others as collaborators.
 2. [WINDOWS] Install **GitHub Desktop**. File → Add local repository → choose `C:\University\Gradfinal` → it offers to "create a repository here" → yes.
-3. Create a file called `.gitignore` in that folder (this project already includes one) so the big CAD Python environment isn't uploaded:
-
-   ```
-   cad/.venv/
-   robot_ws/build/
-   robot_ws/install/
-   robot_ws/log/
-   __pycache__/
-   ```
-
+3. The project already has a `.gitignore` so the big CAD Python environment isn't uploaded.
 4. GitHub Desktop → **Commit to main** → **Publish repository** (keep "private" ticked).
-5. From now on, every change is committed with a short message ("tuned PID", "added station 3"). This gives you a history for the report, and a way back when something breaks.
+5. From now on, every change is committed with a short message ("tuned PID", "servo end points"). This gives you a history for the report, and a way back when something breaks.
 
 **Done when:**
 
 - [ ] Supervisor approved the changes.
 - [ ] Parts ordered, with an expected delivery date written down.
 - [ ] Plates at the laser shop, printing started.
-- [ ] `rviz2` opens on the laptop.
+- [ ] Blink runs on an ESP32 from your laptop.
 - [ ] The repository is on GitHub.
 
 ---
 
 ## Week 1 — Fabrication & mechanical assembly (5 – 11 Oct)
 
-**Goal:** a rolling chassis: plates, rods, motors, wheels, casters, load cells, cargo plate, lidar, E-stop and switch mounted. There's no wiring yet.
+**Goal:** a rolling chassis: plates, rods, motors, wheels, casters, sensors, E-stop, switch, button, LEDs, and the tilting bed with its servos, load cells and cargo plate. There's no wiring yet.
 
-Keep `cad/output/views/render_top.png` and `render_side.png` open while you work. They show where everything goes. All positions below are in millimetres, measured from the **centre** of the plate: +X is forward (lidar end), +Y is left. Almost every hole is already cut in the plates, so the positions are mostly for checking.
+Keep `cad/autocad/CargoRobot_v2_assembly.pdf` open while you work: it has the same steps as below with a picture of every stage. Sheet 07 of the drawings shows the tilting bed. All positions below are in millimetres, measured from the **centre** of the plate: +X is forward, +Y is left. Almost every hole is already cut in the plates, so the positions are mostly for checking.
 
 ![Top view](cad/output/views/render_top.png)
 
 ### 1.1 Laser-cut parts
 
-Collect the three plates (section 0.3). Peel the film only from the side you'll write on. Mark the top face and the **FRONT** edge on each plate with a marker:
+Collect the four plates (section 0.3). Peel the film only from the side you'll write on. Mark the top face and the **FRONT** edge on each plate with a marker:
 
-- **Bottom plate:** the 4 small Pi holes are at the front-left.
+- **Bottom plate:** the 5 small sensor-bracket holes are at the front edge.
 - **Top deck:** the big 22.5 mm E-stop hole is at the front-left.
+- **Tilting plate:** the 4 single holes (horn adapters) are along its **right** edge, at the front and rear corners.
 - **Cargo plate:** it's symmetric, so any way round works.
 
 ### 1.2 3D printing
 
-PETG, 0.2 mm layers, 245 °C nozzle / 80 °C bed, 4 walls:
+PETG, 0.2 mm layers, 245 °C nozzle / 80 °C bed, 4 walls (sheets 08–09 of the drawings show every part with its sizes):
 
 | Part (file in `cad/output/parts/`) | Qty | Orientation | Infill | Supports |
 |---|---|---|---|---|
-| `camera_mount.stl` | 1 | Foot flat on the bed | 40 % | "Supports on build plate only" |
+| `servo_mount_front.stl`, `servo_mount_rear.stl` | 1 each | Foot flat on the bed | 40 % | None |
+| `horn_adapter_front.stl`, `horn_adapter_rear.stl` | 1 each | Round wall flat on the bed | 100 % | "Supports on build plate only" |
+| `bed_rest.stl` | 2 | Flat end down | 40 % | None |
 | `load_cell_spacer.stl` | 8 | Flat | 100 % | None |
-| **Pusher:** `pusher_carriage_L.stl`, `pusher_carriage_R.stl` | 1 each | Standing on its rear end face, so the bearing bore points up | 40 % | "Supports on build plate only" (under the arm) |
-| **Pusher:** `pusher_rail_holder_A.stl` | 2 | Outer end face on the bed | 40 % | "Supports on build plate only" |
-| **Pusher:** `pusher_rail_holder_B.stl` | 1 | Outer end face on the bed | 40 % | "Supports on build plate only" |
-| **Pusher:** `pusher_drive_bracket.stl` | 1 | Base bar's side face (the inner edge) on the bed | 40 % | "Supports on build plate only" |
-
-> **Pusher parts are a first design: they have not been test-printed.** The orientations above are suggestions. Print **one carriage** first and check three fits before printing the rest:
->
-> - an LM8UU bearing presses into the 15.2 mm bore by hand, firmly;
-> - the 8 mm rod slides into a rod holder's hole;
-> - the T8 nut's body goes into the 10.6 mm hole.
->
-> If a hole comes out tight, open it with a drill bit or a round file, or set "hole horizontal expansion" to about +0.1 mm in the slicer.
+| `line_sensor_bracket.stl` | 1 | Flange flat on the bed | 40 % | Under the shelf |
+| `sonar_bracket.stl` | 1 | Base flat on the bed | 40 % | None |
+| `tof_bracket.stl` | 1 | Top flange flat on the bed | 40 % | None |
 
 ### 1.3 Cut the threaded rods
 
 1. Cut **6 pieces of 130 mm** from the M6 rod with a hacksaw.
 2. **Trick:** before cutting, screw a nut past the cut mark. After cutting, unscrew it over the cut end. It re-forms the damaged thread.
 3. File each cut end flat and lightly chamfered.
-4. **Pusher:** cut the T8 lead screw to **310 mm** and a piece of the aluminium angle to **296 mm**. Use the same trick on the lead screw, with its brass nut. File the ends. Do **not** cut the 8 mm rods.
 
 ### 1.4 Assembly, step by step
 
@@ -440,7 +366,7 @@ Use nylock nuts where listed, and don't over-tighten anything that touches acryl
 
 - [ ] Fix each motor to its bracket with the M3 screws that came with the bracket. The shaft sticks out of the bracket's outer face.
 
-**Step 2: Brackets under the bottom plate** (the only holes you drill in plywood)
+**Step 2: Brackets under the bottom plate** (the only holes you drill)
 
 1. Turn the bottom plate upside down. Place a bracket so its flat base lies on the plate:
    - the vertical face (with the shaft) is **5 mm in from the side edge**;
@@ -462,7 +388,7 @@ For each rod:
 2. Push the rod **up** through a 6.5 mm hole from below. Add a washer + nut on top and tighten the two nuts against the plate.
 3. Screw a third nut down the rod and put a washer on it. Set it so the top of the washer is **exactly 100 mm above the plate's top surface**. Cut a 100 mm piece of wood or card as a gauge and use it on all 6 rods. The deck will rest on these 6 washers.
 
-Rod positions (the holes are pre-cut): X = −180, +60, +185 at Y = ±135.
+Rod positions (the holes are pre-cut): X = −190, +60, +190 at Y = ±135.
 
 **Step 5: Casters**
 
@@ -472,42 +398,31 @@ Rod positions (the holes are pre-cut): X = −180, +60, +185 at Y = ±135.
 
 The final height is set in section 1.5.
 
-**Step 6: Load cells on the deck** (before the deck goes on the rods)
+**Step 6: Front sensors**
 
-The deck has 4 round-ended slots for the cells' **fixed ends**:
+1. **Line sensor:** screw the 8-channel sensor board under the shelf of `line_sensor_bracket`, sensors facing **down**, its pin header towards the robot (2 × M3 through the board's end holes; drill the print to suit if your board's holes differ). Sensor 1 must be on the robot's **left**.
+2. **Ultrasonic sensors:** push each HC-SR04 into `sonar_bracket` from behind so its two silver cans go through the windows. Hold each with a dab of hot glue or 2 zip ties. Pins downwards.
+3. Put the ultrasonic bracket on the **top** of the bottom plate at the front edge and the line-sensor bracket **under** it, and bolt both through the 2 shared holes (Y = ±20) with M3 × 20 + nut. Add M3 screws through the ultrasonic bracket's other 3 holes.
+4. Check that the front caster still swivels a full turn without touching the line-sensor bracket.
 
-- **Rear cells:** the slots near the rear edge. Each cell runs forward from there.
-- **Front cells:** the slots at X ≈ +57. Each cell runs **backwards** from there.
-
-All 4 cells sit at Y = ±110, parallel to the robot's length. Their fixed ends face outward (rear cells to the rear edge, front cells to the front); their loaded ends point towards the middle of the cargo bed.
-
-1. Each cell has an arrow on its side. Mount it so the arrow points **down**, the direction the load pushes.
-2. Put a printed spacer on the deck over the slot, and the cell's fixed end on top.
-3. Push 2 screws + washers up **from below**, through the slot and spacer, into the cell's threads. The slot fits hole spacings from ~5 to 23 mm from the cell's end, so any common bar cell fits.
-4. Line the cell up parallel to the deck edge, then tighten.
-5. The screws must **not** come out of the top of the cell. If they do, the cell can't flex. Use shorter screws or add a washer.
-
-> The middle of each cell (the part with the white glue/gauges) must be free: it must not touch the deck or the cargo plate.
-
-**Step 7: E-stop and master switch** (still before the deck goes on)
+**Step 7: Deck parts** (before the deck goes on the rods)
 
 1. **E-stop:**
    1. Unclip the contact block and unscrew the big ring nut from the button.
    2. Push the button through the **22.5 mm hole** (front-left) from **above**.
    3. Screw the ring nut on from below, then clip the contact block back on underneath.
    4. Attach 2 × 40 cm of 16 AWG wire to its **NC** terminals now (it's easier than later). Week 2 connects them.
-2. **Switch:**
-   1. Remove the switch's nut.
-   2. Push the switch up through the **12.2 mm hole** (front-right) from **below**.
-   3. Add the washer + nut on top.
-   4. Attach 2 × 40 cm of 16 AWG wire.
+2. **Master switch:** remove its nut, push it up through the **12.2 mm hole at the front middle** from **below**, add the washer + nut on top, attach 2 × 40 cm of 16 AWG wire.
+3. **Start button:** the 12.2 mm hole at the **rear**: same way as the switch. Attach 2 × 30 cm jumper wires.
+4. **LEDs:** push the 2 clips into the 6.2 mm holes next to the button (green nearer the button, red outside), then the LEDs into the clips. Note which leg is longer (+). Attach jumper wires.
+5. **Side sensor:** screw the VL53L0X behind the window of `tof_bracket` (its sensor chip in the window, looking out), and bolt the bracket **under** the deck at its right edge with 2 × M3 through the 2 small holes (X = −40). The window faces outwards (right).
+6. **Servo mounts:** bolt `servo_mount_front` (front-right corner) and `servo_mount_rear` (rear-right corner) to the deck, each with 3 × M4 × 12 + washer + nylock nut. Their upright plates face each other's inside; compare with `render_iso.png`.
+7. **Bed rests:** push an M4 nut into the pocket at the top of each `bed_rest`, then bolt each to its hole (X = ±40, Y = +95) with an M4 × 20 from below. Stick a rubber pad on top.
 
-**Step 8: Lidar** (the only holes you drill in acrylic: 4 small ones)
+**Step 8: Servos**
 
-1. Place the RPLIDAR on the front of the deck: centre at X = +140, Y = 0, with its cable/USB-board end pointing **backwards**.
-2. Mark its 4 bottom mounting holes. Drill **2.7 mm**, slowly, with the protective film still on and the deck supported on scrap wood.
-3. Mount it on M2.5 standoffs (~20–25 mm) so the cables can pass underneath.
-4. Stick its small USB adapter board next to it with VHB tape.
+1. **Find the servo centre first** (week 3 explains the commands; with no electronics yet, skip the horn alignment and do it in week 4). Lay each servo in its mount: body through the window, shaft towards the middle of the robot, **shaft end outwards** (towards the deck's right edge), cable at the bottom. Fix the 4 tabs with M4 × 12 + nut.
+2. Route each servo cable down through the cut-out next to its mount.
 
 **Step 9: Put the deck on**
 
@@ -515,57 +430,40 @@ All 4 cells sit at Y = ±110, parallel to the robot's length. Their fixed ends f
 2. Add a washer + nut on top of each rod and tighten.
 3. Put a spirit level (or a phone level app) on the deck to check it's level. Adjust the nuts if needed.
 
-**Step 10: Cargo plate**
+**Step 10: Load cells on the tilting plate**
 
-1. Put a printed spacer on each cell's **loaded end** (the end pointing to the middle).
-2. Lay the cargo plate on so its 4 slots sit over the spacers. Push 2 screws + washers **down** through each slot and spacer into the cell.
-3. Tighten gently.
+The tilting plate has 4 round-ended slots for the cells' **fixed ends**, near its front and rear edges.
+
+- All 4 cells sit at Y = ±110, parallel to the robot's length. Their fixed ends face outward (front cells to the front, rear cells to the rear); their loaded ends point towards the middle of the bed.
+
+1. Each cell has an arrow on its side. Mount it so the arrow points **down**, the direction the load pushes.
+2. Put a printed spacer on the plate over the slot, and the cell's fixed end on top.
+3. Push 2 screws + washers up **from below**, through the slot and spacer, into the cell's threads. The slot fits hole spacings from ~5 to 23 mm from the cell's end, so any common bar cell fits.
+4. Line the cell up parallel to the plate edge, then tighten.
+5. The screws must **not** come out of the top of the cell. If they do, the cell can't flex. Use shorter screws or add a washer.
+6. Stick the 4 HX711 boards on the tilting plate between the cells (see `render_top.png`) with VHB tape.
+
+> The middle of each cell (the part with the white glue/gauges) must be free: it must not touch the plate or the cargo plate.
+
+**Step 11: Horn adapters and cargo plate**
+
+1. Bolt `horn_adapter_front` and `horn_adapter_rear` on top of the tilting plate's two right-hand corners (round wall sticking out past the plate's end), each with 2 × M4 × 20 down through the plate and a nut underneath.
+2. Screw an aluminium disc horn onto each adapter's round wall: 4 × M3 × 10 into the 2.8 mm holes (they cut their own thread; a drop of thread-locker). Leave the horn's centre screw out for now.
+3. Put a printed spacer on each cell's **loaded end**, lay the cargo plate on so its 4 slots sit over the spacers, and push 2 screws + washers **down** through each slot and spacer into the cell. Tighten gently.
 4. The cargo plate must touch **only** the 4 spacers. Check with paper all around: no rubbing anywhere.
-5. **With the pusher:** leave the plate bare, so the cargo can slide. Without the pusher: stick the anti-slip rubber mat on top.
+5. **No anti-slip mat:** the package must slide off when the bed tips.
 
-**Step 11: Camera**
+**Step 12: Hang the bed on the servos**
 
-1. Screw the USB camera board to the tilted face of `camera_mount` (drill 2 mm holes in the print to match the board). Point the lens down-forward.
-2. Fix the mount's foot at the front edge of the bottom plate, using the two pre-cut 3.4 mm holes: M3 × 12 + nut.
+1. Lower the bed so it lies on the 2 rest posts, and push the two horns onto the servo splines. Each horn's hub must slide fully onto its spline. If one doesn't line up, turn that servo's shaft by hand (gently) one spline tooth at a time until it does.
+2. Fit the horns' centre screws (thread-locker).
+3. Lift the bed's left edge by hand (servos unpowered they turn, stiffly): it must swing up to about 45° and back without touching anything. Watch the right edge of the cargo plate pass the servo mounts.
 
-**Step 12: Pusher** (skip it if you build without the pusher)
+**Step 13: Check the bed**
 
-Sheet 07 of the drawings (`cad/autocad/CargoRobot_v3_drawings.pdf`) shows the whole pusher with numbered parts, and `cad/output/views/render_pusher_out.png` shows it fully out. The drive side is the robot's **right** side, so the E-stop side stays clear.
-
-1. **Holes in the deck.** A deck cut from the v3 file already has them. On a v2 deck, drill 5 × 4.5 mm: film on, scrap wood underneath, slowly. Positions from the plate **centre**:
-
-   | Hole | X | Y | For |
-   |---|---|---|---|
-   | 1, 2 | −162 | +140 and −140 | rear rod holders |
-   | 3 | +142 | +140 | front-left rod holder |
-   | 4, 5 | +94 and +170 | −139 | drive bracket |
-
-   Easier than measuring: clip each printed part onto the deck edge where it belongs (see below) and mark through its hole. The rear holders sit flush with the deck's rear edge; the drive bracket's rear end is 13 mm in front of the cargo plate.
-2. **Bearings into the carriages.** Press 2 LM8UU bearings into each carriage from its open rear end. The first one goes all the way to the cap at the front; the second sits flush with the rear end.
-3. **T8 nut into the right carriage** (`pusher_carriage_R`). Push the nut's body into the hole from the **front**, so its flange lies on the front face of the block. Fix it with 4 × M3 × 16 into the printed holes. Snug, not tight.
-4. **Rod holders.** Slide the three holders onto the deck edge from the side: block outside, strip on top, lip underneath.
-   - type **B** at the rear-left corner;
-   - type **A** at the rear-right corner;
-   - a second type **A**, turned round, at the front-left (its block towards the front).
-
-   Fix each with an M4 × 20 pushed up through the deck **from below** (washer under the head), washer + nut on top, finger-tight for now. From above there's no room: the rear ones sit under the edge of the cargo plate.
-5. **Left rod.** From the front, push an 8 mm rod through the front-left holder, through the left carriage, and into the rear-left holder until it's flush with the holder's rear face (its front end then sticks out about 20 mm past the front holder; that's intended). The carriage's arm points inwards, over the bed, and sits at the carriage's **rear** end.
-6. **Drive bracket and right rod.** Clip the drive bracket over the right edge of the deck at the front. Bolt it from below as well: M4 × 20 in the rear hole, M4 × 25 in the front hole (the one that ends up under the motor). Push the second rod through the bracket's rod holder, through the right carriage and into the rear-right holder.
-7. **Make the carriages slide.** Each carriage must slide along its whole rod by hand, easily. If one binds near an end, loosen that holder's bolt, slide the carriage there, and retighten. Then tighten all the M4 bolts, and screw an M3 × 8 into the small hole under each holder (3 holders + the bracket) to pinch the rods.
-   - The two carriages are not the same: the **left** one has a finger on its front end (it presses the HOME switch), the **right** one takes the T8 nut.
-8. **Blade.**
-   1. Drill 4 × 4.3 mm in one leg of the angle: 8 mm and 20 mm from each end, 13.5 mm from the **outside** of the other leg.
-   2. Lay the drilled leg on the two carriage arms. The other leg hangs down **behind** the arms, towards the rear: it's the pushing face.
-   3. Bolt it with 4 × M4 × 20 + nuts under the arms.
-   4. Check the gap: the blade's lower edge must clear the cargo plate by **about 3 mm** along the whole stroke. A 2 mm card must slide under it everywhere. **The blade must never touch the cargo plate**, or the scale reads wrong. Too low? Put washers between the blade and both arms.
-9. **Bearing block.** Bolt the KFL08 to the **rear** face of the bracket's first wall, with its round boss through the wall's big hole: 2 × M4 × 20 + nuts.
-10. **Lead screw.** Slide the right carriage to the middle. From the rear, turn the lead screw through the carriage's nut, then on through the bearing block until about 12 mm sticks out in front of it. Fit the coupler on that end (the lead screw goes about 11 mm in) and tighten the coupler's screw on that side. Tighten the two small set screws of the bearing block onto the lead screw: they carry the push force.
-11. **Motor.** Push the motor's shaft through the second wall from the front, into the coupler. The gearbox shaft is off-centre: turn the motor until the shaft lines up with the coupler and the motor body sits towards the **inside** of the robot. Fix it with 4 × M3 × 8 socket-head screws into the gearbox face, through the wall's 4 holes. There are only 30 mm between the two walls, so tighten them with the short end of a hex key. They must not go deeper than 4 mm into the gearbox. (The gearbox has 6 threaded holes; the 2 next to the shaft stay empty, because screw heads there would rub on the coupler.) Tighten the coupler's motor side on the flat of the D-shaft.
-12. **Limit switches.** Both sit on top of a type **A** rod holder, each with 2 × M2 × 10 down through the switch into the holder's two small printed holes. Solder 2-core wire to **C** and **NC** of each switch first: 60 cm for HOME, 100 cm for END.
-    - **HOME:** on the **front-left** holder, its lever pointing to the rear. The finger on the front end of the left carriage presses it when the blade is parked.
-    - **END:** on the **rear-right** holder, its lever pointing to the front. The right carriage presses it when the blade is fully out. Its body sits 4 mm in from the holder's rear face; bend its solder lugs sideways so that nothing sticks out behind the robot.
-13. **Turn the coupler by hand.** The blade must travel from the HOME click to the END click without binding. At END, the blade's face is level with the deck's rear edge and nothing sticks out behind it.
-14. Tie the two switch cables and the motor's wires along the right edge of the deck, **away from the lead screw**, with slack where they go down into the bay. Week 2 and week 3 connect them.
+- [ ] The bed lies level on its 2 rest posts and the 2 servo shafts.
+- [ ] Nothing rubs anywhere between 0° and 45°.
+- [ ] The cargo plate's right edge ends up just outside the deck when tipped (sheet 07 of the drawings: 6 mm).
 
 ### 1.5 Set the casters: all 4 wheels on the floor
 
@@ -578,107 +476,105 @@ The two drive wheels must carry most of the weight (for grip), and the casters m
    3. Retighten the top nut.
 3. **A drive wheel lifts off** (the caster is too low): do the opposite, moving the lower nut down towards the caster body.
 4. **Target:** each caster grips its paper, but a firm tug still pulls it out. Both drive wheels grip their paper hard.
-5. **Stem too short to adjust?** Measure the plate's underside height above the floor next to the caster hole (H), and the caster's height from the floor to the top of its swivel body (C). The gap between caster body and plate must be **H − C**: use nuts and washers to make that gap.
 
 ### 1.6 Mechanical checks
 
 - [ ] Push the robot by hand: it rolls straight, turns smoothly, the casters swivel freely, nothing rubs.
-- [ ] Put 10 kg on the cargo plate: nothing bends visibly, the cargo plate touches only the spacers, and no wheel lifts.
-- [ ] Press the E-stop hard: the deck doesn't bend noticeably. If it does, add a nut/washer "support" under the deck near the E-stop.
-- [ ] **Pusher:** turning the coupler by hand moves the blade the whole way, both switches click, the blade clears the cargo plate everywhere, and nothing sticks out behind the deck's rear edge.
+- [ ] Put 3 kg on the cargo plate: nothing bends visibly, the cargo plate touches only the spacers, and no wheel lifts.
+- [ ] Press the E-stop hard: the deck doesn't bend noticeably.
 
-**Done when:** the chassis rolls freely with all 4 wheels on the floor and carries 10 kg. Take photos for the report.
+**Done when:** the chassis rolls freely with all 4 wheels on the floor and carries 3 kg, and the bed swings from 0° to 45° by hand without touching anything. Take photos for the report.
 
 ---
 
 ## Week 2 — Power & safety wiring (12 – 18 Oct)
 
-**Goal:** battery → fuse → switch → 12 V bus → (E-stop → motor drivers) and (buck → 5.1 V → Pi). Everything is measured and safe.
+**Goal:** battery → fuse → switch → 12 V bus → (E-stop → motor drivers and servo buck) and (buck → 5.1 V → ESP32). Everything is measured and safe.
 
 > Work with the battery **unplugged**. Plug it in only for the measurements, with the master switch OFF first.
 
 ### 2.1 Power diagram
 
-The full power schematic is sheet E02 in `cad/autocad/CargoRobot_v3_schematics.pdf` (also as an AutoCAD `.dxf`). Print it and keep it next to you while wiring. The diagram below is the same circuit in short form.
+The full power schematic is sheet E02 in `cad/autocad/CargoRobot_v2_schematics.pdf` (also as an AutoCAD `.dxf`). Print it and keep it next to you while wiring. `cad/autocad/CargoRobot_v2_connections.pdf` has every wire of this week and the next in one place, also listed part by part.
 
 ```mermaid
 flowchart LR
   B["LiPo +<br/>(XT60)"] -->|16 AWG red| F["Fuse 10 A"] -->|16 AWG| S["Master switch"] -->|16 AWG| P12["WAGO: +12 V MAIN bus"]
-  P12 -->|20 AWG| BI["Buck IN+"]
+  P12 -->|20 AWG| BI["5 V buck IN+"]
   P12 -->|16 AWG| E["E-stop NC contact"] -->|16 AWG| M12["WAGO: +12 V MOTOR bus"]
   M12 -->|16 AWG| DL["Left BTS7960 B+"]
   M12 -->|16 AWG| DR["Right BTS7960 B+"]
-  M12 -->|signal| DIV["10k / 3.3k divider → GPIO26"]
-  M12 -->|20 AWG| DP["Pusher BTS7960 B+"]
+  M12 -->|16 AWG| SB["7.4 V servo buck IN+"]
+  M12 -->|signal| DIV["10k / 2.2k divider → GPIO 33"]
   BN["LiPo −"] -->|16 AWG black| G["WAGO: GND bus"]
-  G --> BIN["Buck IN−"]
-  G --> DLN["Left BTS7960 B−"]
-  G --> DRN["Right BTS7960 B−"]
-  G --> DPN["Pusher BTS7960 B−"]
-  BO["Buck OUT+ 5.1 V / OUT−"] -->|USB-C pigtail| PI["Pi 5 USB-C power"]
+  BO["5 V buck OUT"] --> V5["WAGO: 5 V bus → ESP32 5V pin"]
+  SO["Servo buck OUT"] --> V7["WAGO: 7.4 V bus → 2 servos"]
 ```
 
 ### 2.2 Power wire list
 
-| # | From | To | Wire | End fittings |
+<!-- power wires: generated by cad/make_docs.py from cad/wiring.py -->
+| # | From | To | Wire | Notes |
 |---|---|---|---|---|
-| P1 | Battery XT60 (use a male XT60 lead) + | Fuse holder (in) | 16 AWG red, 10 cm | XT60 soldered; fuse holder crimped/soldered |
-| P2 | Fuse holder (out) | Master switch terminal 1 | 16 AWG red | Crimp/solder to switch |
-| P3 | Master switch terminal 2 | WAGO **MAIN +12 V** (5-way) | 16 AWG red | Ferrule-free (WAGO takes bare wire) |
-| P4 | Battery XT60 − | WAGO **GND** (5-way; add a second one linked to it if you need more slots) | 16 AWG black | |
-| P5 | MAIN +12 V | E-stop NC terminal 1 (contact block under the deck) | 16 AWG red, ~40 cm | Ferrule into the contact block's screw terminal |
-| P6 | E-stop NC terminal 2 | WAGO **MOTOR +12 V** (5-way) | 16 AWG red, ~40 cm | Ferrule |
-| P7 | MOTOR +12 V | Left BTS7960 **B+** | 16 AWG red | Ferrule |
-| P8 | MOTOR +12 V | Right BTS7960 **B+** | 16 AWG red | Ferrule |
-| P9 | GND | Left BTS7960 **B−** | 16 AWG black | Ferrule |
-| P10 | GND | Right BTS7960 **B−** | 16 AWG black | Ferrule |
-| P11 | Left BTS7960 **M+ / M−** | Left motor: red (M1) / white (M2) | 20 AWG (or the motor's own wires) | Ferrules |
-| P12 | Right BTS7960 **M+ / M−** | Right motor: red (M1) / white (M2) | 20 AWG | Ferrules |
-| P13 | MAIN +12 V | Buck **IN+** | 20 AWG red | Ferrule |
-| P14 | GND | Buck **IN−** | 20 AWG black | Ferrule |
-| P15 | Buck **OUT+ / OUT−** | USB-C pigtail red / black | the pigtail's wires, max 30 cm | Ferrules |
-| P16 | LiPo balance plug | Voltage alarm | — | Plug in, check the alarm shows 3 cell voltages |
-| P17 | MOTOR +12 V | **Pusher** BTS7960 **B+** | 20 AWG red | Ferrule |
-| P18 | GND | **Pusher** BTS7960 **B−** | 20 AWG black | Ferrule |
-| P19 | **Pusher** BTS7960 **M+ / M−** | Pusher motor's two terminals | 20 AWG, ~60 cm, up over the right edge of the deck at the front | Ferrules at the driver; soldered at the motor |
+| P1 | Battery BT1 **+ (XT60)** | Fuse holder F1 **in** | 16 AWG red, 10 cm | XT60 soldered |
+| P2 | Fuse holder F1 **out** | Master switch SW1 **terminal 1** | 16 AWG red |  |
+| P3 | Master switch SW1 **terminal 2** | WAGO +12 V MAIN | 16 AWG red | WAGO 221-415 |
+| P4 | Battery BT1 **- (XT60)** | WAGO GND | 16 AWG black | WAGO 221-415, link a second one |
+| P5 | WAGO +12 V MAIN | E-stop S1 **NC terminal 1** | 16 AWG red, 40 cm | ferrule |
+| P6 | E-stop S1 **NC terminal 2** | WAGO +12 V MOTOR | 16 AWG red, 40 cm | ferrule |
+| P7 | WAGO +12 V MOTOR | BTS7960 left U2 **B+** | 16 AWG red | ferrule |
+| P8 | WAGO +12 V MOTOR | BTS7960 right U3 **B+** | 16 AWG red | ferrule |
+| P9 | WAGO GND | BTS7960 left U2 **B-** | 16 AWG black | ferrule |
+| P10 | WAGO GND | BTS7960 right U3 **B-** | 16 AWG black | ferrule |
+| P11 | BTS7960 left U2 **M+** | Left motor M1 **red (motor +)** | 20 AWG or the motor's wire | ferrule |
+| P11 | BTS7960 left U2 **M-** | Left motor M1 **white (motor -)** | 20 AWG or the motor's wire | ferrule |
+| P12 | BTS7960 right U3 **M+** | Right motor M2 **red (motor +)** | 20 AWG or the motor's wire | ferrule |
+| P12 | BTS7960 right U3 **M-** | Right motor M2 **white (motor -)** | 20 AWG or the motor's wire | ferrule |
+| P13 | WAGO +12 V MAIN | 5 V buck U1 **IN+** | 20 AWG red | ferrule |
+| P14 | WAGO GND | 5 V buck U1 **IN-** | 20 AWG black | ferrule |
+| P15 | 5 V buck U1 **OUT+** | WAGO +5 V | 20 AWG red | set to 5.10 V first |
+| P15 | 5 V buck U1 **OUT-** | WAGO GND | 20 AWG black |  |
+| P15 | WAGO +5 V | ESP32 (breakout) **5V** | 20 AWG red |  |
+| P15 | WAGO GND | ESP32 (breakout) **GND** | 20 AWG black | the logic ground starts here |
+| P16 | Battery BT1 **balance plug** | LiPo voltage alarm | - | set it to 3.5 V per cell |
+| P17 | WAGO +12 V MOTOR | Servo buck U5 **IN+** | 16 AWG red | ferrule |
+| P18 | WAGO GND | Servo buck U5 **IN-** | 16 AWG black | ferrule |
+| P19 | Servo buck U5 **OUT+** | WAGO +7.4 V | 16 AWG red | set to 7.4 V first |
+| P19 | Servo buck U5 **OUT-** | WAGO GND | 16 AWG black |  |
+| P19 | WAGO +7.4 V | Front servo SV1 **red (+)** | servo lead |  |
+| P19 | WAGO GND | Front servo SV1 **brown (-)** | servo lead |  |
+| P19 | WAGO +7.4 V | Rear servo SV2 **red (+)** | servo lead |  |
+| P19 | WAGO GND | Rear servo SV2 **brown (-)** | servo lead |  |
+<!-- end -->
 
 > **Motor wire colours:** the most common JGB37-520 encoder cable is red = motor +, white = motor −, blue = encoder VCC, black = encoder GND, yellow = encoder A, green = encoder B. **Check your seller's diagram.** Only red and white go to the driver in this week; the other four are for week 3.
 
 ### 2.3 Building it, in order
 
-1. **Battery lead.** Solder a male XT60 onto 10 cm of 16 AWG red + black.
-   - Heat-shrink each joint.
-   - The XT60 housing has small **+** and **−** marks moulded next to the pins. Red goes to +. When the lead is finished, and before connecting anything else to it, plug it into the battery. With the multimeter's red probe on the red wire and black probe on the black wire, it must read **+11 to +12.6 V** (not a negative number).
+1. **Battery lead.** Solder a male XT60 onto 10 cm of 16 AWG red + black. Heat-shrink each joint. Red goes to the XT60's **+** pin. Plug it into the battery: with the multimeter's red probe on the red wire, it must read **+11 to +12.6 V** (not a negative number).
 2. **Fuse.** Crimp or solder the inline fuse holder into the red wire, as close to the XT60 as possible. Leave the fuse **out** for now.
-3. **Switch.** The switch is mounted in the deck (week 1, step 7), with its two 40 cm wires hanging down into the bay. Connect them as P2 and P3. Put the WAGO buses on the bottom plate near the power-distribution corner (rear-right), fixed with VHB tape.
-   - Leave the wires going up to the deck (switch, E-stop, lidar USB, load cells) with **~10 cm of slack**, so the deck can be lifted off with the wires still connected.
-4. **GND bus** (P4, P9, P10, P14).
-5. **E-stop** (P5, P6). The E-stop's contact block is under the deck, with the two wires you fitted in week 1. Check they're on the **NC** contact (marked "NC", often a red block). With a multimeter on continuity between the two wire ends:
-   - Button released → **beep**
-   - Button pressed → **no beep**
-6. **Motor drivers** (P7–P12). Stick the BTS7960 boards to the bottom plate at the rear, one each side of the centre line (see the top view), with **VHB tape** under the board. Their heatsinks must point up.
-7. **Pusher driver** (P17–P19). Stick the third BTS7960 on the bottom plate at the front-right, opposite the Pi (X = +120, Y = −65). P17 takes the last free slot of the 5-way MOTOR +12 V WAGO; for P18, link a second WAGO to the GND bus. Because it's on the **motor** bus, the E-stop also stops the pusher. Which way round M+ / M− go doesn't matter: `invert_motor` fixes the direction in week 3.
-8. **Buck converter** (P13, P14). Stick it down with VHB tape at the rear-left. Don't connect the pigtail yet.
-9. **Set the buck output to 5.1 V (important):**
-   1. Insert the 10 A fuse, then connect the battery with the master switch **OFF**. Switch **ON**.
-   2. Multimeter (DC V) on buck OUT+ / OUT−.
-   3. Turn the **voltage** potentiometer (the small brass screw; often many turns needed) until it reads **5.10–5.20 V**.
-   4. Turn the **current** potentiometer fully clockwise (about 15 turns, maximum current).
-   5. Switch **OFF**.
-10. **USB-C pigtail** (P15): red → OUT+, black → OUT−. If the pigtail has more wires (e.g. white/green data wires), cut them short and insulate them with heat-shrink.
-11. **Battery alarm** (P16): plug it into the balance lead. It beeps below the threshold; set it to **3.5 V** if it's adjustable.
+3. **Switch** (P2, P3). Put the WAGO buses on the bottom plate in the space between the battery and the rear motor drivers (sheet 02 of the drawings), fixed with VHB tape.
+   - Leave the wires going up to the deck (switch, E-stop, button, LEDs, side sensor, servos, load cells) with **~10 cm of slack**, so the deck can be lifted off with the wires still connected.
+4. **GND bus** (P4, P9, P10, P14, P18).
+5. **E-stop** (P5, P6). With a multimeter on continuity between the two wire ends: button released → **beep**; pressed → **no beep**.
+6. **Motor drivers** (P7–P12). Stick the BTS7960 boards to the bottom plate at the rear, one each side of the centre line, with **VHB tape**. Heatsinks up.
+7. **5 V buck** (P13, P14). VHB at the rear-left. Don't connect its output yet.
+8. **Servo buck** (P17, P18). VHB at the rear-right. Don't connect its output yet.
+9. **Set both bucks (important):**
+   1. Insert the 10 A fuse, connect the battery with the master switch **OFF**. Switch **ON**. Release the E-stop (the servo buck is after it).
+   2. Multimeter on the 5 V buck's OUT+ / OUT−: turn its **voltage** pot (often many turns) to **5.10–5.20 V**. Turn its current pot fully clockwise.
+   3. Multimeter on the servo buck's OUT+ / OUT−: turn its voltage pot to **7.4 V** (7.2–7.6 V). Never above 8.4 V: it destroys the servos.
+   4. Switch **OFF**.
+10. **5 V bus** (P15) and **7.4 V bus** (P19). Connect the buck outputs to their WAGOs. Don't connect the ESP32 or the servos yet.
+11. **Battery alarm** (P16): plug it into the balance lead; set it to **3.5 V** if it's adjustable.
 
-### 2.4 Pi 5 power setting
-
-A Pi 5 fed from a plain 5 V supply (no USB-PD) only gives 600 mA to its USB ports, which isn't enough for the lidar + camera. You'll add one line in week 3 (section 3.3) to allow 1.6 A.
-
-### 2.5 Bench tests: record the results for the report
+### 2.4 Bench tests: record the results for the report
 
 With the battery **unplugged**:
 
 | Test | How | Expect | Result |
 |---|---|---|---|
-| T2.1 No short circuit | Multimeter Ω between MAIN +12 V and GND | Not 0 Ω; it starts low and climbs as the buck's capacitors charge | |
+| T2.1 No short circuit | Multimeter Ω between MAIN +12 V and GND | Not 0 Ω; it starts low and climbs as the bucks' capacitors charge | |
 | T2.2 No short on motor bus | Ω between MOTOR +12 V and GND | Same as above | |
 
 With the battery **connected**:
@@ -687,17 +583,15 @@ With the battery **connected**:
 |---|---|---|---|
 | T2.3 Switch off | Switch OFF, V at MAIN bus | 0 V | |
 | T2.4 Main bus | Switch ON, V at MAIN bus | 11.1–12.6 V (the battery voltage) | |
-| T2.5 E-stop | E-stop pressed: V at MOTOR bus. Released (twist to unlatch): V again | 0 V / battery V | |
-| T2.5b E-stop and pusher | The same, measured at the pusher BTS7960's B+ | 0 V / battery V | |
-| T2.6 5 V rail | V at buck OUT | 5.10–5.20 V | |
-| T2.7 Pi boots | Plug the USB-C into the Pi (SD card from week 3, or just watch the LEDs) | Red LED on, no warning | |
-| T2.8 5 V under load | Pi booted, run `stress` in week 3 (section 3.6), measure V at Pi GPIO pin 2 (5V) and pin 6 (GND) | ≥ 5.0 V | |
-| T2.9 Idle current | Multimeter in **10 A** mode in series with the fuse (take the fuse out, probes into the fuse holder) | Pi idle ≈ 0.4–0.6 A at 12 V | |
-| T2.10 Current with lidar spinning | Same, in week 4 | ≈ 0.7–1.0 A | |
+| T2.5 E-stop | E-stop pressed: V at MOTOR bus and at the 7.4 V bus. Released (twist to unlatch): V again | 0 V / battery V and 7.4 V | |
+| T2.6 5 V bus | V at the 5 V WAGO | 5.10–5.20 V | |
+| T2.7 ESP32 boots | Connect the ESP32 breakout's 5V/GND (P15). Switch ON | The board's red power LED lights | |
+| T2.8 Servos | Connect the servos to the 7.4 V bus (P19), signal wire not connected yet. Switch ON | Nothing moves, no buzzing; the 7.4 V bus stays at 7.2–7.6 V | |
+| T2.9 Idle current | Multimeter in **10 A** mode in series with the fuse (take the fuse out, probes into the fuse holder) | ESP32 + sensors ≈ 0.1–0.2 A at 12 V | |
 
-> **Motor current:** test it in week 3, once the motors can be driven. Wheels in the air at 100 %: ~0.2–0.4 A per motor. Never hold a wheel stalled at full power for more than 2 s.
+> **Never connect the ESP32's USB to the laptop while you probe the 12 V side with a meter in current mode.** Measure first, then plug in the USB.
 
-### 2.6 Charging the LiPo
+### 2.5 Charging the LiPo
 
 1. Charger mode **LiPo BALANCE**, **3S (11.1 V)**, current **5.0 A** (= 1 C for 5000 mAh).
 2. Plug in both the main lead and the white balance plug.
@@ -705,362 +599,246 @@ With the battery **connected**:
 4. Full = 4.20 V per cell (12.6 V). Stop using it at 3.5 V per cell under load (the alarm beeps).
 5. For storage longer than a week: charger **STORAGE** mode (3.8 V per cell).
 
-**Done when:** T2.1–T2.7 pass. Pressing the E-stop kills motor power but not the Pi. The fuse is in.
+**Done when:** T2.1–T2.8 pass. Pressing the E-stop kills motor and servo power but not the ESP32. The fuse is in.
 
 ---
 
-## Week 3 — Raspberry Pi setup, signal wiring, bench tests (19 – 25 Oct)
+## Week 3 — ESP32 setup, signal wiring, bench tests (19 – 25 Oct)
 
-**Goal:** the Pi runs Ubuntu 24.04 + ROS 2 Jazzy, every sensor and motor is wired, and each one passes its bench test.
+**Goal:** the firmware is on the ESP32, every sensor and motor is wired, and each one passes its bench test in the Serial Monitor.
 
-> Sections 3.1–3.5 need only the Pi, the SD card and a phone charger. Do them earlier if you're waiting for parts.
+### 3.1 Upload the firmware [LAPTOP]
 
-### 3.1 Flash the SD card [WINDOWS]
+1. Get the project onto your laptop (GitHub Desktop → *Clone repository*, or download the ZIP).
+2. In the Arduino IDE: *File → Open* → `firmware/cargo_robot/cargo_robot.ino`. All the other files open as tabs.
+3. *Tools → Board → esp32 → **ESP32 Dev Module***. *Tools → Port* → the ESP32.
+4. **Upload.** If it stops at "Connecting....", hold the board's **BOOT** button until the upload starts.
+5. *Tools → Serial Monitor*, **115200 baud**, line ending **Newline**. Press the board's **EN** (reset) button. You see `Cargo robot (ESP32) - type help`, followed by warnings about the parts that aren't wired yet. That's fine.
+6. Type `help`: the list of commands.
 
-1. Install **Raspberry Pi Imager** from raspberrypi.com/software.
-2. **Choose Device** → Raspberry Pi 5.
-3. **Choose OS** → *Other general-purpose OS* → *Ubuntu* → **Ubuntu Server 24.04.x LTS (64-bit)**.
-4. **Choose Storage** → your microSD card → **Next** → **Edit settings**:
-   - *General*:
-     - hostname `cargobot`
-     - username `robot`, plus a password you won't forget
-     - Wi-Fi SSID + password, Wi-Fi country **EG**
-     - time zone Africa/Cairo
-   - *Services*: **Enable SSH** → *Use password authentication*.
-   - **Save** → **Yes** → **Yes** (erases the card).
+> **Upload with the robot's power on or off?** Both work. With the battery off, the USB powers the ESP32 and you can do all the sensor tests except the motors and servos.
 
-> **Use a Wi-Fi network you control:** a phone hotspot or a cheap travel router that stays with the robot. University Wi-Fi usually has a login page and blocks devices from talking to each other, which breaks both SSH and ROS 2. The laptop and the Pi must be on **the same** network.
+### 3.2 Signal wiring
 
-### 3.2 First boot and SSH
+Sheets E03 and E04 in `cad/autocad/CargoRobot_v2_schematics.pdf` show everything in this section, and `cad/autocad/CargoRobot_v2_connections.pdf` lists the same wires part by part (handy for checking one board at a time). Every wire with the same name is connected together. All numbers below are **GPIO numbers**, printed on the screw-terminal breakout ("25" or "GPIO25").
 
-1. Put the SD card in the Pi. Power it with a phone charger (5 V 3 A USB-C) or the robot's buck lead.
-2. Wait **5 minutes**. The first boot sets itself up and may reboot once.
-3. Find the Pi's IP address: your hotspot's "connected devices" list, or the router's DHCP page. Look for `cargobot`.
-4. [WINDOWS PowerShell] or [LAPTOP terminal]:
+**Master switch OFF, battery unplugged, USB unplugged.**
 
-   ```bash
-   ssh robot@192.168.43.57        # use YOUR Pi's IP
-   ```
+**The I/O board.** Build it on the 5 × 7 cm perfboard, and stick it next to the ESP32 (sheet 02):
 
-   Answer `yes` to the fingerprint question, then type the password (nothing shows while you type; that's normal).
-5. You're now typing **on the Pi**. Your prompt looks like `robot@cargobot:~$`.
+- The MCP23017 module, with A0, A1, A2 to GND (address 0x20) and RESET to 3.3 V.
+- 2 × 4.7 kΩ pull-ups: SDA → 3.3 V, SCL → 3.3 V.
+- 1 × 10 kΩ pull-down on the MOTOR_EN line (MCP GPB0 → GND): the motors stay off until the ESP32 has started.
+- 4 × 10 kΩ pull-ups on the encoder lines (GPIO 34, 35, 36, 39 have none inside).
+- 3 ultrasonic ECHO dividers: ECHO → 1 kΩ → junction → 2 kΩ → GND; the junction goes to the ESP32.
+- The bus-sense divider: MOTOR +12 V → 10 kΩ → junction → 2.2 kΩ → GND (+ 100 nF across the 2.2 kΩ); the junction to GPIO 33.
+- 2 × 330 Ω for the LEDs.
+- Small buses (a row of linked pins, or WAGOs): **3V3** (from the ESP32's 3V3 pin), **GND**, **5V** (from the 5 V WAGO bus).
 
-### 3.3 Update and prepare the Pi [PI]
+**Signal wire list** (24–26 AWG jumpers, ferrules into screw terminals):
 
-```bash
-sudo apt update && sudo apt full-upgrade -y
-sudo apt install -y avahi-daemon git gh python3-pip python3-lgpio python3-yaml python3-opencv \
-                    v4l-utils htop stress-ng nano
-```
+<!-- signal wires: generated by cad/make_docs.py from cad/wiring.py -->
+| # | From | To | Notes |
+|---|---|---|---|
+| S1 | BTS7960 left U2 **RPWM** | ESP32 (breakout) **GPIO 25** | forward PWM |
+| S2 | BTS7960 left U2 **LPWM** | ESP32 (breakout) **GPIO 26** | reverse PWM |
+| S3 | BTS7960 right U3 **RPWM** | ESP32 (breakout) **GPIO 27** | forward PWM |
+| S4 | BTS7960 right U3 **LPWM** | ESP32 (breakout) **GPIO 14** | reverse PWM |
+| S5 | BTS7960 left U2 **R_EN + L_EN (linked)** | MCP23017 U4 **GPB0** | MOTOR_EN; 10k pull-down to GND |
+| S5 | BTS7960 right U3 **R_EN + L_EN (linked)** | MCP23017 U4 **GPB0** | MOTOR_EN |
+| S6 | BTS7960 left U2 **VCC** | 3V3 bus | 3.3 V, not 5 V |
+| S6 | BTS7960 right U3 **VCC** | 3V3 bus | 3.3 V, not 5 V |
+| S7 | BTS7960 left U2 **GND (logic)** | GND bus |  |
+| S7 | BTS7960 right U3 **GND (logic)** | GND bus |  |
+| S8 | Left motor M1 **blue (encoder VCC)** | 3V3 bus | 3.3 V, never 5 V |
+| S9 | Left motor M1 **black (encoder GND)** | GND bus |  |
+| S10 | Left motor M1 **yellow (encoder A)** | ESP32 (breakout) **GPIO 34** | 10k pull-up to 3V3 |
+| S11 | Left motor M1 **green (encoder B)** | ESP32 (breakout) **GPIO 35** | 10k pull-up to 3V3 |
+| S12 | Right motor M2 **blue (encoder VCC)** | 3V3 bus | 3.3 V, never 5 V |
+| S13 | Right motor M2 **black (encoder GND)** | GND bus |  |
+| S14 | Right motor M2 **yellow (encoder A)** | ESP32 (breakout) **GPIO 36 (VP)** | 10k pull-up to 3V3 |
+| S15 | Right motor M2 **green (encoder B)** | ESP32 (breakout) **GPIO 39 (VN)** | 10k pull-up to 3V3 |
+| S16 | HX711 front-left **VCC** | 3V3 bus | bus on the tilting plate, 1 wire down |
+| S16 | HX711 front-right **VCC** | 3V3 bus | bus on the tilting plate, 1 wire down |
+| S16 | HX711 rear-left **VCC** | 3V3 bus | bus on the tilting plate, 1 wire down |
+| S16 | HX711 rear-right **VCC** | 3V3 bus | bus on the tilting plate, 1 wire down |
+| S17 | HX711 front-left **GND** | GND bus | bus on the tilting plate, 1 wire down |
+| S17 | HX711 front-right **GND** | GND bus | bus on the tilting plate, 1 wire down |
+| S17 | HX711 rear-left **GND** | GND bus | bus on the tilting plate, 1 wire down |
+| S17 | HX711 rear-right **GND** | GND bus | bus on the tilting plate, 1 wire down |
+| S18 | HX711 front-left **SCK** | ESP32 (breakout) **GPIO 5** | bus on the tilting plate, 1 wire down |
+| S18 | HX711 front-right **SCK** | ESP32 (breakout) **GPIO 5** | bus on the tilting plate, 1 wire down |
+| S18 | HX711 rear-left **SCK** | ESP32 (breakout) **GPIO 5** | bus on the tilting plate, 1 wire down |
+| S18 | HX711 rear-right **SCK** | ESP32 (breakout) **GPIO 5** | bus on the tilting plate, 1 wire down |
+| S19 | HX711 front-left **DT** | ESP32 (breakout) **GPIO 16** |  |
+| S20 | HX711 front-right **DT** | ESP32 (breakout) **GPIO 17** |  |
+| S21 | HX711 rear-left **DT** | ESP32 (breakout) **GPIO 18** |  |
+| S22 | HX711 rear-right **DT** | ESP32 (breakout) **GPIO 19** |  |
+| S23 | Load cell front-left **red** | HX711 front-left **E+** | the cell's own wires |
+| S23 | Load cell front-left **black** | HX711 front-left **E-** | the cell's own wires |
+| S23 | Load cell front-left **white** | HX711 front-left **A-** | the cell's own wires |
+| S23 | Load cell front-left **green** | HX711 front-left **A+** | the cell's own wires |
+| S23 | Load cell front-right **red** | HX711 front-right **E+** | the cell's own wires |
+| S23 | Load cell front-right **black** | HX711 front-right **E-** | the cell's own wires |
+| S23 | Load cell front-right **white** | HX711 front-right **A-** | the cell's own wires |
+| S23 | Load cell front-right **green** | HX711 front-right **A+** | the cell's own wires |
+| S23 | Load cell rear-left **red** | HX711 rear-left **E+** | the cell's own wires |
+| S23 | Load cell rear-left **black** | HX711 rear-left **E-** | the cell's own wires |
+| S23 | Load cell rear-left **white** | HX711 rear-left **A-** | the cell's own wires |
+| S23 | Load cell rear-left **green** | HX711 rear-left **A+** | the cell's own wires |
+| S23 | Load cell rear-right **red** | HX711 rear-right **E+** | the cell's own wires |
+| S23 | Load cell rear-right **black** | HX711 rear-right **E-** | the cell's own wires |
+| S23 | Load cell rear-right **white** | HX711 rear-right **A-** | the cell's own wires |
+| S23 | Load cell rear-right **green** | HX711 rear-right **A+** | the cell's own wires |
+| S24 | HC-SR04 left **VCC** | WAGO +5 V | 5 V |
+| S24 | HC-SR04 centre **VCC** | WAGO +5 V | 5 V |
+| S24 | HC-SR04 right **VCC** | WAGO +5 V | 5 V |
+| S25 | HC-SR04 left **GND** | GND bus |  |
+| S25 | HC-SR04 centre **GND** | GND bus |  |
+| S25 | HC-SR04 right **GND** | GND bus |  |
+| S26 | HC-SR04 left **TRIG** | ESP32 (breakout) **GPIO 4** | all 3 on one pin |
+| S26 | HC-SR04 centre **TRIG** | ESP32 (breakout) **GPIO 4** | all 3 on one pin |
+| S26 | HC-SR04 right **TRIG** | ESP32 (breakout) **GPIO 4** | all 3 on one pin |
+| S27 | HC-SR04 left **ECHO** | ESP32 (breakout) **GPIO 13** | through a 1k / 2k divider (5 V -> 3.3 V) |
+| S28 | HC-SR04 centre **ECHO** | ESP32 (breakout) **GPIO 23** | through a 1k / 2k divider (5 V -> 3.3 V) |
+| S29 | HC-SR04 right **ECHO** | ESP32 (breakout) **GPIO 32** | through a 1k / 2k divider (5 V -> 3.3 V) |
+| S30 | Front servo SV1 **orange (signal)** | ESP32 (breakout) **GPIO 2** | servo lead |
+| S31 | Rear servo SV2 **orange (signal)** | ESP32 (breakout) **GPIO 12** | servo lead; nothing else on this pin (must be LOW at start-up) |
+| S32 | ESP32 (breakout) **GPIO 21 (SDA)** | MCP23017 U4 **SDA** | 4.7k pull-up to 3V3 |
+| S32 | ESP32 (breakout) **GPIO 21 (SDA)** | VL53L0X **SDA** |  |
+| S33 | ESP32 (breakout) **GPIO 22 (SCL)** | MCP23017 U4 **SCL** | 4.7k pull-up to 3V3 |
+| S33 | ESP32 (breakout) **GPIO 22 (SCL)** | VL53L0X **SCL** |  |
+| S34 | ESP32 (breakout) **3V3** | 3V3 bus | feeds every 3.3 V part |
+| S34 | ESP32 (breakout) **GND** | GND bus |  |
+| S34 | MCP23017 U4 **VDD, RESET** | 3V3 bus |  |
+| S34 | MCP23017 U4 **VSS, A0, A1, A2** | GND bus | address 0x20 |
+| S34 | VL53L0X **VIN** | 3V3 bus |  |
+| S34 | VL53L0X **GND** | GND bus |  |
+| S35 | Line sensor **VCC** | 3V3 bus |  |
+| S35 | Line sensor **GND** | GND bus |  |
+| S36 | Line sensor **OUT1** | MCP23017 U4 **GPA0** | OUT1 = leftmost |
+| S36 | Line sensor **OUT2** | MCP23017 U4 **GPA1** |  |
+| S36 | Line sensor **OUT3** | MCP23017 U4 **GPA2** |  |
+| S36 | Line sensor **OUT4** | MCP23017 U4 **GPA3** |  |
+| S36 | Line sensor **OUT5** | MCP23017 U4 **GPA4** |  |
+| S36 | Line sensor **OUT6** | MCP23017 U4 **GPA5** |  |
+| S36 | Line sensor **OUT7** | MCP23017 U4 **GPA6** |  |
+| S36 | Line sensor **OUT8** | MCP23017 U4 **GPA7** | OUT8 = rightmost |
+| S37 | Start button S2 **terminal 1** | MCP23017 U4 **GPB4** | internal pull-up |
+| S37 | Start button S2 **terminal 2** | GND bus |  |
+| S38 | Green LED D1 **+ (long leg)** | MCP23017 U4 **GPB2** | through 330 ohm |
+| S38 | Green LED D1 **- (short leg)** | GND bus |  |
+| S38 | Red LED D2 **+ (long leg)** | MCP23017 U4 **GPB3** | through 330 ohm |
+| S38 | Red LED D2 **- (short leg)** | GND bus |  |
+| S39 | Buzzer module **VCC** | 3V3 bus |  |
+| S39 | Buzzer module **GND** | GND bus |  |
+| S39 | Buzzer module **I/O** | MCP23017 U4 **GPB1** |  |
+| S40 | Bus-sense divider **top of 10k** | WAGO +12 V MOTOR | after the E-stop |
+| S40 | Bus-sense divider **bottom of 2.2k** | GND bus | 100 nF across the 2.2k |
+| S40 | Bus-sense divider **junction** | ESP32 (breakout) **GPIO 33** | about 2.3 V at 12.6 V; 0 V = E-stop pressed |
+<!-- end -->
 
-`avahi-daemon` lets you use `ssh robot@cargobot.local` instead of the IP from now on.
+"Front-left" etc. means: looking down at the robot, with its front pointing away from you.
 
-**Allow more USB current (Pi 5 powered from the buck):**
+These pins are defined in one place, `firmware/cargo_robot/config.h`. If you ever move a wire, change it there too (and re-run `cad/make_schematics.py` so the drawings stay right).
 
-```bash
-sudo nano /boot/firmware/config.txt
-```
-
-Go to the very end of the file and add:
-
-```
-[all]
-usb_max_current_enable=1
-```
-
-**Pusher: free the SPI pins.** The pusher's motor driver uses GPIO 9 and GPIO 10, which Ubuntu reserves for SPI by default. In the same file, find the line `dtparam=spi=on` and put a `#` in front of it, so it reads `#dtparam=spi=on`. If the file has no such line, there is nothing to do.
-
-Save with **Ctrl+O**, **Enter**, then exit with **Ctrl+X**.
-
-**Let your user access the GPIO pins, the lidar's serial port and the camera** without `sudo`:
-
-```bash
-sudo groupadd -f gpio
-sudo usermod -aG gpio,dialout,video $USER
-echo 'SUBSYSTEM=="gpio", KERNEL=="gpiochip*", GROUP="gpio", MODE="0660"' | sudo tee /etc/udev/rules.d/60-gpiochip.rules
-echo 'KERNEL=="ttyUSB*", ATTRS{idVendor}=="10c4", ATTRS{idProduct}=="ea60", MODE:="0666", SYMLINK+="rplidar"' | sudo tee /etc/udev/rules.d/99-rplidar.rules
-sudo reboot
-```
-
-Wait 1 minute, then reconnect with `ssh robot@cargobot.local` and check:
-
-```bash
-ls -l /dev/gpiochip*     # the group column must say "gpio"
-groups                   # must include gpio dialout video
-```
-
-### 3.4 Install ROS 2 Jazzy [PI]
-
-```bash
-sudo apt install -y software-properties-common curl
-sudo add-apt-repository -y universe
-export ROS_APT_SOURCE_VERSION=$(curl -s https://api.github.com/repos/ros-infrastructure/ros-apt-source/releases/latest | grep -F "tag_name" | awk -F\" '{print $4}')
-curl -L -o /tmp/ros2-apt-source.deb "https://github.com/ros-infrastructure/ros-apt-source/releases/download/${ROS_APT_SOURCE_VERSION}/ros2-apt-source_${ROS_APT_SOURCE_VERSION}.$(. /etc/os-release && echo ${UBUNTU_CODENAME:-${VERSION_CODENAME}})_all.deb"
-sudo dpkg -i /tmp/ros2-apt-source.deb
-sudo apt update && sudo apt upgrade -y
-
-# ROS base (no GUI on the robot) + everything this project uses
-sudo apt install -y ros-jazzy-ros-base ros-dev-tools \
-     ros-jazzy-rplidar-ros ros-jazzy-laser-filters ros-jazzy-slam-toolbox \
-     ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-nav2-simple-commander \
-     ros-jazzy-robot-state-publisher ros-jazzy-xacro ros-jazzy-teleop-twist-keyboard \
-     ros-jazzy-foxglove-bridge
-
-echo "source /opt/ros/jazzy/setup.bash" >> ~/.bashrc
-echo "export ROS_DOMAIN_ID=42" >> ~/.bashrc
-source ~/.bashrc
-ros2 --help | head -3        # prints "usage: ros2 ..." if ROS is installed
-```
-
-> `ROS_DOMAIN_ID=42` must be the **same number on the Pi and the laptop**. It also stops you seeing other teams' robots on the same Wi-Fi.
->
-> If `ros-jazzy-rplidar-ros` is "not found", build the driver from source instead. Do this after section 3.5, once the workspace exists:
->
-> ```bash
-> cd ~/cargo_robot/robot_ws/src && git clone -b ros2 https://github.com/Slamtec/rplidar_ros.git
-> ```
-
-### 3.5 Get the project onto the Pi [PI]
-
-```bash
-git config --global user.name "Your Name"
-git config --global user.email "you@example.com"
-gh auth login
-#   -> GitHub.com -> HTTPS -> Yes -> "Login with a web browser"
-#   -> it shows a code; on your laptop open https://github.com/login/device and type it
-gh repo clone YOUR-GITHUB-NAME/cargo_robot ~/cargo_robot
-ls ~/cargo_robot             # BUILD_GUIDE.md  cad  robot_ws  tools ...
-```
-
-**Daily workflow:** open VS Code on the laptop → *Remote-SSH: Connect to Host* → `robot@cargobot.local` → *Open Folder* `~/cargo_robot`. You now edit files directly on the Pi. Save your work to GitHub regularly:
-
-```bash
-cd ~/cargo_robot && git add -A && git commit -m "what you changed" && git push
-```
-
-### 3.6 Power check under load [PI]
-
-This finishes test T2.8 from week 2. Power the Pi from the robot's buck converter (battery, master switch ON), then run:
-
-```bash
-stress-ng --cpu 4 --timeout 60s &
-sleep 50; dmesg | grep -i -E "under-?voltage" || echo "no undervoltage - OK"
-```
-
-Also measure the voltage between GPIO pin 2 (5 V) and pin 6 (GND) during the test. It must stay **≥ 5.0 V**. If it doesn't, raise the buck to 5.2 V, and shorten or thicken the USB-C pigtail wires.
-
-### 3.7 Signal wiring
-
-Sheet E03 in `cad/autocad/CargoRobot_v3_schematics.pdf` shows everything in this section as a schematic. Every wire with the same name is connected together.
-
-**Master switch OFF, battery unplugged.** Plug the GPIO screw-terminal HAT onto the Pi. All numbers below are **BCM GPIO numbers**, with the **physical pin** in brackets. The terminal HAT is labelled with both.
-
-**How to find pin 1 without a HAT:** pin 1 has a **square** solder pad on the underside of the board. Pins 2 and 4 (5 V) are on the outer edge, at the end farthest from the USB ports.
-
-```
-   used for             pin  pin   used for
-   3V3 bus A (encoders)  [ 1][ 2]  5V   - DO NOT USE
-                         [ 3][ 4]  5V   - DO NOT USE
-                         [ 5][ 6]  GND  -> logic GND bus
-   GPIO4  pusher HOME sw [ 7][ 8]
-   GND -> logic GND bus  [ 9][10]
-   GPIO17 L-enc A        [11][12]  GPIO18 R-driver RPWM
-   GPIO27 L-enc B        [13][14]  GND
-   GPIO22 R-enc A        [15][16]  GPIO23 R-enc B
-   3V3 bus B (modules)   [17][18]  GPIO24 HX711 SCK (all 4)
-   GPIO10 pusher RPWM    [19][20]  GND
-   GPIO9  pusher LPWM    [21][22]  GPIO25 HX711 DOUT front-left
-                         [23][24]
-                   GND   [25][26]
-                         [27][28]
-   GPIO5  motor ENABLE   [29][30]  GND
-   GPIO6  pusher END sw  [31][32]  GPIO12 L-driver RPWM
-   GPIO13 L-driver LPWM  [33][34]  GND
-   GPIO19 R-driver LPWM  [35][36]  GPIO16 HX711 DOUT front-right
-   GPIO26 E-STOP sense   [37][38]  GPIO20 HX711 DOUT rear-left
-                   GND   [39][40]  GPIO21 HX711 DOUT rear-right
-```
-
-These pins are defined in one place, `robot_ws/src/cargo_bot/cargo_bot/pins.py`. If you ever move a wire, change it there too.
-
-**Small buses (WAGO 221) you'll create:**
-
-| Bus | Fed from | Feeds |
-|---|---|---|
-| **3V3-A** | Pi pin 1 | Left encoder VCC, right encoder VCC |
-| **3V3-B** | Pi pin 17 | Left BTS7960 VCC, right BTS7960 VCC, HX711 bus on the deck; **pusher** BTS7960 VCC, R_EN and L_EN |
-| **LOGIC-GND** | Pi pins 6 and 9 | Encoder GNDs, BTS7960 GNDs, HX711 bus on the deck, divider GND; **pusher** BTS7960 GND and both limit switches |
-| **HX-3V3 / HX-GND / HX-SCK** | On the top deck, under the cargo plate | The 4 HX711 boards |
-
-**Signal wire list** (24–26 AWG jumpers, ferrules into the HAT):
-
-| # | From | To |
-|---|---|---|
-| S1 | Left BTS7960 **RPWM** | GPIO12 (pin 32) |
-| S2 | Left BTS7960 **LPWM** | GPIO13 (pin 33) |
-| S3 | Right BTS7960 **RPWM** | GPIO18 (pin 12) |
-| S4 | Right BTS7960 **LPWM** | GPIO19 (pin 35) |
-| S5 | Left BTS7960 **R_EN** + **L_EN** (link them with a short jumper on the module) | GPIO5 (pin 29) |
-| S6 | Right BTS7960 **R_EN** + **L_EN** (linked) | GPIO5 (pin 29), same pin as S5 |
-| S7 | Both BTS7960 **VCC** | 3V3-B bus (**3.3 V, not 5 V**) |
-| S8 | Both BTS7960 **GND** (logic header) | LOGIC-GND |
-| — | BTS7960 **R_IS**, **L_IS** | not connected |
-| S9 | Left motor **blue** (encoder VCC) | 3V3-A (**3.3 V, never 5 V**) |
-| S10 | Left motor **black** (encoder GND) | LOGIC-GND |
-| S11 | Left motor **yellow** (A) | GPIO17 (pin 11) |
-| S12 | Left motor **green** (B) | GPIO27 (pin 13) |
-| S13 | Right motor **blue** | 3V3-A |
-| S14 | Right motor **black** | LOGIC-GND |
-| S15 | Right motor **yellow** (A) | GPIO22 (pin 15) |
-| S16 | Right motor **green** (B) | GPIO23 (pin 16) |
-| S17 | Each HX711 **VCC** (×4) | HX-3V3 bus → one wire down → 3V3-B |
-| S18 | Each HX711 **GND** (×4) | HX-GND bus → one wire down → LOGIC-GND |
-| S19 | Each HX711 **SCK** (×4) | HX-SCK bus → one wire down → GPIO24 (pin 18) |
-| S20 | HX711 **front-left DT** | GPIO25 (pin 22) |
-| S21 | HX711 **front-right DT** | GPIO16 (pin 36) |
-| S22 | HX711 **rear-left DT** | GPIO20 (pin 38) |
-| S23 | HX711 **rear-right DT** | GPIO21 (pin 40) |
-| S24 | Load cell **red** | its HX711 **E+** |
-| S25 | Load cell **black** | its HX711 **E−** |
-| S26 | Load cell **white** | its HX711 **A−** |
-| S27 | Load cell **green** | its HX711 **A+** |
-| S28 | Divider junction (see below) | GPIO26 (pin 37) |
-| S29 | RPLIDAR USB adapter | Pi USB 2.0 port (black) |
-| S30 | USB camera | Pi USB 3.0 port (blue) |
-| S31 | **Pusher** BTS7960 **RPWM** | GPIO10 (pin 19) |
-| S32 | **Pusher** BTS7960 **LPWM** | GPIO9 (pin 21) |
-| S33 | **Pusher** BTS7960 **R_EN** + **L_EN** (linked) and **VCC** | 3V3-B bus (**3.3 V, not 5 V**). This driver is always enabled; it has no enable pin on the Pi. |
-| S34 | **Pusher** BTS7960 **GND** (logic header) | LOGIC-GND |
-| S35 | **HOME** limit switch **NC** | GPIO4 (pin 7) |
-| S36 | **END** limit switch **NC** | GPIO6 (pin 31) |
-| S37 | Both limit switches **C** | LOGIC-GND |
-
-"Front-left" etc. means: looking down at the robot, with its front (lidar end) pointing away from you.
-
-**Pusher limit switches (S35–S37).** Each switch has three terminals: C (common), NC (normally closed) and NO (normally open). Use **C and NC**; leave NO empty. While a switch is *not* pressed, C and NC are connected, so the pin is held at GND and reads 0. Pressing it opens the contact and the pin reads 1. A wire that breaks or falls off also reads 1, so a loose wire stops the pusher instead of letting it run into the end stop.
-
-**E-stop sense divider (S28).** Solder it on a small piece of perfboard:
-
-```
-MOTOR +12 V bus ──[ 10 kΩ ]──┬──[ 3.3 kΩ ]── LOGIC-GND
-                             │
-                             └──────────────► GPIO26 (pin 37)
-```
-
-- With a full battery (12.6 V) the junction sits at 12.6 × 3.3 / 13.3 ≈ **3.1 V**, which the Pi reads as "1" (motor power on).
-- E-stop pressed → 0 V → "0".
-- **Measure the junction before connecting it to the Pi:** it must be **below 3.3 V**. If it shows ~9 V, you swapped the resistors.
-
-**HX711 boards:** stick them on the top deck under the cargo plate at the spots shown in the CAD (X = −90 / −30, Y = ±45) with VHB tape. Keep load-cell wires short, and don't let wires touch the load cells' middles or the cargo plate.
+**Wires to the bed:** the HX711 bundle (7 wires: 3V3, GND, SCK, 4 × DT) runs along the tilting plate's right edge, through the zip tie at the hinge and down through the cut-out next to it. Leave a 5 cm loop there: the hinge barely moves at that point.
 
 **Before powering on**, check with the multimeter (continuity mode, battery unplugged):
 
-- [ ] No continuity between any 3V3 bus and GND.
-- [ ] No continuity between 3V3 and the 12 V buses.
-- [ ] Nothing is connected to Pi pins 2 or 4 (5 V).
-- [ ] Each wire S1–S23 beeps from end to end (and S31–S37, if you built the pusher).
+- [ ] No continuity between 3V3 and GND, 5V and GND, 7.4 V and GND.
+- [ ] No continuity between 3V3 and any 5 V, 7.4 V or 12 V bus.
+- [ ] Measure the bus-sense junction with the battery in and the E-stop released: **2.0–2.3 V**. Above 3.3 V: the resistors are swapped. Fix it before connecting GPIO 33.
+- [ ] Each ECHO junction with the HC-SR04 powered: never more than 3.4 V.
 
-### 3.8 Bench tests [PI]
+### 3.3 Bench tests [SERIAL]
 
-Put the robot **on a box, wheels in the air**. Battery in, master switch ON, E-stop released, then SSH into the Pi:
+Put the robot **on a box, wheels in the air**. Battery in, master switch ON, E-stop released, USB to the laptop, Serial Monitor open. Every test is a command; **Enter** stops the live ones. Settings are changed with `set <name> <value>` and kept with `save` (see `list`).
 
-```bash
-cd ~/cargo_robot
+**Test 1: Status**
+
+Type `status`. One line: state, motor-bus volts (about your battery voltage), kg, the line sensors, the 3 ultrasonic distances, the side distance, the bed angle. Any `!!` warning at power-up names the part that isn't answering.
+
+**Test 2: Encoders → `ticks_per_rev`**
+
 ```
-
-Keep `robot_ws/src/cargo_bot/config/robot.yaml` open in VS Code: the tests tell you what to write into it.
-
-**Test 1: Encoders → `ticks_per_rev`**
-
-```bash
-python3 tools/test_encoders.py
+enc
 ```
 
 1. Turn each wheel slowly **forward** (the direction that would drive the robot forward) by hand. The counts must **increase**.
-   - Count goes down → set `invert_left_encoder: true` (or right) in `robot.yaml`.
-   - Doesn't change → check the encoder's 3.3 V, GND, A and B wires.
-2. Stick a piece of tape on the tyre. Restart the test and turn the wheel exactly **10 turns**, then press **Ctrl+C**.
-3. Write `left / 10` (≈ `right / 10`) into `ticks_per_rev`.
-   - Sanity check: 11 pulses × 4 edges × gear ratio. For a 1:56 motor that's ≈ 2464.
-4. "missed edges" should stay at **0** when turning by hand.
+   - Count goes down → `set inv_l_enc 1` (or `inv_r_enc`).
+   - Doesn't change → check the encoder's 3.3 V, GND, A and B wires and the 10 kΩ pull-ups.
+2. Stick a piece of tape on the tyre. Press Enter, type `enc` again (the counts carry on from where they were: note them), and turn the wheel exactly **10 turns**.
+3. `set ticks_per_rev <counts for 10 turns / 10>`. Sanity check: 11 pulses × 4 edges × gear ratio. For a 1:56 motor that's ≈ 2464.
 
-**Test 2: Motor direction**
+**Test 3: Motor direction**
 
-```bash
-python3 tools/test_motors.py
+```
+motortest
 ```
 
-1. The tool spins each wheel forward then backward (30 %, 2 s) and prints the encoder change. Watch each wheel:
-   - On **FORWARD** the wheel must turn the way that drives the robot forward.
-   - If it turns the wrong way → set `invert_left_motor: true` (or right).
-2. The encoder count must go **up** on FORWARD and **down** on BACKWARD. The tool warns you if the sign is wrong → flip that `invert_*_encoder`.
-3. Re-run until both wheels are correct with no warnings.
+1. The test spins each wheel forward then backward (30 %, 2 s) and prints the encoder change. Watch each wheel:
+   - On **FORWARD** the wheel must turn the way that drives the robot forward. If it turns the wrong way → `set inv_l_motor 1` (or `inv_r_motor`).
+2. The test warns you if an encoder counts the wrong way and tells you what to type.
+3. Run `motortest` again until both wheels are right with no warnings.
 
-> Nothing moves? The tool prints `motor power: OFF` when the E-stop is pressed or the divider isn't connected. Also check that both EN pins are on GPIO5, and that driver VCC is on 3.3 V.
+> Nothing moves? The test prints `motor power: OFF` when the E-stop is pressed. Also check that the R_EN/L_EN wires go to MCP GPB0, and that driver VCC is on 3.3 V.
 
-**Test 3: Minimum duty and top speed (feed-forward)**
+**Test 4: Minimum duty and top speed**
 
-```bash
-python3 tools/test_motors.py --min      # -> min_duty
-python3 tools/test_motors.py --max      # -> kf
+```
+mintest
+maxtest
 ```
 
-Copy both numbers into `robot.yaml`. Typical values: `min_duty` 0.08–0.2, `kf` 0.05–0.07.
+Each prints the `set` command to type. Typical values: `min_duty` 0.08–0.2, `kf` 0.05–0.07.
 
-**Test 4: Load cells**
+**Test 5: Load cells**
 
-```bash
-python3 tools/test_hx711.py
+```
+hx
 ```
 
-1. Start it with the cargo bed **empty**; it zeroes itself. Four columns of numbers appear (small drift is normal), plus a total in kg.
+1. Start it with the cargo bed **empty**; it zeroes itself. Four corners and a total appear (small drift is normal).
 2. Press gently on each corner of the cargo plate: that corner's number must change a lot, the others a little.
-   - A column that never changes, or "not ready" → check that board's DT wire, VCC and GND.
-3. Calibrate with a known weight (e.g. 2.00 kg of rice weighed on a kitchen scale). Press Ctrl+C, then:
+   - `!! HX711 boards not answering` → check every board's DT wire, VCC, GND and the shared SCK.
+3. Calibrate with a known weight (e.g. 2.00 kg of rice weighed on a kitchen scale):
 
-   ```bash
-   python3 tools/test_hx711.py --calibrate 2.0
+   ```
+   cal 2.0
    ```
 
-   Follow the prompts (empty the bed → Enter → weight in the middle → Enter). Copy the printed `scale:` and `signs:` into `robot.yaml` under `payload_node`.
-4. If a cell is marked "opposite sign", either swap its green and white wires on the HX711 (A+ ↔ A−), or keep the `-1` in `signs`.
-5. Run `python3 tools/test_hx711.py` again (empty bed at start), then put the 2 kg weight on. The total must read **2.00 ± 0.05 kg**, in the middle **and** near each corner.
+   Follow the prompts (empty the bed → Enter → weight in the middle → Enter). It sets `scale` and the 4 `sign_*` itself.
+4. If a cell is marked "opposite sign", either swap its green and white wires on the HX711 (A+ ↔ A−), or keep the `-1` it set.
+5. `hx` again (empty bed at the start), then put the 2 kg on: the total must read **2.00 ± 0.05 kg**, in the middle **and** near each corner.
 
-**Test 5: Pusher** (only if you built it)
+**Test 6: Line sensor**
 
-Bed empty, hands and wires clear of the blade and the lead screw.
-
-```bash
-python3 tools/test_pusher.py
+```
+line
 ```
 
-1. Press each limit switch by hand. The tool must show `HOME: PRESSED` and `END: PRESSED` for the right one, and `-` when released.
-   - Both show PRESSED all the time → a wire is off, or on NO instead of NC.
-   - `GPIO busy` → SPI is still enabled (section 3.3), or the robot's launch file is still running.
-2. Check the direction:
+1. Hold a strip of black tape under the sensors (on your light floor): the sensors over it show `#`.
+2. Each sensor has a small pot and an LED on the board. Turn each pot so its LED switches cleanly on/off between the tape and the floor, with the robot on the floor (the sensors 5 mm above it).
+3. If the sensors show `#` over the **floor** and `.` over the tape: `set line_black 0`.
+4. Slide the tape from left to right: `position` goes from +1 to −1.
 
-   ```bash
-   python3 tools/test_pusher.py --jog out      # the blade must move towards the REAR for 1 s
-   python3 tools/test_pusher.py --jog in       # ... and back towards the FRONT
-   ```
+**Test 7: Ultrasonic sensors and side sensor**
 
-   - It goes the wrong way → set `invert_motor: true` under `pusher_node` in `robot.yaml`, then repeat.
-   - Nothing moves → the tool prints `motor power: OFF` when the E-stop is pressed. Otherwise check P17–P19 and S31–S34.
-3. Run a full cycle:
-
-   ```bash
-   python3 tools/test_pusher.py --cycle
-   ```
-
-   The blade goes out until the END switch clicks, pauses, and comes back to HOME. The tool prints the time of each stroke: roughly 15–25 s with a 110 RPM motor.
-4. Put a 2 kg box on the bed and run the cycle again. The box must slide off the rear without the blade stalling or tilting, and the weight shown by `test_hx711.py` must be back at zero afterwards.
-5. Start a cycle and press the **E-stop** while the blade moves: it stops at once. Release the E-stop: the blade stays where it is (the tool ends with a fault). `--cycle` brings it home again.
-
-**Save your settings:**
-
-```bash
-git add -A && git commit -m "bench-test calibration" && git push
 ```
+sonar
+tof
+```
+
+Hold your hand 30 cm in front of each ultrasonic sensor: its number reads about 30 cm. Hold a book 10 cm from the robot's right side next to the side sensor: `tof` reads about 100 mm.
+
+**Save your settings and commit:**
+
+```
+save
+```
+
+Copy the output of `list` into a text file in the project (e.g. `firmware/settings_robot.txt`) and commit it: it's your record of the calibration.
 
 **Done when:**
 
@@ -1068,646 +846,260 @@ git add -A && git commit -m "bench-test calibration" && git push
 - [ ] Both wheels spin the right way.
 - [ ] `min_duty` and `kf` are measured.
 - [ ] The scale reads the 2 kg weight as 2.0 ± 0.05 kg.
-- [ ] The E-stop shows `motor power: OFF` when pressed.
-- [ ] **Pusher:** a full `--cycle` runs without a fault, pushes a 2 kg box off the rear, and stops when the E-stop is pressed.
+- [ ] `line`, `sonar` and `tof` read sensibly.
+- [ ] `status` shows `motor power` OFF (about 0 V) while the E-stop is pressed.
 
 ---
 
-## Week 4 — ROS 2 package, robot model, lidar, camera (26 Oct – 1 Nov)
+## Week 4 — The firmware and the tilting bed (26 Oct – 1 Nov)
 
-**Goal:** the `cargo_bot` package builds, and RViz on your laptop shows the robot model with live lidar and camera data.
+**Goal:** you know how the firmware is organised, both servos are calibrated, and the bed tips packages off reliably.
 
-### 4.1 What's in the package
+### 4.1 How the firmware is organised
 
-```
-robot_ws/src/cargo_bot/
-├── package.xml, setup.py, setup.cfg     <- package definition (dependencies, programs to install)
-├── cargo_bot/
-│   ├── pins.py          <- GPIO wiring table (single source of truth)
-│   ├── hw.py            <- low-level drivers: Motor, QuadratureEncoder, HX711Array, DigitalIn/Out
-│   ├── control.py       <- maths: kinematics, wheel PID, odometry, payload speed factor, pusher sequence
-│   ├── base_driver.py   <- NODE: /cmd_vel -> motors, encoders -> /odom + TF, E-stop -> /estop
-│   ├── payload_node.py  <- NODE: 4 load cells -> /payload_weight, /payload_corners, /payload/tare
-│   ├── speed_limiter.py <- NODE: /cmd_vel x weight factor -> /cmd_vel_safe
-│   ├── vision_node.py   <- NODE: USB camera -> line following + ArUco station markers
-│   ├── pusher_node.py   <- NODE: cargo pusher (design v3): /pusher/push, /pusher/home, /pusher/stop -> /pusher/state
-│   └── mission.py       <- delivery mission (home -> pickup -> dropoff -> home) using Nav2
-├── config/
-│   ├── robot.yaml       <- all tunable numbers of our nodes
-│   ├── laser_filter.yaml<- removes lidar hits on the robot/cargo: /scan -> /scan_filtered
-│   ├── gz_bridge.yaml   <- Gazebo <-> ROS topic bridge (simulation only)
-│   ├── nav2_params.yaml <- GENERATED by tools/make_configs.py
-│   └── slam.yaml        <- GENERATED by tools/make_configs.py
-├── launch/
-│   ├── robot.launch.py  <- everything on the robot (drivers, lidar, filter, robot model)
-│   ├── sim.launch.py    <- the same robot in Gazebo (no hardware needed)
-│   ├── slam.launch.py   <- mapping
-│   └── nav.launch.py    <- navigation on a saved map
-├── urdf/
-│   ├── cargo_bot.urdf.xacro    <- robot model: frames, masses, collision shapes
-│   └── cargo_bot.gazebo.xacro  <- Gazebo-only parts: drive plugin, lidar and camera sensors
-├── meshes/cargo_bot_body.stl   <- the real robot shape from the CAD model (for RViz / Gazebo)
-└── worlds/test_area.sdf        <- simulated test room
-```
-
-How the nodes talk to each other:
+| File | Job |
+|---|---|
+| `config.h` | The wiring: every pin number, and a few fixed numbers |
+| `settings.h / .cpp` | The ~45 tunable numbers (`list`), stored in the ESP32's flash |
+| `hw.h / .cpp` | Drivers: motors (hardware PWM), encoders (the ESP32's pulse-counter hardware: no counts are missed), the 4 HX711s on one clock, the MCP23017, the 3 ultrasonic sensors (interrupts), the servos (50 Hz pulses), the side sensor, the bus voltage |
+| `control.h / .cpp` | Maths only: wheel PID, line position, speed factors for weight and obstacles, a median filter |
+| `robot.h / .cpp` | `robotUpdate()`: called thousands of times per second. It reads every sensor that has news, runs the wheel controllers 100 times per second, moves the bed smoothly, drives the LEDs and buzzer |
+| `console.h / .cpp` | The Serial-Monitor commands |
+| `cargo_robot.ino` | `setup()`, `loop()` and the mission (week 8) |
 
 ```mermaid
 flowchart LR
-  TEL[teleop / Nav2 / vision_node] -- /cmd_vel --> LIM[speed_limiter]
-  PAY[payload_node] -- /payload_weight --> LIM
-  LIM -- /cmd_vel_safe --> BASE[base_driver]
-  BASE -- /odom + TF odom→base_footprint --> NAV[Nav2 / SLAM]
-  LID[rplidar_node] -- /scan --> FIL[laser filter] -- /scan_filtered --> NAV
-  RSP[robot_state_publisher] -- TF base_link→laser, camera --> NAV
-  BASE -- /joint_states --> RSP
-  MIS[mission --conveyor] -- /pusher/push --> PUS[pusher_node]
-  PUS -- /pusher/state --> MIS
-  BASE -- /estop --> PUS
+  LOOP["loop()"] --> UPD["robotUpdate()<br/>sensors, wheels, bed"]
+  LOOP --> CON["consolePoll()<br/>Serial commands"]
+  LOOP --> STEP["step()<br/>mission + safety"]
+  STEP -- "driveTarget(v, w)" --> UPD
+  STEP -- "bedMove(deg)" --> UPD
 ```
 
-The full code of every file is in [Appendix B](#appendix-b--full-source-code). Each file starts with a comment explaining what it does.
+### 4.2 Calibrate the servos
 
-### 4.2 Generate the Nav2 / SLAM settings and build [PI]
+Each servo needs two numbers: its pulse (µs) with the bed **flat**, and with the bed at **40°**. The front and rear servos are mirror images, so one goes up as the pulse grows and the other as it shrinks.
 
-```bash
-cd ~/cargo_robot
-python3 tools/make_configs.py            # creates config/nav2_params.yaml and config/slam.yaml
-cd ~/cargo_robot/robot_ws
-colcon build --symlink-install
-echo "source ~/cargo_robot/robot_ws/install/setup.bash" >> ~/.bashrc
-source ~/.bashrc
-ros2 pkg executables cargo_bot           # lists base_driver, mission, payload_node, pusher_node, speed_limiter, vision_node
+1. Robot on the floor, battery in, E-stop released, bed resting flat. Keep your hands off the bed.
+2. Front servo, flat: `servo f 1500`. The front of the bed may jump. Change the number in steps of 10–20 µs (`servo f 1480`, `servo f 1520` …) until that servo holds the bed **exactly flat on its rest post**, without pushing it up and without buzzing. Write the number down: `set f_flat_us <number>`.
+3. Front servo, tipped: increase (or decrease, if the bed goes down into the deck: stop at once) the pulse until the bed's front end is at **40°** (phone angle app on the cargo plate). `set f_tip_us <number>`. A 180° servo moves about 11 µs per degree, so expect about 1500 ± 444.
+4. `servo f off`. Do the same for the rear servo with `servo r …`, `set r_flat_us …`, `set r_tip_us …`, `servo r off`.
+5. Check: `bed 20` (both servos move smoothly to 20°: the bed must not twist; if one end is higher, adjust that servo's numbers), `bed 40`, `bed 0`, `bed off`. Then `save`.
+
+> **If a servo moves the wrong way or hits its end**, its horn is on the wrong spline tooth: take the horn's centre screw out, lift the bed off that servo, turn the shaft to the flat position (`servo f <flat number>`), and push the horn on again with the bed flat.
+
+### 4.3 Tipping tests (report data)
+
+Use cardboard boxes of 0.5, 1, 2 and 3 kg (fill them with rice or books), 10–20 cm wide.
+
+```
+tip
 ```
 
-> **Rule:** after changing anything in `config/`, `launch/` or `urdf/`, run `cd ~/cargo_robot/robot_ws && colcon build --symlink-install` again, then restart the launch. It takes about 5 seconds.
+The bed tips to `tip_deg` at `tip_speed` deg/s, holds for `tip_hold_s`, comes down, and weighs again with the bed flat: "delivered" or "did NOT slide off". Do it 10 times per box, with the box in the middle and near each corner. Record the angle at which each box starts to slide (watch the angle in a phone video).
 
-### 4.3 Lidar check [PI]
+| Box | Starts sliding at (deg) | Delivered (out of 10) |
+|---|---|---|
+| 0.5 kg | | |
+| 1 kg | | |
+| 2 kg | | |
+| 3 kg | | |
 
-```bash
-ls -l /dev/rplidar                  # -> ../ttyUSB0 ; if missing: re-plug the lidar USB, check the udev rule (3.3)
-ros2 launch cargo_bot robot.launch.py payload:=false
-```
+- Boxes stay on? Increase `tip_deg` (up to 45) or `tip_hold_s`, and check the cargo plate is clean and dry (no mat!).
+- Boxes tumble instead of sliding (tall, narrow ones)? Lower `tip_speed` (10–15 deg/s).
+- A servo buzzes or the bed shakes at 40° with 3 kg? The servo buck must be 7.4 V under load: measure it during the tip.
 
-In a **second** SSH terminal:
-
-```bash
-ros2 topic list                     # /scan /scan_filtered /odom /tf /tf_static /joint_states /estop ...
-ros2 topic hz /scan                 # about 7-10 Hz
-ros2 topic hz /scan_filtered        # same rate
-```
-
-The lidar should be spinning. Stop the launch with **Ctrl+C** in the first terminal.
-
-### 4.4 See it in RViz [LAPTOP]
-
-Your laptop must be on the same Wi-Fi, with `ROS_DOMAIN_ID=42` set in `~/.bashrc` (section 0.5).
-
-1. [PI] `ros2 launch cargo_bot robot.launch.py payload:=false`
-2. [LAPTOP] `ros2 topic list`. You must see the robot's topics. If not, see [Troubleshooting → "Laptop can't see topics"](#troubleshooting).
-3. [LAPTOP] `rviz2`:
-   1. *Global Options → Fixed Frame* = `odom`.
-   2. **Add → RobotModel**: *Description Source* = Topic, *Description Topic* = `/robot_description`.
-   3. **Add → TF**.
-   4. **Add → LaserScan**:
-      - *Topic* = `/scan_filtered`
-      - *Size* = 0.03
-      - If nothing shows, set *Topic → Reliability Policy* = **Best Effort**.
-   5. *File → Save Config As* → `~/cargo.rviz`. Next time run `rviz2 -d ~/cargo.rviz`.
-
-**Lidar direction check (important):**
-
-- Put a box 50 cm **in front** of the robot. In RViz the red axis of `base_link` points forward, and the box's dots must appear on that side.
-- If they appear **behind** the robot: in `urdf/cargo_bot.urdf.xacro` change `<xacro:property name="laser_yaw" value="${pi}"/>` to `value="0.0"`, rebuild (4.2), restart.
-- Also check left/right: a box on the robot's **left** must appear on the left. If left and right are mirrored, add `"inverted": True` to the lidar parameters in `launch/robot.launch.py`.
-
-**Filter check:** switch the LaserScan topic to `/scan` and put your hand on the cargo plate. Your hand shows up in `/scan` but **not** in `/scan_filtered`.
-
-### 4.5 Camera check [PI]
-
-```bash
-v4l2-ctl --list-devices                         # your camera -> /dev/video0 (note the number)
-v4l2-ctl -d /dev/video0 --list-formats-ext      # must list 640x480
-ros2 launch cargo_bot robot.launch.py payload:=false vision:=true
-```
-
-[LAPTOP] `ros2 run rqt_image_view rqt_image_view` → choose `/vision/debug/compressed`. You see the camera image with:
-
-- a cyan line marking the top of the search region;
-- a blue centre line;
-- green outlines around a detected line;
-- red squares around markers.
-
-If your camera isn't `/dev/video0`, set `device:` in `robot.yaml` (e.g. `device: 2`) and rebuild.
-
-### 4.6 Optional: Foxglove instead of RViz (Windows laptops)
-
-[PI] `ros2 launch foxglove_bridge foxglove_bridge_launch.xml`, then in the Foxglove app on Windows: *Open connection → Foxglove WebSocket* → `ws://cargobot.local:8765`. Add 3D, Image and Plot panels.
-
-### 4.7 Simulation (Gazebo), with no hardware needed
-
-The same software can run on a simulated robot in Gazebo, the simulator that comes with ROS 2 Jazzy. It's useful for testing SLAM and Nav2 before the robot is built, or when it's being repaired. Everything is in `SIMULATION.md` at the top of the project folder. In short:
-
-```bash
-sudo apt install -y ros-jazzy-ros-gz        # once, on an Ubuntu 24.04 laptop
-ros2 launch cargo_bot sim.launch.py          # Gazebo + robot in a test room
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
-```
-
-**Done when:** RViz shows the robot model and the laser scan, in the correct direction. The camera image is visible. The launch runs for 10 minutes without errors.
+**Done when:** a 3 kg box slides off 10 times out of 10, and the bed comes back flat onto its posts every time.
 
 ---
 
 ## Week 5 — Driving: motor control, PID, odometry (2 – 8 Nov)
 
-**Goal:** you can drive the robot from the laptop keyboard, the wheel speed control is tuned, and odometry is accurate to a few %.
+**Goal:** the wheel speed control is tuned, and the distance the robot measures is accurate to a few %.
 
 ### 5.1 How the driving code works
 
-`base_driver` runs 50 times per second:
+`robotUpdate()` runs the wheels 100 times per second:
 
-1. It reads both encoder counts and turns the change into wheel speeds (rad/s), filtered a little.
-2. It updates the odometry. Distance travelled = (left + right) / 2; turn angle = (right − left) / wheel separation. It publishes `/odom`, the TF `odom → base_footprint`, and the wheel angles.
-3. It turns the wanted robot speed (`/cmd_vel_safe`: `linear.x` m/s, `angular.z` rad/s) into wheel speeds:
-   - left = (v − ω·s/2) / r
-   - right = (v + ω·s/2) / r
+1. It reads both encoder counts and turns the change into wheel speeds (rad/s), filtered a little, and adds up the distance travelled and the change of heading.
+2. It ramps the wanted forward speed by `accel` (0.4 m/s² by default), so starts and stops are gentle and the package doesn't slide.
+3. It turns the wanted robot speed (v m/s forward, w rad/s turning left) into wheel speeds:
+   - left = (v − w·s/2) / r
+   - right = (v + w·s/2) / r
 4. A **PID controller per wheel** turns wanted vs. measured wheel speed into PWM duty:
    - duty = sign · (`min_duty` + `kf`·|target|) + `kp`·error + ∫`ki`·error
    - The feed-forward part (`kf`, `min_duty`, measured in week 3) does most of the work. `kp` and `ki` correct what's left.
-5. Safety: if no command arrives for 0.5 s (`cmd_timeout`), or the E-stop is pressed, the target becomes 0 and the motors brake.
+5. Safety: the motors only run while the MCP23017 enables the drivers, and the mission switches them off whenever it stops.
 
 ### 5.2 First drive (wheels in the air, then on the floor)
 
-[PI] terminal 1:
-
-```bash
-ros2 launch cargo_bot robot.launch.py lidar:=false payload:=false
+```
+drive 0.15 0 3
 ```
 
-[PI or LAPTOP] terminal 2:
-
-```bash
-ros2 run teleop_twist_keyboard teleop_twist_keyboard
-```
-
-1. Press **z** a few times to lower the speed to about 0.15 m/s.
-2. Drive with the keys: **i** forward, **,** back, **j**/**l** turn on the spot, **k** stop.
-3. The robot stops by itself about 0.5 s after you stop pressing.
-4. With the wheels in the air, check forward, back, left and right. Then put it on the floor and drive gently.
-
-Watch the odometry in terminal 3:
-
-```bash
-ros2 topic echo /odom --field twist.twist
-```
+drives forward at 0.15 m/s for 3 s and prints both wheel speeds 4 times per second (target: 0.15 / 0.05 = 3 rad/s), then the distance and turn it measured. Try `drive -0.15 0 3` (backwards), `drive 0 1 3` (turn left on the spot), `drive 0 -1 3`. Then on the floor, gently. **Enter** stops early.
 
 ### 5.3 Tune the wheel speed controller
 
-You need the laptop, which has `rqt`:
+Run `drive 0.3 0 3` with the wheels in the air and watch the printed speeds (target 6 rad/s):
 
-```bash
-ros2 run rqt_plot rqt_plot /cmd_vel_safe/linear/x /odom/twist/twist/linear/x
-```
-
-Drive forward and backward in steps with teleop (i, k, i, k ...). The measured speed (odom) should follow the command within about 0.3 s, **without** overshooting or oscillating.
-
-| What you see | Change in `robot.yaml` (`base_driver`) |
+| What you see | Change |
 |---|---|
-| Measured speed settles clearly **below** the command | increase `ki` (e.g. 0.10 → 0.2), or check `kf` |
+| Both settle clearly **below** 6 | increase `ki` (e.g. 0.10 → 0.2), or check `kf` |
 | Slow to reach the speed | increase `kp` (0.02 → 0.04) |
-| Speed oscillates / motors buzz / robot jerks | decrease `kp`, then `ki` |
+| Speed jumps around / motors buzz / robot jerks | decrease `kp`, then `ki` |
 | Jumps forward when starting | decrease `min_duty` a little |
 | Doesn't start moving at low speeds | increase `min_duty` a little |
 
-After each change: rebuild (`cd ~/cargo_robot/robot_ws && colcon build --symlink-install`) and restart the launch.
+Change with `set`, try again, `save` when happy.
 
-> A good test of the tuning: with 10 kg on the cargo bed, it should still reach the commanded speed.
+> A good test of the tuning: with 3 kg on the bed, it should still reach the commanded speed.
 
 ### 5.4 Calibrate the odometry (on the floor)
-
-This uses the wheel angles in `/joint_states`: `position[0]` = left wheel, `position[1]` = right wheel, both in radians.
 
 **Straight-line test → `wheel_radius`**
 
 1. Put a tape mark on the floor at the robot's axle (the centre of a drive wheel). Measure out **3.00 m** in a straight line and mark the end.
-2. Read the wheel angles: `ros2 topic echo /joint_states --once` → write down the positions L₁, R₁.
-3. Drive slowly straight to the end mark. Use `ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{linear: {x: 0.15}}"` and press Ctrl+C when the axle reaches the mark.
-4. Read the angles again: L₂, R₂. Measure the real distance D the axle travelled (≈ 3.00 m).
-5. **New wheel_radius = D / (((L₂ − L₁) + (R₂ − R₁)) / 2)**
+2. `drive 0.15 0 25` and press **Enter** the moment the axle reaches the end mark. Note the printed distance (odometry), and measure the real distance D the axle travelled.
+3. **New wheel_radius = old wheel_radius × D / odometry distance.** `set wheel_radius …`
 
-**Spin test → `wheel_separation`**
+**Spin test → `wheel_sep`**
 
 1. Put a tape arrow on the floor pointing the way the robot faces.
-2. Read the angles: L₁, R₁.
-3. Spin slowly on the spot **exactly 5 full turns**: `ros2 topic pub -r 10 /cmd_vel geometry_msgs/msg/Twist "{angular: {z: 0.6}}"`. Press Ctrl+C a little early and finish with short key taps.
-4. Read the angles again: L₂, R₂.
-5. **New wheel_separation = wheel_radius × ((R₂ − R₁) − (L₂ − L₁)) / (2π × 5)**
+2. `drive 0 0.6 60` and press Enter when the robot has turned **exactly 5 full turns** (1800°). Note the printed angle.
+3. **New wheel_sep = old wheel_sep × printed angle / 1800.** `set wheel_sep …`
 
-Put both values into `robot.yaml`, rebuild, and repeat both tests once more to confirm.
+`save`, and repeat both tests once more to confirm.
 
-### 5.5 The 1 m square test (report data)
+### 5.5 The straight-line test (report data)
 
-1. Mark the start position and heading.
-2. With teleop, drive a 1 m square (4 × straight 1 m + 90° turns) back to the start.
-3. Read `/odom` at the end: it should say x ≈ 0, y ≈ 0.
-4. Measure the real error with a tape measure.
-5. Repeat 3 times clockwise and 3 times anticlockwise, and record the results.
+Drive 3 m 5 times (`drive 0.2 0 15`, stopping at the mark). Measure how far sideways from the line the robot ends, and how far the printed distance is from the real one.
 
-| Run | Direction | Real end error (cm) | Odom end error (cm) |
+| Run | Real distance (m) | Odometry (m) | Sideways error (cm) |
 |---|---|---|---|
-| 1 | CW | | |
+| 1 | | | |
 | ... | | | |
 
-**Done when:** smooth driving with the keyboard, speed tracking within ~10 %, and the square test ends within ~5 cm. Commit the tuned `robot.yaml`.
+**Done when:** the wheels follow the commanded speed within ~10 %, and the 3 m test ends within ~5 cm. `save`, and commit your `list` output.
 
 ---
 
-## Week 6 — SLAM: mapping the test area (9 – 15 Nov)
+## Week 6 — Line following and station marks (9 – 15 Nov)
 
-**Goal:** a clean map of the test facility, saved as `~/maps/lab.yaml` + `lab.pgm`.
+**Goal:** the robot follows a tape track for 10 laps and stops on every station mark.
 
-### 6.1 Prepare the area
+### 6.1 Lay the track
 
-- Close doors that should count as walls, and keep people out of the area while mapping.
-- The lidar can't see glass, mirrors, very black surfaces, or anything lower or higher than its scan plane (~25 cm above the floor). Tables are seen only as their legs.
-- Lay the tape line and the station positions **after** mapping. Tape doesn't appear in the map anyway.
+- **Line:** black matte tape (19–50 mm wide) on a light, non-shiny floor. A closed loop, curves with a radius of at least 30 cm. Start with an oval about 3 × 1.5 m.
+- **Station marks:** a strip of the same tape **across** the line, at least 12 cm long and 2–5 cm wide (so 6 or more sensors see black at once). One for the **pickup**, one for the **drop-off**.
+- At the drop-off, the conveyor will be on the robot's **right**, so put that mark on a straight part of the track that runs alongside where the belt will be. For now, use a box or a wall 5–10 cm to the right of where the robot stops.
 
-### 6.2 Make the map
+### 6.2 How the line following works
 
-[PI] terminal 1:
+- The 8 sensors give a position: +1 = line under the leftmost sensor, −1 = rightmost, 0 = centred.
+- Turning speed = (`k_line` × position + `kd_line` × how fast the position changes), scaled with the forward speed (so the path is the same when the robot slows down).
+- **Line lost** (no sensor on black) for more than `lost_s`: the robot stops and raises an alarm.
+- **Station mark** (`mark_min` = 6 or more sensors on black for 2 readings): the robot drives on `stop_mm` (214 mm: from the sensor bar to the middle of the bed) and stops, so the middle of the bed is level with the mark.
 
-```bash
-ros2 launch cargo_bot robot.launch.py payload:=false
-```
+### 6.3 Tune it
 
-[PI] terminal 2:
+There's no "follow only" command: use the mission in week 8, but first try it on the bench:
 
-```bash
-ros2 launch cargo_bot slam.launch.py
-```
+1. `line` with the robot on the track: check the position goes + when the tape is under the left sensors.
+2. Put the robot on the track **just after the pickup mark**, facing the drop-off. Put 0.5 kg on the bed (the mission waits for a package), type `run 1`.
+3. It follows the line to the drop-off mark, stops, tips (that's week 8; the side sensor must see your box), and follows on to the pickup.
 
-[LAPTOP]: open `rviz2 -d ~/cargo.rviz`, then:
+| Symptom | Fix |
+|---|---|
+| Snakes left-right along a straight line | lower `k_line` (2.5 → 1.8), raise `kd_line` a little |
+| Loses the line in curves | raise `k_line` (→ 3.5) and/or lower `follow_speed` (→ 0.15) |
+| Turns the **wrong** way, off the line at once | the sensor order is reversed: `set k_line -2.5`, or turn the sensor board round |
+| Stops at a mark too early / too late | change `stop_mm` |
+| Sees a station mark in a sharp curve | raise `mark_min` to 7 |
+| Doesn't see a mark | make the mark wider, or lower `mark_min` to 5 |
 
-1. Set *Fixed Frame* = `map`.
-2. **Add → Map**, topic `/map`. If it stays empty, set *Durability* = **Transient Local**.
+### 6.4 Line-following tests (report data)
 
-[LAPTOP] terminal 3: `ros2 run teleop_twist_keyboard teleop_twist_keyboard`
+| Test | How | Record |
+|---|---|---|
+| L1 | 10 laps at 0.2 m/s, empty | laps without losing the line, lap time |
+| L2 | 10 stops at a mark | distance from the middle of the bed to the mark (cm) |
 
-**Driving rules while mapping:**
-
-- Slow: ≤ 0.2 m/s, and turn slowly (press **c** in teleop to reduce the turn speed).
-- Drive along every wall, about 1 m away from it.
-- **Close loops:** come back to places you've already mapped, and finish where you started. That's how SLAM corrects its drift.
-- Grey = unknown, white = free, black = walls. Keep going until the area of interest is white inside, with black borders.
-
-### 6.3 Save the map
-
-Keep SLAM running. In [PI] terminal 3:
-
-```bash
-mkdir -p ~/maps
-ros2 run nav2_map_server map_saver_cli -f ~/maps/lab
-ls ~/maps                        # lab.pgm  lab.yaml
-```
-
-Also save slam_toolbox's own format, in case you want to extend the map later:
-
-```bash
-ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph "{filename: '$HOME/maps/lab'}"
-```
-
-**Optional clean-up:** copy `lab.pgm` to the laptop (VS Code: right-click → Download) and open it in GIMP.
-
-- Paint over stray dots with white.
-- Close small gaps in walls with black.
-- Paint **black** anywhere the robot must never go (stairs, a table it can't see).
-
-Save it with the same name, then copy it back.
-
-### 6.4 Check the lidar position (Phase II task 2.2.3)
-
-The TF from `base_link` to `laser` comes from the URDF. Check it against reality:
-
-1. Park the robot square to a flat wall, at exactly 1.00 m measured from the **front edge of the plates** to the wall.
-2. In RViz, use the **Measure** tool from the lidar centre to the wall dots. Or run `ros2 topic echo /scan --once` and look at the smallest values in `ranges`.
-3. It should read 1.00 m + (lidar centre to plate front edge, 0.047 m) ≈ **1.05 m**.
-4. If it's off by more than 2 cm, measure the lidar position on the real robot. Fix `laser_joint` → `origin xyz` in `urdf/cargo_bot.urdf.xacro`, then rebuild.
-
-**Done when:** `~/maps/lab.yaml` exists, and the map's walls are straight and not doubled. Put a screenshot in the report. Commit the map files: copy them to `~/cargo_robot/maps/` and `git add` them.
+**Done when:** ≥ 9/10 laps without losing the line, and every stop within ±3 cm of its mark. `save`.
 
 ---
 
-## Week 7 — Payload logic & vision (16 – 22 Nov)
+## Week 7 — Payload logic & obstacles (16 – 22 Nov)
 
-**Goal:** the robot publishes the cargo weight, slows down when loaded (and refuses when overloaded), follows a tape line, and recognises station markers.
+**Goal:** the robot slows down when loaded (and refuses when overloaded), and stops for obstacles.
 
-### 7.1 Payload topic (Phase II task 2.3.1)
+### 7.1 Weight-dependent speed
 
-[PI] Start the launch with the cargo bed **empty**. It zeroes (tares) itself at start:
-
-```bash
-ros2 launch cargo_bot robot.launch.py
-```
-
-[PI] second terminal:
-
-```bash
-ros2 topic echo /payload_weight            # total kg, about 10 per second
-ros2 topic echo /payload_corners           # kg per corner [FL, FR, RL, RR]
-ros2 service call /payload/tare std_srvs/srv/Trigger   # re-zero at any time (bed must be empty)
-```
-
-Put 0, 1, 2 and 5 kg on the bed and check the readings.
-
-> If the reading **drifts** slowly with nothing on the bed, that's normal load-cell creep. Re-tare before each mission; the mission script works with *changes* in weight.
-
-### 7.2 Weight-dependent speed (Phase II task 2.3.3)
-
-`speed_limiter` multiplies every speed command by a factor:
+The forward speed is multiplied by a factor:
 
 | Load | Factor |
 |---|---|
 | 0 kg | 1.00 (full speed) |
-| 7.5 kg | 0.75 |
-| 15 kg (`max_payload_kg`) | 0.50 (`min_factor`) |
-| above 16.5 kg (15 × `overload_ratio` 1.1) | **0.00**: refuses to move and logs "OVERLOAD" |
-| load cells stop reporting for 2 s | 0.50 (plays safe) |
+| 1.5 kg | 0.75 |
+| 3 kg (`max_kg`) | 0.50 (`min_factor`) |
+| above 3.6 kg (`max_kg` × `overload` 1.2) | **0.00**: refuses to move, alarm "overload" |
 
-Test with teleop at 0.3 m/s:
+Watch it with `watch` (the kg column) while you add weights, then on the track: the robot visibly slows with 3 kg. Change `max_kg` to suit your demo packages.
 
-```bash
-ros2 topic echo /speed_factor
-```
+> If the reading **drifts** slowly with nothing on the bed, that's normal load-cell creep. The mission re-zeroes the scale after every delivery.
 
-Add weight step by step: the factor drops and the robot visibly slows. Change the numbers in `robot.yaml` → `speed_limiter` to suit your demo (e.g. `max_payload_kg: 10.0`).
+### 7.2 Obstacles
 
-### 7.3 Line following
+| What the ultrasonic sensors see | What the robot does |
+|---|---|
+| Nothing closer than `slow_cm` (60 cm) | full speed |
+| Something 60 → 25 cm in front of the **centre** sensor | slows down in proportion |
+| Something closer than `stop_cm` (25 cm) in front | **stops**, red LED flashes, one beep per second ("please remove the obstacle"), drives on 1 s (`clear_s`) after the way is clear |
+| Something close to a **side** sensor only | slows to 50 % at most, never stops (so the conveyor and walls beside the track don't stop it) |
 
-1. **Line:**
-   - Black matte tape (19–50 mm wide) on a light, non-shiny floor.
-   - Curves with a radius of at least 30 cm.
-   - Start with a straight line and one gentle curve.
-2. **Start** [PI]:
-
-   ```bash
-   ros2 launch cargo_bot robot.launch.py vision:=true
-   ```
-
-3. **Look at the debug image** [LAPTOP]: `ros2 run rqt_image_view rqt_image_view` → `/vision/debug/compressed`.
-   - Put the robot on the line: a **green outline** must hug the tape, and `err` must be about 0 when the tape is centred.
-   - Only the part of the image below the cyan line is used (`roi_top: 0.55`).
-   - It finds shadows or floor patterns instead of the tape → raise `roi_top` (e.g. 0.65) or raise `min_area`.
-   - White tape on a dark floor → `dark_line: false`.
-4. **Enable following:**
-
-   ```bash
-   ros2 service call /line_follow/enable std_srvs/srv/SetBool "{data: true}"
-   # stop:
-   ros2 service call /line_follow/enable std_srvs/srv/SetBool "{data: false}"
-   ```
-
-   If the line disappears for more than 0.5 s, the robot stops.
-
-5. **Tuning** (`robot.yaml` → `vision_node`):
-
-   | Symptom | Fix |
-   |---|---|
-   | Snakes left-right along a straight line | lower `k_turn` (1.5 → 1.0) |
-   | Loses the line in curves | raise `k_turn` (→ 2.0) and/or lower `follow_speed` (→ 0.08) |
-   | Turns the **wrong** way | the camera image is mirrored: set `k_turn` negative, or flip the camera |
-   | Stops randomly | lighting: avoid strong sun patches; raise `min_area` |
-
-> **Don't run line following and Nav2 at the same time.** Both publish `/cmd_vel`. Use one mode or the other.
-
-### 7.4 Station markers (ArUco)
-
-1. Make printable markers [PI]:
-
-   ```bash
-   cd ~/cargo_robot && python3 tools/make_markers.py 0 1 2
-   ```
-
-   This creates `markers/marker_0.png` etc. Download them to the laptop and print each so the black square is **10 × 10 cm**.
-2. Assign them: **0 = home, 1 = pickup, 2 = drop-off**.
-3. Tape each flat on the floor beside the line, where the camera sees it as the robot arrives.
-4. Check: `ros2 topic echo /station_marker` shows the id while the marker is in view, and −1 otherwise.
-
-You can use the marker id for line-following missions (e.g. stop the line follower when marker 2 appears). A 10-line script that does this is a nice extension; follow the pattern in `mission.py`.
-
-### 7.5 Optional: ML classification with ONNX (only if your supervisor requires ML)
-
-The PDF mentions "ONNX/OpenCV vision classification models". The markers above already identify stations reliably. If an ML model is required:
-
-1. On the laptop, collect ~200 photos per class (e.g. "box", "no box", "person") with the robot's camera. Use `rqt_image_view`'s save button, or `ros2 bag record`.
-2. Train a small image classifier on the laptop. For example, with Ultralytics:
-
-   ```bash
-   pip install ultralytics
-   yolo classify train data=my_dataset model=yolov8n-cls.pt imgsz=224 epochs=30
-   yolo export model=runs/classify/train/weights/best.pt format=onnx imgsz=224
-   ```
-
-   (`my_dataset/train/<class>/*.jpg` and `my_dataset/val/<class>/*.jpg`)
-3. Copy `best.onnx` to the Pi and add this to `vision_node.py`:
-
-   ```python
-   # in __init__:
-   self.net = cv2.dnn.readNetFromONNX("/home/robot/cargo_robot/models/best.onnx")
-   self.classes = ["box", "no_box", "person"]          # same order as training (alphabetical folders)
-   # in step(), every 5th frame:
-   blob = cv2.dnn.blobFromImage(frame, 1 / 255.0, (224, 224), swapRB=True)
-   self.net.setInput(blob)
-   scores = self.net.forward()[0]
-   self.get_logger().info(f"class: {self.classes[int(scores.argmax())]} ({scores.max():.2f})")
-   ```
-
-   A Pi 5 runs a 224 px YOLOv8n-cls model at roughly 10+ FPS.
+Test it during a mission: walk in front of the robot, put a box on the track.
 
 **Done when:**
 
-- [ ] `/payload_weight` is correct to ±0.1 kg.
+- [ ] The weight reads within ±0.1 kg while standing still.
 - [ ] The robot slows when loaded and refuses when overloaded.
-- [ ] It follows the tape line for a full lap.
-- [ ] `/station_marker` shows the right ids.
+- [ ] It stops for a box in front and drives on when it's taken away.
 
 ---
 
-## Week 8 — Autonomous navigation & delivery missions (23 – 29 Nov)
+## Week 8 — Delivery missions (23 – 29 Nov)
 
-**Goal:** the robot localises itself on the saved map, drives to goals you click in RViz, follows waypoints, and runs the full delivery mission by itself.
+**Goal:** the robot runs the full delivery by itself: pickup → drop-off (tip) → pickup, 5 times in a row.
 
-### 8.1 How our Nav2 setup differs from the defaults
+### 8.1 The mission
 
-`tools/make_configs.py` (run in week 4) copied Nav2's default settings and changed only these:
+Put the robot on the track **just after the pickup mark** (middle of the bed level with the mark), facing the drop-off, bed **empty**, and power it on (it zeroes the scale at power-on). Then press the **start button** or type `run` (`run 5` = 5 deliveries then stop).
 
-- **Footprint:** a 0.45 × 0.38 m rectangle (the robot plus its wheels), instead of a circle.
-- **Laser:** every lidar user (costmaps, AMCL, collision monitor, SLAM) reads `/scan_filtered`, so the robot's own body and cargo are never seen as obstacles.
-- **Controller:** **Regulated Pure Pursuit**. It follows the path smoothly, slows down in tight curves and near obstacles, never reverses (the cargo blocks the lidar's rear view), and uses little CPU.
-- **Speed:** 0.35 m/s max, turning 1.0 rad/s. Acceleration is gentle so the cargo doesn't slide.
-
-### 8.2 Start navigation
-
-[PI] terminal 1:
-
-```bash
-ros2 launch cargo_bot robot.launch.py
-```
-
-[PI] terminal 2:
-
-```bash
-ros2 launch cargo_bot nav.launch.py map:=$HOME/maps/lab.yaml
-```
-
-Wait until it prints **"Managed nodes are active"**.
-
-[LAPTOP]:
-
-```bash
-ros2 launch nav2_bringup rviz_launch.py
-```
-
-This opens RViz with the Nav2 panel and tools.
-
-1. **Tell the robot where it is:** click **2D Pose Estimate**, then click on the map where the robot really is and drag in the direction it faces. The green particle cloud appears around it.
-2. Drive 1–2 m with teleop, or turn on the spot. The particles shrink and the laser dots line up with the map walls. The robot is now "localised".
-3. **Send a goal:** click **Nav2 Goal**, then click and drag on the map. The robot plans (green line) and drives there. Keep a hand near the E-stop.
-
-### 8.3 Waypoints (Phase II task 2.4.2)
-
-In the RViz **Navigation 2** panel:
-
-1. Click **Waypoint / Nav Through Poses Mode**.
-2. Place 3–5 goals with **Nav2 Goal**.
-3. Click **Start Waypoint Following**.
-
-The robot visits each one in turn.
-
-### 8.4 Record your stations
-
-For each station (**home**, **pickup**, **dropoff**):
-
-1. Drive the robot there with teleop, parked exactly how it should stop (localisation running).
-2. Run:
-
-   ```bash
-   ros2 run tf2_ros tf2_echo map base_footprint
-   ```
-
-   Note the *Translation* x, y and the *Rotation → RPY (degree)* last number (yaw).
-3. Put a strip of tape on the floor at the front wheels. You'll measure the stopping accuracy against it in week 9.
-
-Create `~/maps/stations.yaml`:
-
-```yaml
-home:    [0.00, 0.00, 0.0]      # x (m), y (m), yaw (degrees)
-pickup:  [3.20, 1.10, 90.0]
-dropoff: [6.50, -0.40, 180.0]
-```
-
-### 8.5 Run the delivery mission
-
-With the robot localised at *home*:
-
-```bash
-ros2 run cargo_bot mission --stations ~/maps/stations.yaml --loops 1
-```
-
-What happens:
-
-1. It drives to **pickup** and waits until more than 0.3 kg has been on the bed for 2 seconds.
-2. It drives to **dropoff** (automatically slower, because it's loaded) and waits until the bed has been empty for 2 seconds.
-3. It drives back **home**.
-
-Useful options:
-
-- `--loops 5`: repeat the delivery 5 times.
-- `--set-initial-pose`: tells AMCL the robot starts at *home*, so you can skip the 2D Pose Estimate click.
-- `--conveyor`: unload at the drop-off with the pusher instead of waiting for a person ([section 8.7](#87-unload-onto-a-conveyor-with-the-pusher-design-v3)).
-- **Ctrl+C**: cancels the mission and stops the robot.
-
-### 8.6 Tuning Nav2 (only if needed)
-
-Edit `robot_ws/src/cargo_bot/config/nav2_params.yaml`, then rebuild and restart:
-
-| Problem | Parameter (search for it in the file) |
-|---|---|
-| Stops too far from the goal | `general_goal_checker` → `xy_goal_tolerance` (0.25 → 0.10), `yaw_goal_tolerance` (0.25 → 0.15) |
-| Won't pass through a doorway | `inflation_radius` in both costmaps (→ 0.35), `cost_scaling_factor` (→ 5.0) |
-| Drives too close to walls | `inflation_radius` up (→ 0.6) |
-| Too slow | `desired_linear_vel` in `FollowPath`, and `max_velocity` in `velocity_smoother` |
-| Oscillates on straight paths | `lookahead_dist` up (0.6 → 0.8) |
-| "Robot is in collision" / won't start | footprint too big, or the laser filter box is too small. Check `/scan_filtered` in RViz: no dots may be inside the robot outline. |
-
-### 8.7 Unload onto a conveyor with the pusher (design v3)
-
-With `--conveyor`, the robot unloads by itself at the drop-off: it backs up until its rear touches the conveyor, pushes the cargo off, checks that the bed is empty and drives clear.
-
-**What the conveyor must be like**
-
-| | Requirement | Why |
+| State | What happens | Lights |
 |---|---|---|
-| Belt height | Top of the belt **180–205 mm** above the floor | The bed is 211 mm high. A pusher can't lift, and a drop of more than about 3 cm tips the package over. |
-| Side facing the robot | A flat, rigid face at least 40 cm wide, from 165 mm above the floor up to the belt: the conveyor's own side frame, or a board fixed to it | The robot backs up until its rear edge (178–183 mm high) presses on it. |
-| Gap | The belt starts within 2–3 cm of that face | The package has to bridge the gap. |
-| Backstop | A board along the far side of the belt whose top is **more than 260 mm** above the floor, at least as wide as the robot | The lidar scans 250 mm above the floor and sees nothing lower. Without the board, Nav2 doesn't know the conveyor exists and can plan a path through it. It also stops the package overshooting. |
-| Belt | **Running** while the robot unloads | A heavy package gripping a stopped rubber belt pushes the robot away instead of sliding on. Onto a stopped belt, keep packages under about 6 kg. |
-| Packages | Rigid boxes at least 10 mm high, up to 255 × 280 mm (length × width), up to 15 kg | The blade is 25 mm tall and rides 3 mm above the plate; the usable bed is 257 mm long. |
+| LOAD | Waits until more than `load_kg` (0.15 kg) has been on the bed for `hold_s` (2 s), then beeps | green on |
+| FOLLOW | Follows the line to the next station mark: slower when loaded, slow/stop for obstacles | green on |
+| DOCK | Drives on `stop_mm`, stops level with the mark | green on |
+| CHECK | At the drop-off: the side sensor must see something 20–150 mm to the right (the belt). If not: alarm | |
+| TIP | Tips the bed to 40° at 20°/s | green flashing |
+| HOLD | Holds it there for `tip_hold_s` (2 s) | green flashing |
+| LOWER | Lowers the bed, switches the servos off, waits 1 s, **weighs with the bed flat**: empty → re-zeroes the scale and goes on to the pickup; still loaded → alarm | |
+| ALARM | Line lost, overload, no belt, package still on the bed: red LED, beep every 2 s. Fix it, press the start button: it carries on from where it stopped | red on |
+| ESTOP | E-stop pressed: everything stops (the servos lose power; the bed sinks back onto its posts). When released: back to IDLE; press start to begin again | red on |
 
-A 3D model of a conveyor that meets all of these is in `conveyor/` (STEP, STL and glTF, with its dimensions in `conveyor/README.md`). It is for simulation and pictures; it is not a build design.
+`stop` in the Serial Monitor stops everything at any time and lowers the bed.
 
-**Set it up**
+> **Why weigh only with the bed flat?** Tipped at 40°, the load cells feel only part of the weight (cos 40° = 0.77), so a light package would look like an empty bed. Flat, the reading is exact.
 
-1. Put the conveyor and its backstop in place, then make the map again (week 6), so they're on it.
-2. Tighten Nav2's goal tolerance as in the table in 8.6: `xy_goal_tolerance` 0.10 and `yaw_goal_tolerance` 0.15.
-3. Record the **dropoff** station (8.4) with the robot's **rear towards the conveyor, square to it, and about 30 cm clear of it**. It needs that room to turn on the spot when it arrives.
-4. Start the robot with the pusher node:
+### 8.2 With the real conveyor
 
-   ```bash
-   ros2 launch cargo_bot robot.launch.py pusher:=true
-   ```
+When the conveyor exists, put the drop-off mark where the middle of the bed is level with the belt, and the belt 2–15 cm to the right of the robot's deck edge, with its top **below 200 mm** from the floor (the package leaves the bed at about 217 mm, 6 mm outside the deck). Check `tof` reads within `tof_min_mm`–`tof_max_mm` there; the side sensor is 150–170 mm above the floor, so it must see the conveyor's frame or side guard. If your conveyor is lower, move the sensor or `set tof_check 0`.
 
-5. Try the pusher by itself first, with the bed empty:
+### 8.3 Run the delivery mission
 
-   ```bash
-   ros2 topic echo /pusher/state --once                     # home
-   ros2 service call /pusher/push std_srvs/srv/Trigger      # one cycle: out, pause, back
-   ros2 service call /pusher/stop std_srvs/srv/Trigger      # stop the motor now
-   ros2 service call /pusher/home std_srvs/srv/Trigger      # park the blade; also clears a fault
-   ```
+Load at the pickup (by hand), watch it deliver, repeat. Record a video of 5 deliveries in a row for the report.
 
-6. Run the mission:
-
-   ```bash
-   ros2 run cargo_bot mission --stations ~/maps/stations.yaml --conveyor
-   ```
-
-**What happens at the drop-off**
-
-1. The robot backs up at 5 cm/s until its wheels stop turning: the rear is pressing on the conveyor. If it backs up `--dock-distance` (0.6 m) without touching anything, or doesn't move at all, it does **not** push: the mission stops with an error.
-2. It calls `/pusher/push`. The blade goes out (about 20 s), pauses half a second and comes back.
-3. It reads the scale. The bed must be empty within 10 s; if the cargo is still there, the mission stops with the robot still at the conveyor.
-4. It drives 30 cm forward, clear of the conveyor, and carries on with Nav2.
-
-`/pusher/state` says what the pusher is doing:
-
-| State | Meaning |
-|---|---|
-| `home` | parked at the front, HOME switch pressed |
-| `pushing`, `out`, `returning` | moving to the rear, pausing there, coming back |
-| `stopped` | standing between the switches: after `/pusher/stop`, or at start-up if it wasn't parked. Call `/pusher/home`. |
-| `fault` | it gave up; the reason is in the `pusher_node` log. Fix the cause, then call `/pusher/home`. |
-
-The pusher stops by itself, and stays stopped, when:
-
-- a stroke takes longer than `stroke_timeout` (45 s);
-- the blade hasn't left its switch 2 s after starting: motor wired backwards, jammed, or no motor power;
-- the E-stop is pressed during a stroke. Releasing the E-stop does **not** restart it;
-- both switches read "pressed" at once: a switch wire is broken.
-
-The settings (`duty_out`, `duty_in`, `stroke_timeout`, `dwell`, `invert_motor`) are under `pusher_node` in `robot.yaml`.
-
-**Done when:** the delivery mission runs **3 times in a row** without help, with 5 kg of cargo. Record a video of it for the report. **Pusher:** the same with `--conveyor`, the box landing on the belt each time.
+**Done when:** the delivery mission runs **5 times in a row** without help, with 1 kg and with 3 kg packages.
 
 ---
 
@@ -1715,241 +1107,189 @@ The settings (`duty_out`, `duty_in`, `stroke_timeout`, `dwell`, `invert_motor`) 
 
 **Goal:** measured numbers for the report. Each test lists what to do, what to record and what counts as good. Put every result into a spreadsheet: mean, standard deviation, min and max.
 
-**Recording data:**
+**Recording data:** `watch` prints a status line twice a second. In the Serial Monitor, untick *autoscroll*, select the lines, copy them into a spreadsheet. Film every test with a phone as well; slow motion (240 fps) is great for timing.
 
-```bash
-# a topic to a CSV file you can open in Excel/LibreOffice
-ros2 topic echo --csv /payload_weight > ~/tests/weight_static_5kg.csv
-# everything, to replay later ("ros2 bag play <folder>")
-ros2 bag record -o ~/tests/mission_run1 /scan_filtered /odom /tf /tf_static /payload_weight /cmd_vel /cmd_vel_safe /estop /speed_factor
-```
+### T1: Weight accuracy, static
 
-(`mkdir -p ~/tests` first.) Film every test with a phone as well; slow-motion (240 fps) is great for timing.
-
-### T1: Weight accuracy, static (task 3.1.1)
-
-1. Put known masses of 0, 1, 2, 5 and 10 kg on the middle of the bed; for 5 kg, also near each corner.
-2. For each, record 30 s of `/payload_weight` to CSV.
+1. Put known masses of 0, 0.5, 1, 2 and 3 kg on the middle of the bed; for 2 kg, also near each corner.
+2. For each, copy 30 s of `watch` lines.
 3. **Record:** mean, std, error = mean − true.
 4. **Good:** error < 2 % of the load, std < 0.05 kg.
 
-### T2: Weight accuracy while driving (task 3.1.1)
+### T2: Weight accuracy while driving
 
-1. With 5 kg on the bed, drive straight at 0.2 m/s, then at 0.35 m/s, while recording `/payload_weight`.
+1. With 2 kg on the bed, run the mission (or `drive 0.2 0 10`) while watching the kg column.
 2. **Record:** mean, std, max deviation while moving; peaks when starting and stopping.
 3. **Good:** the mean stays within 5 %. Peaks at start/stop are expected (inertia); explain them in the report.
 
-### T3: E-stop response time (task 3.1.2)
+### T3: E-stop response time
 
-1. The robot drives at 0.3 m/s (teleop). Film it from the side in slow motion.
+1. The robot follows the line at 0.2 m/s. Film it from the side in slow motion.
 2. Press the E-stop as it passes a tape mark.
 3. Count frames from the finger touching the button to the wheels stopping (at 240 fps each frame = 4.2 ms). Measure the stopping distance from the mark.
-4. Repeat 5 times, and again with 10 kg on board.
+4. Repeat 5 times, and again with 3 kg on board.
 5. **Good:** < 0.3 s and < 10 cm.
 
-### T4: Obstacle reaction (task 3.1.2)
+### T4: Obstacle reaction
 
-1. Nav2 drives to a goal 4 m away.
-2. Someone places a box in the path while the robot is 1.5 m from it.
-3. **Record** (from video): the time from the box landing to visible slow-down or path change, the minimum distance to the box, and whether it went around or stopped.
-4. Repeat 5 times.
-5. **Good:** reacts within 0.5 s, never touches the box.
-6. Optional: calculate the software latency from the bag file. Compare the timestamp of the first `/scan_filtered` message that shows the box with the first `/cmd_vel` message that changes.
+1. The robot follows a straight line. Someone places a box on the line 1 m in front of it.
+2. **Record** (from video): the time from the box landing to visible slow-down, the distance at which it stops, whether it touched the box.
+3. Repeat 5 times.
+4. **Good:** reacts within 0.5 s, stops 20–30 cm from the box, never touches it.
 
-### T5: Navigation accuracy
+### T5: Station-stop accuracy
 
-1. Run the mission 10 times.
-2. At each stop, measure the distance from the robot's front wheels to the tape mark (from section 8.4), and the angle error.
-3. **Record:** mean and max position error, mean yaw error.
-4. **Good:** < 10 cm, < 10°.
+1. Run 10 deliveries.
+2. At each stop, measure the distance from the middle of the bed to the mark, along the line.
+3. **Good:** within ±3 cm.
 
-### T6: Battery life under full payload (task 3.1.3)
+### T6: Unloading reliability
 
-1. Fully charged battery, 10 kg cargo.
-2. Run `ros2 run cargo_bot mission --stations ~/maps/stations.yaml --loops 100`. Someone loads and unloads at the stations; or lower `--load-kg` and use a fixed load, removing and adding a 1 kg item.
-3. **Record:** the start time, the number of completed loops, and the time when the voltage alarm beeps (3.5 V per cell). Note the idle current from T2.9 and the driving current (clamp meter or 10 A multimeter).
-4. Estimate: runtime ≈ 5 Ah × 0.8 / average current.
+1. 10 deliveries each with 0.5, 1, 2 and 3 kg boxes.
+2. **Record:** delivered / not delivered, the time from stopping to driving on.
+3. **Good:** 10/10 for every weight, under 6 s each.
 
-### T7: Line following reliability
+### T7: Battery life under full payload
 
-1. 10 laps of the tape track. **Record:** lap time and the number of times the line was lost.
+1. Fully charged battery, 3 kg box.
+2. `run` and keep loading at the pickup (or use a fixed box and let someone put it back after each delivery).
+3. **Record:** the start time, the number of deliveries, and the time when the voltage alarm beeps (3.5 V per cell).
+4. Estimate: runtime ≈ 5 Ah × 0.8 / average current (clamp meter or 10 A multimeter on the battery lead while driving).
+
+### T8: Line following reliability
+
+1. 10 laps of the track. **Record:** lap time and the number of times the line was lost.
 2. **Good:** ≥ 9/10 laps without losing the line.
-
-### T8: Conveyor unloading (pusher)
-
-1. Run the mission with `--conveyor` 10 times each with a 1 kg, a 5 kg and a 10 kg box.
-2. **Record:** unloads that needed no help, out of 10; the time from arriving at the drop-off to driving clear; where on the belt the box lands; every fault message.
-3. **Good:** ≥ 9/10 at each weight, under 60 s per unload.
 
 ### Results table (copy into the report)
 
 | Test | Metric | Result | Target | Pass? |
 |---|---|---|---|---|
-| T1 | static weight error @5 kg | | < 2 % | |
-| T2 | dynamic weight std @0.35 m/s | | — | |
+| T1 | static weight error @2 kg | | < 2 % | |
+| T2 | dynamic weight std @0.2 m/s | | — | |
 | T3 | E-stop time / distance | | < 0.3 s / 10 cm | |
 | T4 | obstacle reaction time | | < 0.5 s | |
-| T5 | goal position error (mean/max) | | < 10 cm | |
-| T6 | runtime @ 10 kg | | ≥ 1 h | |
-| T7 | line-follow laps without loss | | ≥ 9/10 | |
-| T8 | conveyor unloads without help @ 1 / 5 / 10 kg | | ≥ 9/10 | |
+| T5 | station-stop error (mean/max) | | < 3 cm | |
+| T6 | unloading success @3 kg | | 10/10 | |
+| T7 | runtime @ 3 kg | | ≥ 1 h | |
+| T8 | line-follow laps without loss | | ≥ 9/10 | |
 
 **Done when:** every row has a result, backed by a video or data file.
 
 ---
 
-## Week 10 — Cable harness, covers, auto-start (7 – 13 Dec)
+## Week 10 — Cable harness, covers, final checks (7 – 13 Dec)
 
-**Goal:** wiring that looks professional and survives the demo, protective covers, and a robot that starts its software by itself at power-on.
+**Goal:** wiring that looks professional and survives the demo, protective covers, and a robot that is ready the moment it is switched on.
 
-### 10.1 Cable harness (task 3.2.1)
+### 10.1 Cable harness
 
-1. **Label every wire** at both ends (heat-shrink labels or tape + marker) with its ID from the wire lists (P1…P19, S1…S37).
+1. **Label every wire** at both ends (heat-shrink labels or tape + marker) with its ID from the wire lists (P1…P19, S1…S40).
 2. **Route power and signals apart:**
-   - power wires (red/black, motor wires) along the **left** side;
+   - power wires (red/black, motor and servo wires) along the **left** side;
    - signal wires along the **right** side;
    - where they must cross, cross at 90°.
 3. **Twist** each motor's two power wires together (≈ 1 twist per 2 cm). This reduces electrical noise into the encoders.
 4. **Bundle** with zip ties every 8–10 cm. Use spiral wrap where a bundle passes the cable slots or bends.
-5. **Strain relief:** every cable that goes to a moving or removable part (the motors, the top deck, the lidar) gets a zip tie to a rod or plate 3–5 cm before its connector.
-   - **Pusher:** its motor wires and the two limit-switch cables run along the right edge of the deck. Tie them down every 8 cm so that nothing can reach the lead screw or lie in the carriages' path.
-6. **Ferrules:** every stranded wire in a screw terminal (HAT, BTS7960, buck) must have a crimped ferrule. Tug each wire: none may come out.
-7. **Service loop:** leave ~10 cm of slack on the wires between the bottom plate and the top deck, so the deck can be lifted off without unplugging anything.
-8. Take a clear photo from above for the report. Update the wire lists if anything changed.
+5. **Strain relief:** every cable that goes to a moving or removable part (the motors, the top deck, **the bed**) gets a zip tie 3–5 cm before its connector. The bed bundle is tied at the hinge zip tie on the tilting plate.
+6. **Ferrules:** every stranded wire in a screw terminal must have a crimped ferrule. Tug each wire: none may come out.
+7. **Service loop:** leave ~10 cm of slack on the wires between the bottom plate and the top deck.
+8. Tip the bed to 45° (`bed 45`): no wire may pull tight. `bed 0`, `bed off`.
+9. Take a clear photo from above for the report.
 
-### 10.2 Covers (task 3.2.2)
+### 10.2 Covers
 
-- The simplest cover is 2–3 mm acrylic or PVC-foam side panels, 400 × 100 mm, one per side (plus front/rear pieces if you want). Hold them against the outside of the rods with small zip ties through 4 mm holes, or use VHB tape on the plate edges.
-- Leave openings for: the master switch access, USB/SD access to the Pi, the camera's view, and airflow at the Pi fan and motor drivers.
-- **Never** block the lidar's scan plane (the ring at the top of the lidar).
-- **Pusher:** fix the side panels against the rods, on the **inside**. Don't tape them to the plate edges: the carriages run along the outside of the deck edges. The pusher itself stays uncovered.
+- The simplest cover is 2–3 mm acrylic or PVC-foam side panels, 400 × 100 mm, one per side (plus front/rear pieces if you want). Hold them against the outside of the rods with small zip ties through 4 mm holes, or VHB tape on the plate edges.
+- Leave openings for: the master switch, the ESP32's USB socket (left side), the ultrasonic sensors and the line sensor (front), the side sensor (right), and airflow at the motor drivers and bucks.
+- **Never** cover the space under the bed's right edge or the servo horns.
 
-### 10.3 Start automatically at power-on
+### 10.3 Power-on routine
 
-Create a system service [PI]:
+The ESP32 starts its program by itself at power-on (no laptop needed):
 
-```bash
-sudo nano /etc/systemd/system/cargobot.service
-```
-
-Paste this (the user is `robot`, the project is in `/home/robot/cargo_robot`):
-
-```ini
-[Unit]
-Description=Cargo robot base software
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-User=robot
-Environment=ROS_DOMAIN_ID=42
-ExecStart=/bin/bash -c "source /opt/ros/jazzy/setup.bash && source /home/robot/cargo_robot/robot_ws/install/setup.bash && exec ros2 launch cargo_bot robot.launch.py"
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-```
-
-Then:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now cargobot.service
-systemctl status cargobot.service        # "active (running)"
-journalctl -u cargobot.service -f        # live log; Ctrl+C to leave
-```
-
-- **Pusher:** add ` pusher:=true` after `robot.launch.py` in the `ExecStart` line. The blade never moves by itself at start-up; if it isn't parked, the state is `stopped` until someone calls `/pusher/home`.
-- Stop it for manual work: `sudo systemctl stop cargobot`.
-- Disable it: `sudo systemctl disable cargobot`.
-
-> **Power-on routine:**
-> 1. Cargo bed **empty** (it tares at start).
+> **Power-on:**
+> 1. Cargo bed **empty** and flat (it zeroes the scale at start).
 > 2. E-stop released.
-> 3. Master switch ON.
-> 4. Wait ~60 s.
+> 3. Master switch ON. The green LED blinks slowly after about 1 s (IDLE).
+> 4. Put the robot on the track after the pickup mark, press the start button.
 >
-> **Power-off routine:** `sudo shutdown now` → wait until the green LED stops → master switch OFF.
+> **Power-off:** master switch OFF. Nothing to shut down first.
 
-### 10.4 Back up the SD card
+### 10.4 Back up the settings
 
-Shut down the Pi and put the SD card in the laptop.
+`list` in the Serial Monitor → copy into `firmware/settings_robot.txt` → commit. If an ESP32 dies on demo day, upload the firmware to the spare (2 minutes) and type the settings back in with `set` + `save` (5 minutes).
 
-- [WINDOWS] **Win32 Disk Imager** → *Read* → save `cargobot_2026-12-13.img`.
-- Write it onto the spare SD card and test that the robot boots from it. If the main card dies on demo day, swap cards: 2 minutes.
-
-**Done when:** tidy, labelled wiring (photo); covers on; the robot's software starts by itself; the spare SD card is tested.
+**Done when:** tidy, labelled wiring (photo); covers on; the robot works from power-on without the laptop; the spare ESP32 has the firmware.
 
 ---
 
 ## Week 11 — Report, video, presentation, demo (14 – 20 Dec)
 
-### 11.1 Report outline (task 3.3.2)
+### 11.1 Report outline
 
-1. **Introduction:** problem (indoor cargo delivery), objectives, scope.
-2. **Background:** differential drive, SLAM, AMCL, Nav2, load cells/Wheatstone bridge, HX711.
+1. **Introduction:** problem (indoor cargo delivery and sorting), objectives, scope (the robot; the conveyor and vision are the partner project).
+2. **Background:** differential drive, line following, PID, load cells/Wheatstone bridge, HX711, ultrasonic ranging, servos.
 3. **System design:**
    - requirements;
-   - block diagram (section 1);
-   - design changes from Phase I/PDF, with reasons (the table in section 1).
+   - block diagram (section 1, sheet E01);
+   - design changes from the Phase II plan, with reasons (the table in section 1).
 4. **Mechanical design:**
-   - CAD renders (`cad/output/views/*.png`), and the 8 engineering drawing sheets from `cad/autocad/CargoRobot_v3_drawings.pdf` as an appendix;
+   - CAD renders (`cad/output/views/*.png`), and the 10 drawing sheets from `cad/autocad/CargoRobot_v2_drawings.pdf` as an appendix;
    - material choices;
-   - load path (cargo → load cells → deck → threaded rods → bottom plate → wheels and casters);
-   - design choices that keep it simple to build: threaded rods, bought steel motor brackets, adjustable swivel casters, laser-cut slots instead of hand drilling;
-   - the pusher (sheet 07): how it works, why the blade never touches the weighed plate, and what it added to the design (`PUSHER_IMPACT.md`).
+   - load path (package → cargo plate → load cells → tilting plate → servos and rest posts → deck → threaded rods → bottom plate → wheels and casters);
+   - **the tilting bed:** why servos on the hinge (no linkages), the torque calculation (sheet 07: 4.7 N·m for 3 kg, 40 % of the servos' stall torque), the tipping tests (week 4);
+   - design choices that keep it simple to build: threaded rods, bought steel motor brackets, adjustable swivel casters, laser-cut holes.
 5. **Electrical design:**
-   - power diagram, wire lists P/S, GPIO map;
-   - E-stop design and divider calculation;
-   - power budget (T2.9/T2.10).
+   - power diagram (E02), wire lists P/S, the ESP32 pin map (E03, E04);
+   - E-stop design and the divider calculation;
+   - power budget (T2.9, T7).
 6. **Software design:**
-   - ROS graph: run `ros2 run rqt_graph rqt_graph` on the laptop and screenshot it;
-   - each node's job, the PID + odometry maths (section 5.1), the speed-scaling curve (section 7.2), Nav2 configuration (section 8.1).
-7. **Calibration:** encoders, PID, odometry (week 5 data), load cells.
+   - the firmware's structure (section 4.1) and the mission state machine (section 8.1);
+   - the PID + odometry maths (section 5.1), line following (section 6.2), the speed-by-weight curve (section 7.1), obstacle handling (section 7.2).
+7. **Calibration:** encoders, PID, odometry (week 5 data), load cells, servos.
 8. **Testing & results:** T1–T8 tables, graphs, discussion of every failure.
 9. **Conclusion & future work:**
-   - rear-facing sensor (so it can reverse);
-   - battery monitoring through an ADC;
-   - docking/charging;
+   - talk to the conveyor's ESP32 over Wi-Fi (ESP-NOW) so the conveyor knows a package is coming;
+   - tip either side (a second pair of servos, or a centre pivot);
+   - a docking check with the camera; charging contacts at the pickup;
    - a fleet of robots.
 10. **Appendices:** BOM with costs, full wiring tables, code (from GitHub), and this timeline with the actual dates.
 
 **Figures to collect:**
 
-- CAD renders; photos of each build stage;
+- CAD renders (flat and tipped); photos of each build stage;
 - wiring photo;
-- RViz map screenshot, mission path screenshot;
-- rqt_plot of the PID tuning;
+- the track with its station marks;
+- a speed-vs-time plot from the PID tuning;
 - speed-factor vs. weight plot;
+- a frame sequence of the bed tipping a package off;
 - test result charts.
 
-### 11.2 Video (task 3.3.1)
+### 11.2 Video
 
 Film in landscape, 1080p, good light, 2–3 minutes total. Shot list:
 
-1. Robot overview, 360° walk-around (10 s).
-2. Mapping time-lapse, with the RViz map growing (screen recording) (20 s).
-3. RViz goal click → robot drives there (20 s).
-4. **Full delivery mission** with cargo: loading at pickup, slower drive, unloading (with the pusher: the box sliding onto the conveyor), return (60 s).
-5. Overload: too much weight → robot refuses (10 s).
-6. Obstacle avoidance: a person steps in front (15 s).
-7. E-stop press (10 s).
-8. Line following + marker (20 s).
+1. Robot overview, 360° walk-around, then the bed tipping on the bench (15 s).
+2. Line following a full lap (20 s).
+3. **Full delivery mission:** loading at the pickup, slower drive, stop at the drop-off, bed tips, package slides onto the conveyor, return (60 s).
+4. Overload: too much weight → robot refuses (10 s).
+5. Obstacle: a person steps in front, the robot stops and beeps, then drives on (15 s).
+6. E-stop press (10 s).
+7. Slow motion of the package sliding off (10 s).
 
-### 11.3 Slides (task 3.3.3)
+### 11.3 Slides
 
 About 12–15 slides, 15 minutes:
 
 1. Title
 2. Problem & objectives
-3. System overview (block diagram)
+3. System overview (block diagram, robot + conveyor + laptop)
 4. Mechanical design (renders + photo)
-5. Electrical design (power diagram, safety chain)
-6. Software architecture (ROS graph)
-7. Payload sensing
-8. Mapping & navigation
-9. Vision
+5. The tilting bed
+6. Electrical design (power diagram, safety chain)
+7. Firmware (structure, mission states)
+8. Payload sensing and speed by weight
+9. Line following and station marks
 10. Test results (the results table)
 11. Video
 12. Challenges & lessons learned
@@ -1959,13 +1299,11 @@ About 12–15 slides, 15 minutes:
 ### 11.4 Demo-day checklist
 
 - [ ] Two batteries charged (a full one in the robot, a spare in the LiPo bag), plus the charger.
-- [ ] Spare fuses, zip ties, screwdrivers, hex keys, multimeter, tape.
-- [ ] Spare SD card (tested).
-- [ ] Your own Wi-Fi hotspot/router (don't rely on the venue Wi-Fi).
-- [ ] Laptop charged; `rviz2`, `rqt_image_view` and the rviz config tested at home.
-- [ ] Map of the demo room. If the room is different, arrive 1 hour early and make a new map (week 6: ~15 min) plus `stations.yaml` (8.4).
-- [ ] Tape line and markers laid; stations taped.
-- [ ] **Pusher:** conveyor and backstop in place and on the map; dropoff station recorded 30 cm in front of it; one `--conveyor` run done in the room.
+- [ ] Spare fuses, zip ties, screwdrivers, hex keys, multimeter, black tape.
+- [ ] Spare ESP32 with the firmware, and the settings file printed.
+- [ ] Laptop charged, Arduino IDE and the USB cable tested at home.
+- [ ] Track and station marks laid (arrive 1 hour early if the room is new: 20 min of tape plus a few test laps).
+- [ ] Test packages (0.5, 1, 3 kg boxes).
 - [ ] The video on the laptop **and** a USB stick (plan B if the live demo fails).
 - [ ] Two full rehearsals done in the week before, timed.
 
@@ -1975,74 +1313,49 @@ About 12–15 slides, 15 minutes:
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| `RuntimeError: Raspberry Pi GPIO chip not found` | User not in the `gpio` group / udev rule missing | Redo the GPIO part of section 3.3, then log out and in (or reboot) |
-| `can not open gpiochip` / `GPIO busy` | Another program (e.g. the auto-start service) is using the pins | `sudo systemctl stop cargobot`; close other test scripts |
-| Motors don't move, no errors | E-stop pressed / divider missing (`motor power: OFF`), or EN not on GPIO5, or driver VCC not powered | Check `ros2 topic echo /estop`; measure 3.3 V at the driver VCC; if the divider isn't fitted, set `use_estop_sense: false` |
-| One wheel spins the wrong way | Motor wires reversed | `invert_*_motor: true` in `robot.yaml` |
-| A drive wheel slips / spins without moving the robot, or the robot rocks | A caster is set too low and lifts the drive wheel | Redo the caster setting (section 1.5) on a flat floor |
-| Robot spins in circles when told to go straight | One encoder is inverted, or its motor is | Redo `tools/test_motors.py` until there are no warnings |
-| Wheel speed jumps / "missed edges" rising | Noise on the encoder wires | Twist the motor power wires, keep the encoder wires away from them, shorten them; check the encoder is on 3.3 V and GND is good |
-| Robot jerks / oscillates while driving | PID gains too high | Lower `kp` and `ki` (section 5.3) |
-| Weight reads negative | Cell wiring or `signs` | Redo `test_hx711.py --calibrate` |
-| Weight jumps by huge amounts sometimes | HX711 timing glitch (Linux paused the program) | The median filter removes most of it. Increase `median_window` to 7. Check no program is using 100 % CPU (`htop`). |
-| `load-cell read failed (not ready: [2])` | That HX711 has no power or its DT wire is loose | Check board 2's VCC, GND and DT (0 = FL, 1 = FR, 2 = RL, 3 = RR) |
-| `/dev/rplidar` missing | udev rule / USB | `ls /dev/ttyUSB*`; re-plug; check `lsusb` shows "CP210x" |
-| Lidar spins but no `/scan` | Wrong baud rate | A1: 115200. An A2M12/A3 needs 256000: change `serial_baudrate` in `robot.launch.py` |
-| Laptop can't see topics | Different Wi-Fi / ROS_DOMAIN_ID / network blocks multicast | Same hotspot for both; `echo $ROS_DOMAIN_ID` must be 42 on both; try `ros2 multicast receive` on one machine and `ros2 multicast send` on the other |
-| RViz shows no laser | QoS mismatch | LaserScan → Reliability = Best Effort |
-| RViz: "No transform from laser to odom" | robot.launch.py not running, or base_driver crashed | Check the terminal for errors |
-| SLAM map smeared / doubled walls | Odometry calibration off, driving too fast | Redo 5.4; map at ≤ 0.2 m/s; close loops |
-| AMCL loses position | Area changed since mapping, or a bad initial pose | Give a new 2D Pose Estimate; re-map if furniture moved |
-| Nav2: "Robot is in collision" | Laser hits the robot/cargo, or the footprint is too big | Check `/scan_filtered` has no dots inside the robot; enlarge the filter box in `laser_filter.yaml` |
-| Nav2 plans but the robot doesn't move | `/cmd_vel` → limiter → base chain broken, or overload | `ros2 topic echo /cmd_vel_safe`; `ros2 topic echo /speed_factor` (0 = overload) |
-| Robot stops ~0.5 s after starting | Commands not arriving continuously | Normal for teleop when no key is held; for Nav2 check that the Wi-Fi isn't the bottleneck (run Nav2 on the Pi, as in this guide) |
-| Pi reboots when the motors start | Battery sag / buck too weak / shared ground problem | Charge the battery; buck at 5.2 V; thicker/shorter 5 V wires; check the GND bus connections |
-| Pi gets hot / slows down | No cooler, or a heavy load | Fit the active cooler; check `vcgencmd measure_temp` if available, or `cat /sys/class/thermal/thermal_zone0/temp` |
-| Camera not found | Wrong device number | `v4l2-ctl --list-devices`, set `device:` in `robot.yaml` |
-| `cannot use the pusher pins: 'GPIO busy'` | SPI is still enabled (it owns GPIO 9 and 10), or another program has the pins | Section 3.3: `#dtparam=spi=on`, then reboot; `sudo systemctl stop cargobot` |
-| Pusher fault: "did not leave the HOME switch" | Motor wired backwards, no motor power (E-stop), or the blade is jammed | `tools/test_pusher.py --jog out`; set `invert_motor: true`; check P17–P19 |
-| Pusher fault: "both limit switches read 'pressed'" | A switch wire is off, or on NO instead of NC | `tools/test_pusher.py`, press each switch; C → LOGIC-GND, NC → its pin |
-| Pusher fault: "did not reach the END switch in time" | Rods binding, coupler or bearing block slipping on the lead screw, or the package is stuck against something | Master switch off, turn the coupler by hand; loosen and realign the rod holders; tighten the coupler and the bearing block's set screws |
-| The blade tilts, or one end lags behind | The push is far off-centre, or a carriage binds | Centre the package; realign the rod holders; check all 4 blade bolts are tight |
-| The blade runs but the package stays, or the robot is pushed away from the conveyor | A heavy package on a stopped belt; the anti-slip mat is still on the plate | Run the belt while unloading; bare plate |
-| The weight reading changes when the empty blade moves | The blade or one of its wires touches the cargo plate | Washers between the blade and both carriage arms; re-route the wire |
-| Mission: "backed up … without touching the conveyor" | The dropoff station is too far from the conveyor, or Nav2 stopped short of it | Re-record the station; tighten the goal tolerance (8.6); raise `--dock-distance` |
-| Mission: "the robot did not move when backing up" | E-stop pressed, overload, or the robot stopped already touching the conveyor | Release the E-stop; record the dropoff station further from the conveyor |
+| Upload stops at "Connecting...." | The ESP32 isn't entering download mode | Hold the **BOOT** button until the upload starts. Unplug the rear-servo signal wire (GPIO 12) and try again. |
+| No COM port appears | USB driver or a charge-only cable | Install the CP210x or CH340 driver (section 0.5); try another USB cable |
+| The ESP32 resets in a loop, `flash read err` | GPIO 12 is pulled HIGH at start-up | Only the rear servo's signal may be on GPIO 12; check for a short to 3.3 V |
+| `!! MCP23017 not found` | I2C wiring | SDA = GPIO 21, SCL = GPIO 22, the 4.7 kΩ pull-ups, MCP VDD on 3.3 V, A0–A2 to GND |
+| Motors don't move, no errors | E-stop pressed, or EN not reaching the drivers, or driver VCC not powered | `status` shows the motor-bus volts; check S5 (R_EN/L_EN → MCP GPB0) and 3.3 V at the driver VCC |
+| One wheel spins the wrong way | Motor wires reversed | `set inv_l_motor 1` (or right), `save` |
+| A drive wheel slips / the robot rocks | A caster is set too low and lifts the drive wheel | Redo the caster setting (section 1.5) on a flat floor |
+| Robot spins in circles when told to go straight | One encoder is inverted, or its motor is | Redo `motortest` until there are no warnings |
+| Encoder count doesn't change | No pull-up, or wrong supply | 10 kΩ from each encoder line to 3.3 V; encoder VCC on 3.3 V |
+| Weight reads negative | Cell wiring or signs | Redo `cal` |
+| Weight jumps by huge amounts sometimes | A loose HX711 wire | Check every DT and the shared SCK; the median filter hides single glitches |
+| `!! HX711 boards not answering` | One board has no power or a loose DT wire | `hx` shows nothing at all → check the shared VCC/GND/SCK first |
+| The bed shakes or a servo buzzes | Pulse beyond the end stop, or the servo supply sags | Recalibrate (section 4.2); measure 7.4 V during a tip; the servo buck must be the 10 A one |
+| A servo twitches at power-on | Normal for some servos for a moment | If the bed moves more than a few degrees, check the signal wire isn't swapped with another |
+| The bed tips but the box stays on | Too little angle, a sticky plate, or a box with a rubbery base | Raise `tip_deg` (max 45), clean the plate, use cardboard boxes |
+| Robot snakes along the line | `k_line` too high | Lower `k_line`, raise `kd_line` a little |
+| Line lost in curves | Too fast or `k_line` too low | Lower `follow_speed`, raise `k_line` |
+| Stops at random places | It sees station marks in curves, or shadows | Raise `mark_min`; adjust the sensor pots; avoid strong sun patches |
+| "obstacle" with nothing in front | An ultrasonic sensor sees the floor or the robot | Check the centre sensor points straight ahead and level; `sonar` shows which one |
+| "nothing beside the robot's right side" at the drop-off | The side sensor doesn't see the conveyor | `tof` at the drop-off; move the mark, or the sensor, or `set tof_check 0` |
+| The robot stops at the right place but the box misses the belt | `stop_mm` or the mark's position | Move the mark, or change `stop_mm` |
 
 ---
 
 ## Appendix A — Skills crash course
 
-### A.1 Terminal basics (Linux)
+### A.1 The Arduino IDE and the Serial Monitor
 
-| Command | Does |
+| Action | How |
 |---|---|
-| `pwd` | show the current folder |
-| `ls -l` | list files |
-| `cd ~/cargo_robot` | go to a folder (`~` = home, `..` = up one) |
-| `nano file.txt` | edit a file (Ctrl+O save, Enter, Ctrl+X exit) |
-| `cat file.txt` | print a file |
-| `Ctrl+C` | stop the running program |
-| `↑` (up arrow) | repeat the previous command |
-| `Tab` | auto-complete names (press it a lot!) |
-| `sudo <cmd>` | run as administrator (asks your password) |
-| `htop` | see CPU/RAM use (q to quit) |
+| Open the firmware | *File → Open* → `firmware/cargo_robot/cargo_robot.ino` |
+| Compile only (check for errors) | the **✓** button |
+| Upload | the **→** button (hold BOOT if it hangs at "Connecting....") |
+| Serial Monitor | *Tools → Serial Monitor*, 115200 baud, **Newline** |
+| Restart the ESP32 | the **EN** button on the board |
+| Find the right port | unplug the ESP32, look at *Tools → Port*, plug it in again: the new entry is it |
 
-**Several terminals at once:** open more SSH windows, or use `tmux`:
+### A.2 Settings
 
-- `sudo apt install tmux`, then run `tmux`.
-- Ctrl+B then C: new window.
-- Ctrl+B then 0/1/2: switch between windows.
-- The programs keep running if Wi-Fi drops. Reattach with `tmux attach`.
-
-### A.2 SSH
-
-- Log in: `ssh robot@cargobot.local`
-- Copy a file to the Pi: `scp file.txt robot@cargobot.local:~/`
-- Copy a file from the Pi: `scp robot@cargobot.local:~/maps/lab.pgm .`
-- **Log in without typing the password every time:**
-  1. On the laptop, run `ssh-keygen` (press Enter at every question).
-  2. Then run `ssh-copy-id robot@cargobot.local`. On Windows there's no `ssh-copy-id`: append the contents of `C:\Users\YOU\.ssh\id_ed25519.pub` to `~/.ssh/authorized_keys` on the Pi.
+- `list`: every setting with its value.
+- `set kp 0.03`: change one; it works at once.
+- `save`: keep everything in flash (survives power-off and firmware uploads).
+- `defaults`: back to the values in `settings.h`.
 
 ### A.3 Git in 5 commands
 
@@ -2054,7 +1367,7 @@ git commit -m "short message"     # save a snapshot
 git push                          # upload
 ```
 
-**If `git pull` reports a conflict:** open the file, keep the right lines (delete the `<<<<`, `====`, `>>>>` markers), then `git add -A && git commit`.
+**If `git pull` reports a conflict:** open the file, keep the right lines (delete the `<<<<`, `====`, `>>>>` markers), then `git add -A && git commit`. GitHub Desktop does the same with buttons.
 
 ### A.4 Soldering
 
@@ -2093,2581 +1406,1647 @@ After changing a number in `cad/robot_cad.py` [WINDOWS PowerShell in `C:\Univers
 
 ```powershell
 .venv\Scripts\python robot_cad.py        # STEP, STL, DXF, SVG, BOM -> output/
-.venv\Scripts\python check_render.py     # collision check (pusher parked, half-way, fully out), wheels-on-the-floor check, PNG renders
-.venv\Scripts\python make_autocad.py     # AutoCAD file (3D model + 8 drawing sheets) + drawings PDF
-.venv\Scripts\python make_schematics.py  # electrical schematics (3 sheets) + PDF; reads the pins from pins.py
-.venv\Scripts\python export_ros_mesh.py  # robot body mesh for RViz / Gazebo
+.venv\Scripts\python check_render.py     # collision check (bed flat and tipped), wheels on the floor, torque, PNG renders
+.venv\Scripts\python make_autocad.py     # AutoCAD file (3D model + 10 drawing sheets) + drawings PDF
+.venv\Scripts\python make_schematics.py  # electrical schematics (pins from firmware/cargo_robot/config.h) + PDF
+.venv\Scripts\python make_docs.py        # assembly PDF + connections PDF; updates the wire tables and Appendix B here
 ```
 
-The untouched v2 design can be regenerated the same way from `backup_v2\cad` (see `backup_v2/README.md`).
+The CAD environment needs CadQuery, ezdxf and matplotlib, plus `reportlab` and `pypdf` for `make_docs.py` (`.venv\Scripts\python -m pip install reportlab pypdf`). Wires live in `cad/wiring.py`: change a wire there, not in this guide.
 
 **AutoCAD:**
 
-1. Open `cad/autocad/CargoRobot_v3.dxf` (File → Open → *Files of type: DXF*).
+1. Open `cad/autocad/CargoRobot_v2.dxf` (File → Open → *Files of type: DXF*).
 2. Save it as a `.dwg`.
 3. The Model tab has the 3D robot. Set the visual style to *Shaded with Edges* and orbit with Shift + middle mouse button.
-4. The layout tabs 01–08 are the A3 drawing sheets, ready to plot.
+4. The layout tabs 01–10 are the A3 drawing sheets, ready to plot.
 
-**Other CAD programs:** open `output/robot_assembly.step` in Fusion 360, SolidWorks, Onshape or FreeCAD.
+**Other CAD programs:** open `output/robot_assembly.step` (or `robot_assembly_tipped.step`) in Fusion 360, SolidWorks, Onshape or FreeCAD.
 
 ---
 
+<!-- appendix B: generated by cad/make_docs.py -->
 ## Appendix B — Full source code
 
 Every file below is already in the project folder; this is a copy for reading, printing and the report. Paths are relative to the project folder.
 
+### `firmware/cargo_robot/config.h`
 
-### `robot_ws/src/cargo_bot/cargo_bot/pins.py`
+```cpp
+// Cargo robot - ESP32 wiring and fixed numbers.
+//
+// This file is the single source of truth for the wiring: the wire list in BUILD_GUIDE.md (week 3) and the
+// schematics (cad/make_schematics.py reads this file) follow it. If you move a wire, change it here too.
+// Numbers are the GPIO numbers printed on the ESP32 DevKit / screw-terminal breakout ("GPIO25" or just "25").
+#pragma once
 
-```python
-"""Raspberry Pi wiring - BCM GPIO numbers (physical header pin in the comment).
+// ---------------- ESP32 pins ----------------
+// Drive: 2 x BTS7960 (IBT-2). RPWM = forward, LPWM = reverse. R_EN + L_EN come from the MCP23017 (XP_MOTOR_EN).
+constexpr int PIN_L_RPWM = 25;
+constexpr int PIN_L_LPWM = 26;
+constexpr int PIN_R_RPWM = 27;
+constexpr int PIN_R_LPWM = 14;
+// Wheel encoders (JGB37-520 Hall, powered from 3.3 V). Input-only pins: each needs a 10k pull-up to 3.3 V.
+constexpr int PIN_ENC_L_A = 34;
+constexpr int PIN_ENC_L_B = 35;
+constexpr int PIN_ENC_R_A = 36;          // marked "VP" on most boards
+constexpr int PIN_ENC_R_B = 39;          // marked "VN"
+// 4 x HX711 load-cell amplifiers: one shared clock, one data line each
+constexpr int PIN_HX_SCK = 5;
+constexpr int PIN_HX_DT[4] = {16, 17, 18, 19};   // front-left, front-right, rear-left, rear-right
+// 3 x HC-SR04 ultrasonic: one shared TRIG; each ECHO through a 1k / 2k divider (5 V -> 3.3 V)
+constexpr int PIN_SONAR_TRIG = 4;
+constexpr int PIN_ECHO[3] = {13, 23, 32};        // left, centre, right
+// Bed servos: signal wire only (their power comes from the 7.4 V servo buck converter)
+constexpr int PIN_SERVO_FRONT = 2;
+constexpr int PIN_SERVO_REAR = 12;       // GPIO12 must be LOW while the ESP32 starts: connect nothing else to it
+// I2C: MCP23017 I/O expander (0x20) + VL53L0X side distance sensor (0x29), 4.7k pull-ups to 3.3 V
+constexpr int PIN_SDA = 21;
+constexpr int PIN_SCL = 22;
+// Motor 12 V (after the E-stop) through a 10k / 2.2k divider: battery voltage, about 0 V = E-stop pressed
+constexpr int PIN_BUS_SENSE = 33;
 
-This is the single source of truth for the wiring table in BUILD_GUIDE.md.
-If you move a wire, change it here (or override the matching ROS parameter).
-"""
+// ---------------- MCP23017 pins (0-7 = GPA0-GPA7, 8-15 = GPB0-GPB7) ----------------
+constexpr int MCP_ADDR = 0x20;           // A0, A1, A2 tied to GND
+constexpr int XP_LINE_FIRST = 0;         // GPA0..GPA7 <- line sensors 1 (leftmost) .. 8 (rightmost)
+constexpr int XP_MOTOR_EN = 8;           // GPB0 -> R_EN + L_EN of both BTS7960 (10k pull-down: off at power-up)
+constexpr int XP_BUZZER = 9;             // GPB1 -> active buzzer module
+constexpr int XP_LED_GREEN = 10;         // GPB2 -> green LED + 330 ohm
+constexpr int XP_LED_RED = 11;           // GPB3 -> red LED + 330 ohm
+constexpr int XP_BUTTON = 12;            // GPB4 <- start button to GND (internal pull-up)
 
-PINS = {
-    # BTS7960 motor drivers (both drivers' R_EN + L_EN tied together)
-    "enable": 5,            # pin 29
-    "left_fwd": 12,         # pin 32 -> left  BTS7960 RPWM
-    "left_rev": 13,         # pin 33 -> left  BTS7960 LPWM
-    "right_fwd": 18,        # pin 12 -> right BTS7960 RPWM
-    "right_rev": 19,        # pin 35 -> right BTS7960 LPWM
-    # Wheel encoders (powered from 3.3 V!)
-    "left_enc_a": 17,       # pin 11
-    "left_enc_b": 27,       # pin 13
-    "right_enc_a": 22,      # pin 15
-    "right_enc_b": 23,      # pin 16
-    # HX711 load-cell amplifiers: one shared clock, one data line each
-    "hx711_sck": 24,        # pin 18 -> SCK of all four boards
-    "hx711_dout": [25, 16, 20, 21],   # pins 22, 36, 38, 40 -> front-left, front-right, rear-left, rear-right
-    # Motor-power sense (10k / 3.3k divider after the E-stop): 1 = motors powered, 0 = E-stop pressed
-    "estop_sense": 26,      # pin 37
-    # Pusher (design v3): a third BTS7960 (its R_EN + L_EN are wired to 3.3 V, so it is always enabled)
-    "pusher_out": 10,       # pin 19 -> pusher BTS7960 RPWM (blade moves to the rear, pushing the cargo off)
-    "pusher_in": 9,         # pin 21 -> pusher BTS7960 LPWM (blade moves back to the front)
-    # Pusher limit switches: C -> GND, NC -> pin (pull-up in software). 0 = not pressed, 1 = pressed OR wire broken
-    "pusher_home": 4,       # pin 7  <- HOME switch (blade parked at the front)
-    "pusher_end": 6,        # pin 31 <- END switch (blade fully out at the rear)
+// ---------------- fixed numbers ----------------
+constexpr float BUS_DIVIDER = (10.0f + 2.2f) / 2.2f;   // motor-bus volts per volt at PIN_BUS_SENSE
+constexpr float BUS_ON_V = 7.0f;         // below this the motors have no power: E-stop pressed or battery out
+constexpr int CONTROL_HZ = 100;          // wheel speed control and line following
+constexpr int DRIVE_PWM_HZ = 20000;      // BTS7960 PWM, above hearing
+constexpr int SONAR_PERIOD_MS = 60;      // one ping of all 3 ultrasonic sensors
+constexpr float SONAR_MAX_CM = 400.0f;   // reported when nothing echoes back
+```
+
+### `firmware/cargo_robot/settings.h`
+
+```cpp
+// Tunable numbers, kept in the ESP32's flash so they survive a power cycle.
+//
+// Change them in the Serial Monitor:   set kp 0.03   (takes effect at once)   then   save   (keeps it).
+// "list" prints them all, "defaults" goes back to the values below. Switches use 1 = yes, 0 = no.
+#pragma once
+#include <Arduino.h>
+
+struct Settings {
+  // ---- drive (week 3 bench tests, week 5) ----
+  float wheel_radius = 0.05f;     // m - fine-tune with the 3 m straight-line test
+  float wheel_sep = 0.33f;        // m, middle of the left tyre to middle of the right tyre - 5-turn spin test
+  float ticks_per_rev = 2464;     // encoder counts per wheel turn - measure with "enc"
+  float max_wheel = 12.0f;        // rad/s (12 x 0.05 m = 0.6 m/s)
+  float kf = 0.05f;               // duty per rad/s - from "maxtest"
+  float kp = 0.02f;
+  float ki = 0.10f;
+  float min_duty = 0.10f;         // duty that just starts a wheel - from "mintest"
+  float accel = 0.4f;             // m/s^2: gentle, so the package does not slide
+  float inv_l_motor = 0, inv_r_motor = 0, inv_l_enc = 0, inv_r_enc = 0;
+  // ---- payload (week 3 calibration, week 7) ----
+  float scale = 22000;            // raw counts (sum of the 4 cells) per kg - from "cal"
+  float sign_fl = 1, sign_fr = 1, sign_rl = 1, sign_rr = 1;   // -1 for a cell wired "upside down"
+  float max_kg = 3.0f;            // the speed has dropped to min_factor at this load
+  float min_factor = 0.5f;
+  float overload = 1.2f;          // refuse to move above max_kg x overload
+  float load_kg = 0.15f;          // this much on the bed counts as "a package is on"
+  float hold_s = 2.0f;            // ... for this long
+  // ---- line following (week 6) ----
+  float line_black = 1;           // 1 = a sensor output is HIGH over black tape, 0 = LOW over black
+  float follow_speed = 0.20f;     // m/s, empty bed
+  float k_line = 2.5f;            // rad/s of turning per unit of line error (-1..+1)
+  float kd_line = 0.15f;
+  float lost_s = 0.5f;            // stop if the line is gone this long
+  float mark_min = 6;             // this many sensors on black at once = a station mark
+  float stop_mm = 214;            // drive on this far after a mark: sensor bar -> middle of the bed
+  // ---- obstacles (week 7) ----
+  float stop_cm = 25;             // centre sensor: stop below this
+  float slow_cm = 60;             // all sensors: slow down below this
+  float clear_s = 1.0f;           // the way must be clear this long before driving on
+  // ---- tilting bed (week 4, week 8) ----
+  float tip_deg = 40;             // how far the bed tips to drop the package
+  float tip_speed = 20;           // deg/s
+  float f_flat_us = 1500, f_tip_us = 1944;   // front servo pulse, bed flat / bed at tip_deg - set with "servo"
+  float r_flat_us = 1500, r_tip_us = 1056;   // rear servo: a mirror image, so it turns the other way
+  float tip_hold_s = 2;           // seconds the bed stays tipped before it comes down
+  float tof_check = 1;            // 1 = only tip when something (the belt) is beside the robot's right side
+  float tof_min_mm = 20, tof_max_mm = 150;
+};
+
+extern Settings cfg;
+
+void settingsLoad();
+bool settingsSave();
+void settingsDefaults();
+bool settingsSet(const char *name, float value);
+bool settingsGet(const char *name, float &value);
+void settingsList(Print &out);
+```
+
+### `firmware/cargo_robot/settings.cpp`
+
+```cpp
+#include "settings.h"
+
+#include <Preferences.h>
+
+Settings cfg;
+
+namespace {
+
+struct Entry {
+  const char *name;   // also the key in flash (max 15 characters)
+  float *value;
+};
+
+Entry entries[] = {
+    {"wheel_radius", &cfg.wheel_radius}, {"wheel_sep", &cfg.wheel_sep}, {"ticks_per_rev", &cfg.ticks_per_rev},
+    {"max_wheel", &cfg.max_wheel},       {"kf", &cfg.kf},               {"kp", &cfg.kp},
+    {"ki", &cfg.ki},                     {"min_duty", &cfg.min_duty},   {"accel", &cfg.accel},
+    {"inv_l_motor", &cfg.inv_l_motor},   {"inv_r_motor", &cfg.inv_r_motor},
+    {"inv_l_enc", &cfg.inv_l_enc},       {"inv_r_enc", &cfg.inv_r_enc},
+    {"scale", &cfg.scale},               {"sign_fl", &cfg.sign_fl},     {"sign_fr", &cfg.sign_fr},
+    {"sign_rl", &cfg.sign_rl},           {"sign_rr", &cfg.sign_rr},     {"max_kg", &cfg.max_kg},
+    {"min_factor", &cfg.min_factor},     {"overload", &cfg.overload},   {"load_kg", &cfg.load_kg},
+    {"hold_s", &cfg.hold_s},
+    {"line_black", &cfg.line_black},     {"follow_speed", &cfg.follow_speed}, {"k_line", &cfg.k_line},
+    {"kd_line", &cfg.kd_line},           {"lost_s", &cfg.lost_s},       {"mark_min", &cfg.mark_min},
+    {"stop_mm", &cfg.stop_mm},
+    {"stop_cm", &cfg.stop_cm},           {"slow_cm", &cfg.slow_cm},     {"clear_s", &cfg.clear_s},
+    {"tip_deg", &cfg.tip_deg},           {"tip_speed", &cfg.tip_speed},
+    {"f_flat_us", &cfg.f_flat_us},       {"f_tip_us", &cfg.f_tip_us},
+    {"r_flat_us", &cfg.r_flat_us},       {"r_tip_us", &cfg.r_tip_us},
+    {"tip_hold_s", &cfg.tip_hold_s},     {"tof_check", &cfg.tof_check},
+    {"tof_min_mm", &cfg.tof_min_mm},     {"tof_max_mm", &cfg.tof_max_mm},
+};
+
+Entry *find(const char *name) {
+  for (Entry &e : entries)
+    if (strcmp(e.name, name) == 0) return &e;
+  return nullptr;
 }
 
-CORNERS = ["front_left", "front_right", "rear_left", "rear_right"]
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/hw.py`
-
-```python
-"""Raspberry Pi hardware drivers built on lgpio (works on Pi 4 and Pi 5, Ubuntu 24.04).
-
-    Motor              one BTS7960 channel (RPWM = forward, LPWM = reverse), software PWM
-    DigitalOut/In      plain GPIO output / input
-    QuadratureEncoder  counts A/B encoder edges in the background (x4 decoding)
-    HX711Array         several HX711 boards on one shared clock line
-
-All pin numbers are BCM GPIO numbers, not physical header pin numbers.
-"""
-import glob
-import os
-import time
-
-# lgpio writes small notification files into its working directory; make sure it is writable.
-os.environ.setdefault("LG_WD", "/tmp")
-import lgpio  # noqa: E402
-
-_chip = None
-
-
-def open_chip():
-    """Open the gpiochip that drives the 40-pin header (auto-detects Pi 4 / Pi 5)."""
-    global _chip
-    if _chip is not None:
-        return _chip
-    numbers = sorted(int(p.rsplit("gpiochip", 1)[1]) for p in glob.glob("/dev/gpiochip[0-9]*"))
-    for n in numbers:
-        try:
-            h = lgpio.gpiochip_open(n)
-        except Exception:
-            continue
-        label = lgpio.gpio_get_chip_info(h)[3]
-        if isinstance(label, bytes):
-            label = label.decode()
-        if label.startswith(("pinctrl-rp1", "pinctrl-bcm2711", "pinctrl-bcm2835")):
-            _chip = h
-            return h
-        lgpio.gpiochip_close(h)
-    raise RuntimeError("Raspberry Pi GPIO chip not found - is this a Pi, and is your user in the 'gpio' group?")
-
-
-def close_chip():
-    global _chip
-    if _chip is not None:
-        lgpio.gpiochip_close(_chip)
-        _chip = None
-
-
-class DigitalOut:
-    def __init__(self, h, pin, level=0):
-        self.h, self.pin = h, pin
-        lgpio.gpio_claim_output(h, pin, level)
-
-    def write(self, level):
-        lgpio.gpio_write(self.h, self.pin, 1 if level else 0)
-
-    def close(self):
-        lgpio.gpio_write(self.h, self.pin, 0)
-        lgpio.gpio_free(self.h, self.pin)
-
-
-class DigitalIn:
-    def __init__(self, h, pin, pull_down=True):
-        self.h, self.pin = h, pin
-        lgpio.gpio_claim_input(h, pin, lgpio.SET_PULL_DOWN if pull_down else lgpio.SET_PULL_UP)
-
-    def read(self):
-        return lgpio.gpio_read(self.h, self.pin)
-
-    def close(self):
-        lgpio.gpio_free(self.h, self.pin)
-
-
-class Motor:
-    """One BTS7960 (IBT-2) motor channel. set(+0.5) = 50 % forward, set(-1) = full reverse, set(0) = brake."""
-
-    def __init__(self, h, pin_fwd, pin_rev, freq=1000, invert=False):
-        self.h, self.fwd, self.rev, self.freq, self.invert = h, pin_fwd, pin_rev, freq, invert
-        for p in (pin_fwd, pin_rev):
-            lgpio.gpio_claim_output(h, p, 0)
-        self._last = None
-        self.set(0.0)
-
-    def set(self, duty):
-        duty = max(-1.0, min(1.0, float(duty)))
-        if self.invert:
-            duty = -duty
-        pct = round(abs(duty) * 100.0, 1)
-        state = (pct, duty >= 0)
-        if state == self._last:
-            return                      # nothing changed - don't restart the PWM
-        self._last = state
-        on, off = (self.fwd, self.rev) if duty >= 0 else (self.rev, self.fwd)
-        lgpio.tx_pwm(self.h, off, self.freq, 0)
-        lgpio.tx_pwm(self.h, on, self.freq, pct)
-
-    def close(self):
-        for p in (self.fwd, self.rev):
-            lgpio.tx_pwm(self.h, p, 0, 0)
-            lgpio.gpio_write(self.h, p, 0)
-            lgpio.gpio_free(self.h, p)
-
-
-class QuadratureEncoder:
-    """Counts every edge of channels A and B (x4 decoding). Read .count at any time."""
-
-    # index = (old_state << 2) | new_state, where state = (A << 1) | B
-    _TABLE = (0, -1, 1, 0, 1, 0, 0, -1, -1, 0, 0, 1, 0, 1, -1, 0)
-
-    def __init__(self, h, pin_a, pin_b, invert=False):
-        self.h, self.pin_a, self.pin_b = h, pin_a, pin_b
-        self.sign = -1 if invert else 1
-        self.count = 0
-        self.errors = 0                 # impossible transitions = missed edges (should stay ~0)
-        for p in (pin_a, pin_b):
-            lgpio.gpio_claim_alert(h, p, lgpio.BOTH_EDGES, lgpio.SET_PULL_UP)
-        self._a = lgpio.gpio_read(h, pin_a)
-        self._b = lgpio.gpio_read(h, pin_b)
-        self._state = (self._a << 1) | self._b
-        self._cbs = [lgpio.callback(h, p, lgpio.BOTH_EDGES, self._edge) for p in (pin_a, pin_b)]
-
-    def _edge(self, chip, gpio, level, tick):
-        if level > 1:                   # 2 = watchdog timeout, not an edge
-            return
-        if gpio == self.pin_a:
-            self._a = level
-        else:
-            self._b = level
-        new = (self._a << 1) | self._b
-        step = self._TABLE[(self._state << 2) | new]
-        if step == 0 and new != self._state:
-            self.errors += 1
-        self._state = new
-        self.count += step * self.sign
-
-    def close(self):
-        for cb in self._cbs:
-            cb.cancel()
-        for p in (self.pin_a, self.pin_b):
-            lgpio.gpio_free(self.h, p)
-
-
-class HX711Array:
-    """Several HX711 boards sharing one SCK line, each with its own DOUT line (channel A, gain 128)."""
-
-    def __init__(self, h, pin_sck, pins_dout):
-        self.h, self.sck, self.douts = h, pin_sck, list(pins_dout)
-        lgpio.gpio_claim_output(h, pin_sck, 0)       # SCK low = chips powered up
-        for d in self.douts:
-            lgpio.gpio_claim_input(h, d, lgpio.SET_PULL_UP)
-
-    def not_ready(self):
-        """Indexes of boards that have no new reading yet (DOUT high)."""
-        return [i for i, d in enumerate(self.douts) if lgpio.gpio_read(self.h, d)]
-
-    def read_raw(self, timeout=0.5):
-        """Signed 24-bit reading of every board, or None if they were not all ready in time."""
-        t_end = time.monotonic() + timeout
-        while self.not_ready():
-            if time.monotonic() > t_end:
-                return None
-            time.sleep(0.002)
-        h, sck, douts = self.h, self.sck, self.douts
-        write, read = lgpio.gpio_write, lgpio.gpio_read
-        vals = [0] * len(douts)
-        for _ in range(24):
-            write(h, sck, 1)            # keep SCK high as short as possible (>60 us = chip powers down)
-            write(h, sck, 0)
-            for i, d in enumerate(douts):
-                vals[i] = (vals[i] << 1) | read(h, d)
-        write(h, sck, 1)                # 25th pulse: next conversion = channel A, gain 128
-        write(h, sck, 0)
-        return [v - (1 << 24) if v & 0x800000 else v for v in vals]
-
-    def close(self):
-        lgpio.gpio_write(self.h, self.sck, 0)
-        for p in [self.sck] + self.douts:
-            lgpio.gpio_free(self.h, p)
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/control.py`
-
-```python
-"""Pure-Python maths used by the nodes (no ROS, no GPIO - easy to test on any computer)."""
-import math
-
-
-def clamp(x, lo, hi):
-    return max(lo, min(hi, x))
-
-
-def twist_to_wheels(v, w, wheel_separation, wheel_radius):
-    """Robot speed (v m/s forward, w rad/s turning left) -> wheel speeds (rad/s) (left, right)."""
-    left = (v - w * wheel_separation / 2.0) / wheel_radius
-    right = (v + w * wheel_separation / 2.0) / wheel_radius
-    return left, right
-
-
-def limit_wheels(left, right, max_speed):
-    """Scale both wheels down together (keeps the curve) so neither exceeds max_speed rad/s."""
-    biggest = max(abs(left), abs(right))
-    if biggest <= max_speed or biggest == 0.0:
-        return left, right
-    k = max_speed / biggest
-    return left * k, right * k
-
-
-class WheelPID:
-    """Wheel speed controller: feed-forward + PI. Input/feedback in rad/s, output motor duty -1..1.
-
-    duty = sign(target) * (min_duty + kf * |target|) + kp * error + integral
-      kf       duty per rad/s (about 1 / top speed at 100 % duty)
-      min_duty duty needed to just start turning (static friction)
-    """
-
-    def __init__(self, kf, kp, ki, min_duty=0.0, i_limit=0.3):
-        self.kf, self.kp, self.ki, self.min_duty, self.i_limit = kf, kp, ki, min_duty, i_limit
-        self.integral = 0.0
-
-    def reset(self):
-        self.integral = 0.0
-
-    def update(self, target, measured, dt):
-        if abs(target) < 1e-3:
-            self.reset()
-            return 0.0
-        error = target - measured
-        self.integral = clamp(self.integral + self.ki * error * dt, -self.i_limit, self.i_limit)
-        ff = math.copysign(self.min_duty + self.kf * abs(target), target)
-        return clamp(ff + self.kp * error + self.integral, -1.0, 1.0)
-
-
-class LowPass:
-    def __init__(self, alpha):
-        self.alpha, self.value = alpha, 0.0
-
-    def update(self, x):
-        self.value += self.alpha * (x - self.value)
-        return self.value
-
-
-class Odometry:
-    """Dead-reckoning pose from the distance each wheel travelled."""
-
-    def __init__(self):
-        self.x = self.y = self.theta = 0.0
-
-    def update(self, d_left, d_right, wheel_separation):
-        d = (d_left + d_right) / 2.0
-        d_theta = (d_right - d_left) / wheel_separation
-        mid = self.theta + d_theta / 2.0
-        self.x += d * math.cos(mid)
-        self.y += d * math.sin(mid)
-        self.theta = math.atan2(math.sin(self.theta + d_theta), math.cos(self.theta + d_theta))
-        return d, d_theta
-
-
-def yaw_to_quaternion(yaw):
-    """(x, y, z, w) for a rotation of yaw radians about Z."""
-    return 0.0, 0.0, math.sin(yaw / 2.0), math.cos(yaw / 2.0)
-
-
-def payload_speed_factor(weight_kg, max_payload_kg, min_factor=0.5, overload_ratio=1.1):
-    """1.0 empty -> min_factor at full payload -> 0.0 (refuse to move) above max * overload_ratio."""
-    if weight_kg <= 0.0:
-        return 1.0
-    if weight_kg > max_payload_kg * overload_ratio:
-        return 0.0
-    frac = min(weight_kg / max_payload_kg, 1.0)
-    return 1.0 - (1.0 - min_factor) * frac
-
-
-def median(values):
-    s = sorted(values)
-    n = len(s)
-    return s[n // 2] if n % 2 else 0.5 * (s[n // 2 - 1] + s[n // 2])
-
-
-class PusherCycle:
-    """The cargo pusher's sequence. The node reads the two limit switches, calls update() at a fixed rate
-    and applies the duty it returns (+ = blade towards the rear, - = blade back towards the front).
-
-    state   home       parked at the front (HOME switch pressed)
-            pushing    moving to the rear, sliding the cargo off
-            out        pausing at the rear (END switch pressed)
-            returning  moving back to the front
-            stopped    standing somewhere between the two switches
-            fault      gave up; 'reason' says why, home() clears it
-    """
-
-    START_GRACE = 2.0       # s: by now the blade must have left the switch it started from
-
-    def __init__(self, duty_out=1.0, duty_in=1.0, stroke_timeout=45.0, dwell=0.5):
-        self.duty_out, self.duty_in = duty_out, duty_in
-        self.stroke_timeout, self.dwell = stroke_timeout, dwell
-        self.state, self.reason = "stopped", ""
-        self.elapsed = 0.0
-        self.at_home = self.at_end = False
-
-    def push(self):
-        """Start one unload cycle (out, pause, back). Returns (accepted, message)."""
-        if self.state == "home":
-            self._go("pushing")
-            return True, "pushing"
-        if self.state == "fault":
-            return False, f"fault: {self.reason} - call pusher/home first"
-        if self.state == "stopped":
-            return False, "the blade is not parked - call pusher/home first"
-        return False, "busy"
-
-    def home(self):
-        """Bring the blade back to the front. Also clears a fault. Returns (accepted, message)."""
-        self.reason = ""
-        if self.at_home and not self.at_end:
-            self.state = "home"
-            return True, "already parked"
-        self._go("returning")
-        return True, "returning"
-
-    def stop(self):
-        self.state = "home" if self.at_home else "stopped"
-
-    def _go(self, state):
-        self.state, self.elapsed = state, 0.0
-
-    def _fault(self, reason):
-        self.state, self.reason = "fault", reason
-        return 0.0
-
-    def update(self, at_home, at_end, estop, dt):
-        """at_home / at_end: True while that limit switch is pressed. Returns the motor duty, -1..1."""
-        self.at_home, self.at_end = at_home, at_end
-        moving = self.state in ("pushing", "out", "returning")
-        if at_home and at_end:
-            return self._fault("both limit switches read 'pressed': a switch wire is broken or unplugged")
-        if moving and estop:
-            return self._fault("the E-stop was pressed during the stroke")
-        if moving:
-            self.elapsed += dt
-
-        if self.state == "pushing":
-            if at_end:
-                self._go("out")
-            elif at_home and self.elapsed > self.START_GRACE:
-                return self._fault("the blade did not leave the HOME switch: motor wired backwards "
-                                   "(set invert_motor), jammed, or no motor power")
-            elif self.elapsed > self.stroke_timeout:
-                return self._fault("the blade did not reach the END switch in time: jammed, or no motor power")
-            else:
-                return self.duty_out
-        if self.state == "out":
-            if self.elapsed >= self.dwell:
-                self._go("returning")
-            return 0.0
-        if self.state == "returning":
-            if at_home:
-                self.state = "home"
-            elif at_end and self.elapsed > self.START_GRACE:
-                return self._fault("the blade did not leave the END switch: jammed, or no motor power")
-            elif self.elapsed > self.stroke_timeout:
-                return self._fault("the blade did not reach the HOME switch in time: jammed, or no motor power")
-            else:
-                return -self.duty_in
-
-        if self.state == "home" and not at_home:
-            self.state = "stopped"
-        elif self.state == "stopped" and at_home:
-            self.state = "home"
-        return 0.0
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/base_driver.py`
-
-```python
-"""Base driver node.
-
-  subscribes  cmd_vel        geometry_msgs/Twist   wanted robot speed (the launch file remaps it to cmd_vel_safe)
-  publishes   odom           nav_msgs/Odometry     wheel odometry
-              joint_states   sensor_msgs/JointState  wheel angles (for the robot model in RViz)
-              estop          std_msgs/Bool         True while the E-stop has cut motor power
-  tf          odom -> base_footprint
-
-Every 1/rate s: read encoders -> update odometry -> PID each wheel -> set motor PWM.
-Motors stop if no cmd_vel arrives for cmd_timeout s, or while the E-stop is pressed.
-"""
-import math
-
-import rclpy
-from geometry_msgs.msg import TransformStamped, Twist
-from nav_msgs.msg import Odometry as OdometryMsg
-from rclpy.node import Node
-from sensor_msgs.msg import JointState
-from std_msgs.msg import Bool
-from tf2_ros import TransformBroadcaster
-
-from cargo_bot import hw
-from cargo_bot.control import LowPass, Odometry, WheelPID, limit_wheels, twist_to_wheels, yaw_to_quaternion
-from cargo_bot.pins import PINS
-
-
-class BaseDriver(Node):
-    def __init__(self):
-        super().__init__("base_driver")
-        self.declare_parameters("", [
-            ("wheel_radius", 0.05),          # m
-            ("wheel_separation", 0.33),      # m, centre of left tyre to centre of right tyre
-            ("ticks_per_rev", 2464),         # encoder counts per WHEEL turn (x4 decoding) - measure it!
-            ("max_wheel_speed", 12.0),       # rad/s, commands are scaled down to this
-            ("rate", 50.0),                  # Hz
-            ("cmd_timeout", 0.5),            # s
-            ("kf", 0.05), ("kp", 0.02), ("ki", 0.10), ("min_duty", 0.10),
-            ("pwm_freq", 1000),
-            ("invert_left_motor", False), ("invert_right_motor", False),
-            ("invert_left_encoder", False), ("invert_right_encoder", False),
-            ("use_estop_sense", True),
-            ("odom_frame", "odom"), ("base_frame", "base_footprint"), ("publish_tf", True),
-        ])
-        p = lambda name: self.get_parameter(name).value
-        self.R, self.sep, self.tpr = p("wheel_radius"), p("wheel_separation"), p("ticks_per_rev")
-        self.max_w, self.timeout = p("max_wheel_speed"), p("cmd_timeout")
-        self.odom_frame, self.base_frame, self.publish_tf = p("odom_frame"), p("base_frame"), p("publish_tf")
-
-        chip = hw.open_chip()
-        self.enable = hw.DigitalOut(chip, PINS["enable"], 0)
-        self.motor_l = hw.Motor(chip, PINS["left_fwd"], PINS["left_rev"], p("pwm_freq"), p("invert_left_motor"))
-        self.motor_r = hw.Motor(chip, PINS["right_fwd"], PINS["right_rev"], p("pwm_freq"), p("invert_right_motor"))
-        self.enc_l = hw.QuadratureEncoder(chip, PINS["left_enc_a"], PINS["left_enc_b"], p("invert_left_encoder"))
-        self.enc_r = hw.QuadratureEncoder(chip, PINS["right_enc_a"], PINS["right_enc_b"], p("invert_right_encoder"))
-        self.estop_in = hw.DigitalIn(chip, PINS["estop_sense"]) if p("use_estop_sense") else None
-        self.enable.write(1)
-
-        gains = dict(kf=p("kf"), kp=p("kp"), ki=p("ki"), min_duty=p("min_duty"))
-        self.pid_l, self.pid_r = WheelPID(**gains), WheelPID(**gains)
-        self.speed_l, self.speed_r = LowPass(0.5), LowPass(0.5)
-        self.odom = Odometry()
-        self.last_counts = (self.enc_l.count, self.enc_r.count)
-        self.target = (0.0, 0.0)                     # wheel speeds, rad/s
-        self.last_cmd_time = self.get_clock().now()
-        self.last_time = self.get_clock().now()
-        self.estop_active = None
-
-        self.odom_pub = self.create_publisher(OdometryMsg, "odom", 10)
-        self.joint_pub = self.create_publisher(JointState, "joint_states", 10)
-        self.estop_pub = self.create_publisher(Bool, "estop", 10)
-        self.tf_pub = TransformBroadcaster(self)
-        self.create_subscription(Twist, "cmd_vel", self.on_cmd, 10)
-        self.create_timer(1.0 / p("rate"), self.loop)
-        self.create_timer(1.0, self.publish_estop)
-        self.get_logger().info("base_driver ready")
-
-    def on_cmd(self, msg):
-        left, right = twist_to_wheels(msg.linear.x, msg.angular.z, self.sep, self.R)
-        self.target = limit_wheels(left, right, self.max_w)
-        self.last_cmd_time = self.get_clock().now()
-
-    def loop(self):
-        now = self.get_clock().now()
-        dt = (now - self.last_time).nanoseconds * 1e-9
-        if dt <= 0.0:
-            return
-        self.last_time = now
-
-        # 1. encoders -> wheel speeds and odometry
-        cl, cr = self.enc_l.count, self.enc_r.count
-        dl, dr = cl - self.last_counts[0], cr - self.last_counts[1]
-        self.last_counts = (cl, cr)
-        rad_per_tick = 2.0 * math.pi / self.tpr
-        wl = self.speed_l.update(dl * rad_per_tick / dt)
-        wr = self.speed_r.update(dr * rad_per_tick / dt)
-        d, d_theta = self.odom.update(dl * rad_per_tick * self.R, dr * rad_per_tick * self.R, self.sep)
-        self.publish_odom(now, d / dt, d_theta / dt, cl * rad_per_tick, cr * rad_per_tick)
-
-        # 2. safety: E-stop and command timeout
-        estop = self.estop_in is not None and self.estop_in.read() == 0
-        if estop != self.estop_active:
-            self.estop_active = estop
-            self.publish_estop()
-            if estop:
-                self.get_logger().warn("E-STOP: motor power is OFF")
-            else:
-                self.get_logger().info("motor power is ON")
-        stale = (now - self.last_cmd_time).nanoseconds * 1e-9 > self.timeout
-        target_l, target_r = (0.0, 0.0) if (estop or stale) else self.target
-
-        # 3. PID -> motors
-        if estop:
-            self.pid_l.reset()
-            self.pid_r.reset()
-        self.motor_l.set(self.pid_l.update(target_l, wl, dt))
-        self.motor_r.set(self.pid_r.update(target_r, wr, dt))
-
-    def publish_odom(self, now, v, w, pos_l, pos_r):
-        stamp = now.to_msg()
-        qx, qy, qz, qw = yaw_to_quaternion(self.odom.theta)
-        msg = OdometryMsg()
-        msg.header.stamp = stamp
-        msg.header.frame_id = self.odom_frame
-        msg.child_frame_id = self.base_frame
-        msg.pose.pose.position.x = self.odom.x
-        msg.pose.pose.position.y = self.odom.y
-        msg.pose.pose.orientation.z, msg.pose.pose.orientation.w = qz, qw
-        msg.pose.covariance[0] = msg.pose.covariance[7] = 0.01
-        msg.pose.covariance[14] = msg.pose.covariance[21] = msg.pose.covariance[28] = 1e6
-        msg.pose.covariance[35] = 0.05
-        msg.twist.twist.linear.x = v
-        msg.twist.twist.angular.z = w
-        msg.twist.covariance[0] = 0.01
-        msg.twist.covariance[7] = msg.twist.covariance[14] = msg.twist.covariance[21] = 1e6
-        msg.twist.covariance[28] = 1e6
-        msg.twist.covariance[35] = 0.05
-        self.odom_pub.publish(msg)
-
-        if self.publish_tf:
-            t = TransformStamped()
-            t.header.stamp = stamp
-            t.header.frame_id = self.odom_frame
-            t.child_frame_id = self.base_frame
-            t.transform.translation.x = self.odom.x
-            t.transform.translation.y = self.odom.y
-            t.transform.rotation.z, t.transform.rotation.w = qz, qw
-            self.tf_pub.sendTransform(t)
-
-        js = JointState()
-        js.header.stamp = stamp
-        js.name = ["left_wheel_joint", "right_wheel_joint"]
-        js.position = [pos_l, pos_r]
-        self.joint_pub.publish(js)
-
-    def publish_estop(self):
-        self.estop_pub.publish(Bool(data=bool(self.estop_active)))
-
-    def shutdown(self):
-        self.motor_l.set(0.0)
-        self.motor_r.set(0.0)
-        self.enable.write(0)
-        for part in (self.motor_l, self.motor_r, self.enc_l, self.enc_r, self.enable, self.estop_in):
-            if part is not None:
-                part.close()
-        hw.close_chip()
-
-
-def main():
-    rclpy.init()
-    node = BaseDriver()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.shutdown()
-        node.destroy_node()
-        rclpy.try_shutdown()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/payload_node.py`
-
-```python
-"""Payload node: 4 load cells (HX711) -> weight on the cargo bed.
-
-  publishes  payload_weight   std_msgs/Float32            total kg (median-filtered)
-             payload_corners  std_msgs/Float32MultiArray  kg per corner [FL, FR, RL, RR]
-  service    payload/tare     std_srvs/Trigger            zero the scale (bed must be empty)
-
-Calibrate once with tools/test_hx711.py --calibrate <kg> and put 'scale' (and optionally 'offsets')
-into config/robot.yaml.
-"""
-from collections import deque
-
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import Float32, Float32MultiArray
-from std_srvs.srv import Trigger
-
-from cargo_bot import hw
-from cargo_bot.control import median
-from cargo_bot.pins import PINS
-
-SATURATED = (-(1 << 23), (1 << 23) - 1)
-
-
-class PayloadNode(Node):
-    def __init__(self):
-        super().__init__("payload_node")
-        self.declare_parameters("", [
-            ("scale", 22000.0),                      # raw counts (sum of 4 cells) per kg - calibrate!
-            ("offsets", [0.0, 0.0, 0.0, 0.0]),       # raw zero of each cell (used when tare_on_start is false)
-            ("signs", [1, 1, 1, 1]),                 # -1 for a cell wired "upside down"
-            ("tare_on_start", True),                 # zero automatically at start (bed must be empty!)
-            ("median_window", 5),
-        ])
-        p = lambda name: self.get_parameter(name).value
-        self.scale = p("scale")
-        self.offsets = list(p("offsets"))
-        self.signs = list(p("signs"))
-        self.window = deque(maxlen=p("median_window"))
-
-        self.cells = hw.HX711Array(hw.open_chip(), PINS["hx711_sck"], PINS["hx711_dout"])
-        self.weight_pub = self.create_publisher(Float32, "payload_weight", 10)
-        self.corner_pub = self.create_publisher(Float32MultiArray, "payload_corners", 10)
-        self.create_service(Trigger, "payload/tare", self.on_tare)
-        self.bad_reads = 0
-
-        if p("tare_on_start"):
-            ok, msg = self.tare()
-            self.get_logger().info(msg) if ok else self.get_logger().error(msg)
-        self.create_timer(0.02, self.poll)          # HX711 gives a new reading 10x per second
-
-    def read(self):
-        raw = self.cells.read_raw(timeout=0.3)
-        if raw is None or any(v in SATURATED for v in raw):
-            self.bad_reads += 1
-            if self.bad_reads % 50 == 1:
-                missing = self.cells.not_ready()
-                self.get_logger().warn(f"load-cell read failed (not ready: {missing}) - check HX711 wiring")
-            return None
-        return raw
-
-    def tare(self, samples=20):
-        readings = [r for r in (self.read() for _ in range(samples)) if r is not None]
-        if len(readings) < samples // 2:
-            return False, "tare failed: HX711 boards not responding"
-        self.offsets = [median([r[i] for r in readings]) for i in range(len(readings[0]))]
-        self.window.clear()
-        return True, f"tare done, offsets = {[round(o) for o in self.offsets]}"
-
-    def on_tare(self, request, response):
-        response.success, response.message = self.tare()
-        return response
-
-    def poll(self):
-        if self.cells.not_ready():
-            return
-        raw = self.read()
-        if raw is None:
-            return
-        corners = [s * (r - o) / self.scale for r, o, s in zip(raw, self.offsets, self.signs)]
-        self.window.append(sum(corners))
-        self.weight_pub.publish(Float32(data=float(median(self.window))))
-        self.corner_pub.publish(Float32MultiArray(data=[float(c) for c in corners]))
-
-    def shutdown(self):
-        self.cells.close()
-        hw.close_chip()
-
-
-def main():
-    rclpy.init()
-    node = PayloadNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.shutdown()
-        node.destroy_node()
-        rclpy.try_shutdown()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/speed_limiter.py`
-
-```python
-"""Speed limiter: the heavier the cargo, the slower the robot.
-
-  subscribes  cmd_vel         geometry_msgs/Twist  from teleop / Nav2 / line follower
-              payload_weight  std_msgs/Float32     from payload_node
-  publishes   cmd_vel_safe    geometry_msgs/Twist  what the base driver actually executes
-              speed_factor    std_msgs/Float32     1.0 = full speed, 0.0 = refusing to move (overload)
-"""
-import rclpy
-from geometry_msgs.msg import Twist
-from rclpy.node import Node
-from std_msgs.msg import Float32
-
-from cargo_bot.control import clamp, payload_speed_factor
-
-
-class SpeedLimiter(Node):
-    def __init__(self):
-        super().__init__("speed_limiter")
-        self.declare_parameters("", [
-            ("max_payload_kg", 15.0),
-            ("min_factor", 0.5),          # speed multiplier at full payload
-            ("overload_ratio", 1.1),      # above max_payload_kg * this -> stop
-            ("max_linear", 0.5),          # m/s, hard limit
-            ("max_angular", 1.5),         # rad/s, hard limit
-            ("weight_timeout", 2.0),      # s without weight data -> assume full payload
-        ])
-        p = lambda name: self.get_parameter(name).value
-        self.max_payload, self.min_factor = p("max_payload_kg"), p("min_factor")
-        self.overload_ratio, self.weight_timeout = p("overload_ratio"), p("weight_timeout")
-        self.max_lin, self.max_ang = p("max_linear"), p("max_angular")
-        self.weight = None
-        self.weight_time = None
-        self.last_factor = None
-
-        self.pub = self.create_publisher(Twist, "cmd_vel_safe", 10)
-        self.factor_pub = self.create_publisher(Float32, "speed_factor", 10)
-        self.create_subscription(Twist, "cmd_vel", self.on_cmd, 10)
-        self.create_subscription(Float32, "payload_weight", self.on_weight, 10)
-
-    def on_weight(self, msg):
-        self.weight = msg.data
-        self.weight_time = self.get_clock().now()
-
-    def factor(self):
-        if self.weight is None:
-            return 1.0                               # no load cells running (e.g. payload:=false)
-        age = (self.get_clock().now() - self.weight_time).nanoseconds * 1e-9
-        if age > self.weight_timeout:
-            return self.min_factor                   # load cells stopped talking: be careful
-        return payload_speed_factor(self.weight, self.max_payload, self.min_factor, self.overload_ratio)
-
-    def on_cmd(self, msg):
-        k = self.factor()
-        if k == 0.0 and self.last_factor != 0.0:
-            self.get_logger().warn(f"OVERLOAD ({self.weight:.1f} kg) - refusing to move")
-        self.last_factor = k
-        out = Twist()
-        out.linear.x = clamp(msg.linear.x * k, -self.max_lin, self.max_lin)
-        out.angular.z = clamp(msg.angular.z * k, -self.max_ang, self.max_ang)
-        self.pub.publish(out)
-        self.factor_pub.publish(Float32(data=float(k)))
-
-
-def main():
-    rclpy.init()
-    node = SpeedLimiter()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.destroy_node()
-        rclpy.try_shutdown()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/vision_node.py`
-
-```python
-"""Vision node (USB camera): line following + ArUco station markers.
-
-  publishes  line/error                std_msgs/Float32   -1 (line far left) .. +1 (far right), NaN = no line
-             station_marker            std_msgs/Int32     id of the biggest ArUco marker in view, -1 = none
-             cmd_vel                   geometry_msgs/Twist  ONLY while line following is enabled
-             vision/debug/compressed   sensor_msgs/CompressedImage  annotated JPEG for RViz / rqt
-  service    line_follow/enable        std_srvs/SetBool
-"""
-import cv2
-import numpy as np
-import rclpy
-from geometry_msgs.msg import Twist
-from rclpy.node import Node
-from sensor_msgs.msg import CompressedImage
-from std_msgs.msg import Float32, Int32
-from std_srvs.srv import SetBool
-
-
-def make_aruco_detector(dict_name):
-    """Returns detect(gray) -> (corners, ids), working with both old and new OpenCV APIs; None if no aruco."""
-    aruco = getattr(cv2, "aruco", None)
-    if aruco is None:
-        return None
-    dictionary = aruco.getPredefinedDictionary(getattr(aruco, dict_name))
-    if hasattr(aruco, "ArucoDetector"):                       # OpenCV >= 4.7
-        det = aruco.ArucoDetector(dictionary, aruco.DetectorParameters())
-        return lambda gray: det.detectMarkers(gray)[:2]
-    params = aruco.DetectorParameters_create()                # OpenCV 4.6 (Ubuntu 24.04)
-    return lambda gray: aruco.detectMarkers(gray, dictionary, parameters=params)[:2]
-
-
-class VisionNode(Node):
-    def __init__(self):
-        super().__init__("vision_node")
-        self.declare_parameters("", [
-            ("device", 0), ("width", 640), ("height", 480), ("rate", 15.0),
-            ("dark_line", True),          # True = black tape on a light floor
-            ("roi_top", 0.55),            # only look at the image below this fraction of its height
-            ("min_area", 600),            # px, smaller blobs are noise
-            ("follow_speed", 0.12),       # m/s while following
-            ("k_turn", 1.5),              # rad/s per unit of line error
-            ("lost_timeout", 0.5),        # s without a line -> stop
-            ("aruco_dict", "DICT_4X4_50"),
-            ("debug_image", True),
-        ])
-        p = lambda name: self.get_parameter(name).value
-        self.dark, self.roi_top, self.min_area = p("dark_line"), p("roi_top"), p("min_area")
-        self.speed, self.k_turn, self.lost_timeout = p("follow_speed"), p("k_turn"), p("lost_timeout")
-        self.debug = p("debug_image")
-
-        self.cap = cv2.VideoCapture(p("device"), cv2.CAP_V4L2)
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, p("width"))
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, p("height"))
-        self.cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
-        if not self.cap.isOpened():
-            self.get_logger().error(f"cannot open camera /dev/video{p('device')}")
-        self.detect_markers = make_aruco_detector(p("aruco_dict"))
-        if self.detect_markers is None:
-            self.get_logger().warn("OpenCV has no aruco module - station markers disabled")
-
-        self.following = False
-        self.last_seen = self.get_clock().now()
-        self.frame_count = 0
-        self.err_pub = self.create_publisher(Float32, "line/error", 10)
-        self.marker_pub = self.create_publisher(Int32, "station_marker", 10)
-        self.cmd_pub = self.create_publisher(Twist, "cmd_vel", 10)
-        self.dbg_pub = self.create_publisher(CompressedImage, "vision/debug/compressed", 2)
-        self.create_service(SetBool, "line_follow/enable", self.on_enable)
-        self.create_timer(1.0 / p("rate"), self.step)
-
-    def on_enable(self, request, response):
-        self.following = request.data
-        self.last_seen = self.get_clock().now()
-        if not self.following:
-            self.cmd_pub.publish(Twist())
-        response.success = True
-        response.message = "line following " + ("ON" if self.following else "OFF")
-        self.get_logger().info(response.message)
-        return response
-
-    def find_line(self, gray):
-        """Returns (error -1..1 or None, mask, contour, roi_y0)."""
-        h, w = gray.shape
-        y0 = int(h * self.roi_top)
-        roi = cv2.GaussianBlur(gray[y0:, :], (7, 7), 0)
-        mode = cv2.THRESH_BINARY_INV if self.dark else cv2.THRESH_BINARY
-        _, mask = cv2.threshold(roi, 0, 255, mode + cv2.THRESH_OTSU)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, np.ones((5, 5), np.uint8))
-        contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-        if not contours:
-            return None, mask, None, y0
-        c = max(contours, key=cv2.contourArea)
-        area = cv2.contourArea(c)
-        if area < self.min_area or area > 0.6 * mask.size:   # too small = noise, too big = no real line
-            return None, mask, None, y0
-        m = cv2.moments(c)
-        cx = m["m10"] / m["m00"]
-        return (cx - w / 2.0) / (w / 2.0), mask, c, y0
-
-    def step(self):
-        ok, frame = self.cap.read()
-        if not ok:
-            return
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        now = self.get_clock().now()
-
-        error, _, contour, y0 = self.find_line(gray)
-        self.err_pub.publish(Float32(data=float("nan") if error is None else float(error)))
-
-        marker_id, corners = -1, None
-        if self.detect_markers is not None:
-            corners, ids = self.detect_markers(gray)
-            if ids is not None and len(ids):
-                sizes = [cv2.contourArea(c.reshape(-1, 2).astype(np.float32)) for c in corners]
-                marker_id = int(ids[int(np.argmax(sizes))][0])
-        self.marker_pub.publish(Int32(data=marker_id))
-
-        if self.following:
-            cmd = Twist()
-            if error is not None:
-                self.last_seen = now
-                cmd.linear.x = self.speed * (1.0 - 0.5 * min(abs(error), 1.0))
-                cmd.angular.z = -self.k_turn * error
-            elif (now - self.last_seen).nanoseconds * 1e-9 < self.lost_timeout:
-                return                                   # brief dropout: keep last command
-            self.cmd_pub.publish(cmd)                    # line lost -> zero Twist = stop
-
-        self.frame_count += 1
-        if self.debug and self.frame_count % 3 == 0:
-            self.publish_debug(frame, error, contour, y0, corners, marker_id)
-
-    def publish_debug(self, frame, error, contour, y0, corners, marker_id):
-        img = frame.copy()
-        h, w = img.shape[:2]
-        cv2.line(img, (0, y0), (w, y0), (255, 255, 0), 1)
-        cv2.line(img, (w // 2, y0), (w // 2, h), (255, 0, 0), 1)
-        if contour is not None:
-            cv2.drawContours(img, [contour + np.array([[0, y0]])], -1, (0, 255, 0), 2)
-        if corners is not None and len(corners):
-            for c in corners:
-                cv2.polylines(img, [c.reshape(-1, 2).astype(np.int32)], True, (0, 0, 255), 2)
-        txt = f"err={'none' if error is None else f'{error:+.2f}'} marker={marker_id} follow={self.following}"
-        cv2.putText(img, txt, (10, 25), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        msg = CompressedImage()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "camera_link"
-        msg.format = "jpeg"
-        msg.data = cv2.imencode(".jpg", img, [cv2.IMWRITE_JPEG_QUALITY, 60])[1].tobytes()
-        self.dbg_pub.publish(msg)
-
-    def shutdown(self):
-        if self.following:
-            self.cmd_pub.publish(Twist())
-        self.cap.release()
-
-
-def main():
-    rclpy.init()
-    node = VisionNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.shutdown()
-        node.destroy_node()
-        rclpy.try_shutdown()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/pusher_node.py`
-
-```python
-"""Pusher node (design v3): slides the cargo off the rear of the robot with the lead-screw blade.
-
-  services   pusher/push    std_srvs/Trigger   start one unload cycle: blade out to the END switch, then back
-             pusher/home    std_srvs/Trigger   bring the blade back to the HOME switch (also clears a fault)
-             pusher/stop    std_srvs/Trigger   stop the motor now
-  publishes  pusher/state   std_msgs/String    home | pushing | out | returning | stopped | fault
-  subscribes estop          std_msgs/Bool      from base_driver: True while the E-stop has cut motor power
-
-The services answer at once; watch pusher/state to see when the cycle has finished.
-The motor stops on a limit switch, when a stroke takes longer than stroke_timeout (jammed, or no motor
-power), when the E-stop is pressed during a stroke, and when the node shuts down.
-"""
-import rclpy
-from rclpy.node import Node
-from std_msgs.msg import Bool, String
-from std_srvs.srv import Trigger
-
-from cargo_bot import hw
-from cargo_bot.control import PusherCycle
-from cargo_bot.pins import PINS
-
-
-class PusherNode(Node):
-    def __init__(self):
-        super().__init__("pusher_node")
-        self.declare_parameters("", [
-            ("duty_out", 1.0),               # 0..1, motor power while pushing the cargo off
-            ("duty_in", 1.0),                # 0..1, motor power while returning
-            ("stroke_timeout", 45.0),        # s, give up if a limit switch is not reached in this time
-            ("dwell", 0.5),                  # s, pause at the rear before returning
-            ("invert_motor", False),         # true if "out" moves the blade to the FRONT
-            ("pwm_freq", 1000),
-            ("rate", 50.0),                  # Hz
-        ])
-        p = lambda name: self.get_parameter(name).value
-        self.dt = 1.0 / p("rate")
-        self.cycle = PusherCycle(p("duty_out"), p("duty_in"), p("stroke_timeout"), p("dwell"))
-
-        chip = hw.open_chip()
-        try:
-            self.motor = hw.Motor(chip, PINS["pusher_out"], PINS["pusher_in"], p("pwm_freq"), p("invert_motor"))
-            # NC contact to GND + pull-up: 0 = not pressed, 1 = pressed (or the wire is broken)
-            self.switches = [hw.DigitalIn(chip, PINS[name], pull_down=False) for name in ("pusher_home", "pusher_end")]
-        except Exception as e:
-            self.get_logger().error(f"cannot use the pusher pins: {e}. If it says 'GPIO busy', SPI is still "
-                                    "enabled on the Pi: see BUILD_GUIDE.md, section 3.3")
-            raise
-        self.pressed = [False, False]        # debounced: [HOME, END]
-        self.last_raw = [0, 0]
-        self.estop = False
-        self.last_state = None
-
-        self.state_pub = self.create_publisher(String, "pusher/state", 10)
-        self.create_subscription(Bool, "estop", self.on_estop, 10)
-        self.create_service(Trigger, "pusher/push", self.on_push)
-        self.create_service(Trigger, "pusher/home", self.on_home)
-        self.create_service(Trigger, "pusher/stop", self.on_stop)
-        self.create_timer(self.dt, self.loop)
-        self.create_timer(0.2, self.publish_state)
-        self.get_logger().info("pusher_node ready")
-
-    def on_estop(self, msg):
-        self.estop = msg.data
-
-    def on_push(self, request, response):
-        if self.estop:
-            response.success, response.message = False, "the E-stop is pressed"
-        else:
-            response.success, response.message = self.cycle.push()
-        return response
-
-    def on_home(self, request, response):
-        response.success, response.message = self.cycle.home()
-        return response
-
-    def on_stop(self, request, response):
-        self.cycle.stop()
-        response.success, response.message = True, "stopped"
-        return response
-
-    def loop(self):
-        for i, switch in enumerate(self.switches):
-            raw = switch.read()
-            self.pressed[i] = bool(raw and self.last_raw[i])     # pressed = two readings in a row
-            self.last_raw[i] = raw
-        duty = self.cycle.update(self.pressed[0], self.pressed[1], self.estop, self.dt)
-        self.motor.set(duty)
-        if self.cycle.state != self.last_state:
-            self.last_state = self.cycle.state
-            if self.cycle.state == "fault":
-                self.get_logger().error(f"pusher fault: {self.cycle.reason}")
-            else:
-                self.get_logger().info(f"pusher: {self.cycle.state}")
-            self.publish_state()
-
-    def publish_state(self):
-        self.state_pub.publish(String(data=self.cycle.state))
-
-    def shutdown(self):
-        self.motor.set(0.0)
-        for part in [self.motor] + self.switches:
-            part.close()
-        hw.close_chip()
-
-
-def main():
-    rclpy.init()
-    node = PusherNode()
-    try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        node.shutdown()
-        node.destroy_node()
-        rclpy.try_shutdown()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `robot_ws/src/cargo_bot/cargo_bot/mission.py`
-
-```python
-"""Delivery mission: home -> pickup (wait for cargo) -> dropoff (unload) -> home.
-
-At the drop-off the cargo is unloaded either by hand (the default: the robot waits until the bed is empty)
-or, with --conveyor, by the robot itself: it backs up until its rear touches the conveyor, pushes the cargo
-off with the pusher (pusher_node must be running), checks that the bed is empty and drives clear.
-
-Needs Nav2 running with a map (see BUILD_GUIDE.md, week 8) and a stations file:
-
-    home:    [x, y, yaw_degrees]
-    pickup:  [x, y, yaw_degrees]
-    dropoff: [x, y, yaw_degrees]      with --conveyor: rear towards the conveyor, about 30 cm clear of it
-
-Run:  ros2 run cargo_bot mission --stations ~/maps/stations.yaml [--loops 3] [--set-initial-pose] [--conveyor]
-"""
-import argparse
-import math
-import sys
-import time
-
-import rclpy
-import yaml
-from geometry_msgs.msg import PoseStamped, Twist
-from nav2_simple_commander.robot_navigator import BasicNavigator, TaskResult
-from nav_msgs.msg import Odometry
-from std_msgs.msg import Float32, String
-from std_srvs.srv import Trigger
-
-
-def make_pose(nav, x, y, yaw_deg):
-    pose = PoseStamped()
-    pose.header.frame_id = "map"
-    pose.header.stamp = nav.get_clock().now().to_msg()
-    pose.pose.position.x = float(x)
-    pose.pose.position.y = float(y)
-    yaw = math.radians(yaw_deg)
-    pose.pose.orientation.z = math.sin(yaw / 2.0)
-    pose.pose.orientation.w = math.cos(yaw / 2.0)
-    return pose
-
-
-class Mission:
-    def __init__(self, nav, stations, load_kg, hold_s, conveyor=None):
-        """conveyor: None = unload by hand, or a dict with dock_speed, dock_distance, clear_distance, push_timeout."""
-        self.nav, self.stations, self.load_kg, self.hold_s = nav, stations, load_kg, hold_s
-        self.conveyor = conveyor
-        self.weight = None
-        self.odom = None                 # (x, y, forward speed) from the wheel odometry
-        self.pusher_state = None
-        nav.create_subscription(Float32, "payload_weight", self.on_weight, 10)
-        if conveyor:
-            nav.create_subscription(Odometry, "odom", self.on_odom, 10)
-            nav.create_subscription(String, "pusher/state", self.on_pusher_state, 10)
-            self.cmd_pub = nav.create_publisher(Twist, "cmd_vel", 10)
-            self.push_client = nav.create_client(Trigger, "pusher/push")
-
-    def on_weight(self, msg):
-        self.weight = msg.data
-
-    def on_odom(self, msg):
-        self.odom = (msg.pose.pose.position.x, msg.pose.pose.position.y, msg.twist.twist.linear.x)
-
-    def on_pusher_state(self, msg):
-        self.pusher_state = msg.data
-
-    def go(self, name):
-        x, y, yaw = self.stations[name]
-        self.nav.get_logger().info(f"-> going to {name} ({x:.2f}, {y:.2f})")
-        self.nav.goToPose(make_pose(self.nav, x, y, yaw))
-        while not self.nav.isTaskComplete():
-            rclpy.spin_once(self.nav, timeout_sec=0.1)
-        result = self.nav.getResult()
-        if result != TaskResult.SUCCEEDED:
-            raise RuntimeError(f"navigation to {name} failed: {result}")
-        self.nav.get_logger().info(f"arrived at {name}")
-
-    def wait_weight(self, loaded, timeout=None):
-        """Block until the bed has been loaded (or emptied) for hold_s seconds in a row.
-        With a timeout (seconds), give up with an error instead of waiting for ever."""
-        what = "cargo to be LOADED" if loaded else "cargo to be REMOVED"
-        self.nav.get_logger().info(f"waiting for {what} ...")
-        since = None
-        t_end = None if timeout is None else time.monotonic() + timeout
-        while True:
-            rclpy.spin_once(self.nav, timeout_sec=0.1)
-            if t_end is not None and time.monotonic() > t_end:
-                seen = "no payload_weight data" if self.weight is None else f"payload = {self.weight:.2f} kg"
-                raise RuntimeError(f"gave up waiting for {what} ({seen})")
-            if self.weight is None:
-                continue
-            ok = self.weight > self.load_kg if loaded else self.weight < self.load_kg / 2.0
-            if not ok:
-                since = None
-            elif since is None:
-                since = time.monotonic()
-            elif time.monotonic() - since > self.hold_s:
-                self.nav.get_logger().info(f"payload = {self.weight:.2f} kg")
-                return
-
-    def creep(self, speed, distance, until_contact=False):
-        """Drive straight at speed (m/s, negative = backwards) for distance metres of wheel odometry.
-        With until_contact, also stop when the wheels stand still: the robot is pressing on something.
-        Returns (why it stopped: "distance" or "contact", metres travelled)."""
-        t0 = time.monotonic()
-        while self.odom is None:
-            rclpy.spin_once(self.nav, timeout_sec=0.1)
-            if time.monotonic() - t0 > 5.0:
-                raise RuntimeError("no odometry (is base_driver running?)")
-        x0, y0, _ = self.odom
-        travelled = lambda: math.hypot(self.odom[0] - x0, self.odom[1] - y0)
-        cmd = Twist()
-        cmd.linear.x = float(speed)
-        t0, still_since, reason = time.monotonic(), None, "distance"
-        time_limit = 5.0 + 3.0 * distance / abs(speed)
-        try:
-            while travelled() < distance:
-                self.cmd_pub.publish(cmd)
-                rclpy.spin_once(self.nav, timeout_sec=0.05)
-                now = time.monotonic()
-                if now - t0 > time_limit:
-                    raise RuntimeError("the robot is not moving (E-stop pressed, or overloaded?)")
-                if not until_contact or now - t0 < 1.0:           # the first second: still starting to move
-                    continue
-                if abs(self.odom[2]) > 0.2 * abs(speed):
-                    still_since = None
-                elif still_since is None:
-                    still_since = now
-                elif now - still_since > 0.5:
-                    reason = "contact"
-                    break
-        finally:
-            self.cmd_pub.publish(Twist())
-        return reason, travelled()
-
-    def push_cargo_off(self):
-        """One pusher cycle: blade out to the rear, then back. Returns when the blade is parked again."""
-        if not self.push_client.wait_for_service(timeout_sec=5.0):
-            raise RuntimeError("pusher_node is not running (start robot.launch.py with pusher:=true)")
-        future = self.push_client.call_async(Trigger.Request())
-        while not future.done():
-            rclpy.spin_once(self.nav, timeout_sec=0.1)
-        if not future.result().success:
-            raise RuntimeError(f"the pusher refused to start: {future.result().message}")
-        self.nav.get_logger().info("pushing the cargo off ...")
-        t_end = time.monotonic() + self.conveyor["push_timeout"]
-        left_home = False
-        while True:
-            rclpy.spin_once(self.nav, timeout_sec=0.1)
-            if self.pusher_state == "fault":
-                raise RuntimeError("pusher fault (the reason is in the pusher_node log)")
-            if self.pusher_state not in (None, "home"):
-                left_home = True
-            elif left_home and self.pusher_state == "home":
-                return
-            if time.monotonic() > t_end:
-                raise RuntimeError("the pusher did not finish in time")
-
-    def unload_on_conveyor(self):
-        c, log = self.conveyor, self.nav.get_logger().info
-        log("backing up to the conveyor ...")
-        why, moved = self.creep(-c["dock_speed"], c["dock_distance"], until_contact=True)
-        if why != "contact":
-            raise RuntimeError(f"backed up {moved:.2f} m without touching the conveyor - not pushing "
-                               "(record the dropoff station closer to it, or raise --dock-distance)")
-        if moved < 0.03:        # it never moved, so standing still does not mean "touching the conveyor"
-            raise RuntimeError("the robot did not move when backing up - not pushing "
-                               "(E-stop pressed, overloaded, or already against the conveyor)")
-        log(f"touching the conveyor after {moved:.2f} m")
-        self.push_cargo_off()
-        self.wait_weight(loaded=False, timeout=10.0)
-        log("driving clear of the conveyor ...")
-        self.creep(c["dock_speed"] * 2.0, c["clear_distance"])
-
-    def run(self, loops):
-        for i in range(loops):
-            self.nav.get_logger().info(f"=== delivery {i + 1}/{loops} ===")
-            self.go("pickup")
-            self.wait_weight(loaded=True)
-            self.go("dropoff")
-            if self.conveyor:
-                self.unload_on_conveyor()
-            else:
-                self.wait_weight(loaded=False)
-        self.go("home")
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--stations", required=True, help="YAML file with home / pickup / dropoff")
-    parser.add_argument("--loops", type=int, default=1)
-    parser.add_argument("--load-kg", type=float, default=0.3, help="weight that counts as 'loaded'")
-    parser.add_argument("--hold", type=float, default=2.0, help="seconds the weight must be stable")
-    parser.add_argument("--set-initial-pose", action="store_true", help="tell AMCL the robot is at 'home'")
-    parser.add_argument("--conveyor", action="store_true",
-                        help="unload at the drop-off with the pusher instead of waiting for a person")
-    parser.add_argument("--dock-distance", type=float, default=0.60,
-                        help="m: how far the robot may back up while looking for the conveyor")
-    parser.add_argument("--dock-speed", type=float, default=0.05, help="m/s: backing-up speed")
-    parser.add_argument("--clear-distance", type=float, default=0.30,
-                        help="m: how far it drives forward again after unloading")
-    parser.add_argument("--push-timeout", type=float, default=120.0, help="s: longest time for one pusher cycle")
-    args, _ = parser.parse_known_args()
-
-    with open(args.stations) as f:
-        stations = yaml.safe_load(f)
-    for key in ("home", "pickup", "dropoff"):
-        if key not in stations:
-            sys.exit(f"stations file is missing '{key}'")
-    conveyor = None
-    if args.conveyor:
-        conveyor = dict(dock_speed=args.dock_speed, dock_distance=args.dock_distance,
-                        clear_distance=args.clear_distance, push_timeout=args.push_timeout)
-
-    rclpy.init()
-    nav = BasicNavigator()
-    if args.set_initial_pose:
-        nav.setInitialPose(make_pose(nav, *stations["home"]))
-    nav.waitUntilNav2Active()
-    mission = Mission(nav, stations, args.load_kg, args.hold, conveyor)
-    try:
-        mission.run(args.loops)
-        nav.get_logger().info("mission complete")
-    except (RuntimeError, KeyboardInterrupt) as e:
-        nav.cancelTask()
-        nav.get_logger().error(str(e) or "mission cancelled")
-    finally:
-        nav.destroy_node()
-        rclpy.try_shutdown()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `robot_ws/src/cargo_bot/launch/robot.launch.py`
-
-```python
-"""Starts everything that runs on the robot itself.
-
-    ros2 launch cargo_bot robot.launch.py                  # base + payload + lidar
-    ros2 launch cargo_bot robot.launch.py vision:=true     # + camera / line follower
-    ros2 launch cargo_bot robot.launch.py pusher:=true     # + cargo pusher (design v3)
-    ros2 launch cargo_bot robot.launch.py lidar:=false payload:=false   # just the wheels
-
-Command flow:  (teleop | Nav2 | line follower) -> /cmd_vel -> speed_limiter -> /cmd_vel_safe -> base_driver
-"""
-import os
-
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument
-from launch.conditions import IfCondition
-from launch.substitutions import Command, LaunchConfiguration
-from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
-
-
-def generate_launch_description():
-    pkg = get_package_share_directory("cargo_bot")
-    config = os.path.join(pkg, "config", "robot.yaml")
-    laser_filter = os.path.join(pkg, "config", "laser_filter.yaml")
-    xacro_file = os.path.join(pkg, "urdf", "cargo_bot.urdf.xacro")
-    robot_description = ParameterValue(Command(["xacro ", xacro_file]), value_type=str)
-
-    lidar = LaunchConfiguration("lidar")
-    return LaunchDescription([
-        DeclareLaunchArgument("lidar", default_value="true"),
-        DeclareLaunchArgument("payload", default_value="true"),
-        DeclareLaunchArgument("vision", default_value="false"),
-        DeclareLaunchArgument("pusher", default_value="false"),
-        DeclareLaunchArgument("lidar_port", default_value="/dev/rplidar"),
-
-        Node(package="robot_state_publisher", executable="robot_state_publisher",
-             parameters=[{"robot_description": robot_description}]),
-        Node(package="cargo_bot", executable="base_driver", parameters=[config],
-             remappings=[("cmd_vel", "cmd_vel_safe")], output="screen"),
-        Node(package="cargo_bot", executable="speed_limiter", parameters=[config], output="screen"),
-        Node(package="cargo_bot", executable="payload_node", parameters=[config], output="screen",
-             condition=IfCondition(LaunchConfiguration("payload"))),
-        Node(package="cargo_bot", executable="vision_node", parameters=[config], output="screen",
-             condition=IfCondition(LaunchConfiguration("vision"))),
-        Node(package="cargo_bot", executable="pusher_node", parameters=[config], output="screen",
-             condition=IfCondition(LaunchConfiguration("pusher"))),
-
-        Node(package="rplidar_ros", executable="rplidar_node", name="rplidar_node", output="screen",
-             parameters=[{"serial_port": LaunchConfiguration("lidar_port"), "serial_baudrate": 115200,
-                          "frame_id": "laser", "angle_compensate": True}],
-             condition=IfCondition(lidar)),
-        Node(package="laser_filters", executable="scan_to_scan_filter_chain", parameters=[laser_filter],
-             condition=IfCondition(lidar)),
-    ])
-```
-
-### `robot_ws/src/cargo_bot/launch/sim.launch.py`
-
-```python
-"""Gazebo simulation of the cargo robot (replaces robot.launch.py when there is no real robot).
-
-    ros2 launch cargo_bot sim.launch.py                 # Gazebo window + robot in the test area
-    ros2 launch cargo_bot sim.launch.py headless:=true  # no Gazebo window (faster)
-
-Then, exactly as on the real robot:
-    ros2 run teleop_twist_keyboard teleop_twist_keyboard
-    ros2 launch cargo_bot slam.launch.py use_sim_time:=true
-    ros2 launch cargo_bot nav.launch.py map:=$HOME/maps/sim.yaml use_sim_time:=true
-
-Simulated: wheels + odometry (Gazebo DiffDrive, in place of base_driver), lidar (/scan), camera
-(/camera/image_raw). Not simulated: load cells (no /payload_weight, so speed_limiter runs at full speed),
-E-stop, encoders/GPIO.
-"""
-import os
-
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
-from launch.actions import AppendEnvironmentVariable, DeclareLaunchArgument, IncludeLaunchDescription
-from launch.conditions import IfCondition, UnlessCondition
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import Command, LaunchConfiguration
-from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
-
-
-def generate_launch_description():
-    pkg = get_package_share_directory("cargo_bot")
-    world = LaunchConfiguration("world")
-    xacro_file = os.path.join(pkg, "urdf", "cargo_bot.urdf.xacro")
-    robot_description = ParameterValue(Command(["xacro ", xacro_file, " sim:=true"]), value_type=str)
-    gz_sim = os.path.join(get_package_share_directory("ros_gz_sim"), "launch", "gz_sim.launch.py")
-    sim_time = {"use_sim_time": True}
-
-    return LaunchDescription([
-        DeclareLaunchArgument("world", default_value=os.path.join(pkg, "worlds", "test_area.sdf")),
-        DeclareLaunchArgument("headless", default_value="false"),
-        # lets Gazebo find package://cargo_bot/meshes/... from the URDF
-        AppendEnvironmentVariable("GZ_SIM_RESOURCE_PATH", os.path.dirname(pkg)),
-
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(gz_sim),
-                                 launch_arguments={"gz_args": ["-r ", world]}.items(),
-                                 condition=UnlessCondition(LaunchConfiguration("headless"))),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(gz_sim),
-                                 launch_arguments={"gz_args": ["-r -s ", world]}.items(),
-                                 condition=IfCondition(LaunchConfiguration("headless"))),
-
-        Node(package="robot_state_publisher", executable="robot_state_publisher",
-             parameters=[{"robot_description": robot_description}, sim_time]),
-        Node(package="ros_gz_sim", executable="create", output="screen",
-             arguments=["-topic", "robot_description", "-name", "cargo_bot", "-z", "0.01"]),
-        Node(package="ros_gz_bridge", executable="parameter_bridge", output="screen",
-             parameters=[{"config_file": os.path.join(pkg, "config", "gz_bridge.yaml")}, sim_time]),
-
-        # same processing chain as the real robot
-        Node(package="cargo_bot", executable="speed_limiter", output="screen",
-             parameters=[os.path.join(pkg, "config", "robot.yaml"), sim_time]),
-        Node(package="laser_filters", executable="scan_to_scan_filter_chain",
-             parameters=[os.path.join(pkg, "config", "laser_filter.yaml"), sim_time]),
-    ])
-```
-
-### `robot_ws/src/cargo_bot/launch/slam.launch.py`
-
-```python
-"""Mapping: slam_toolbox with our settings (uses /scan_filtered). Run robot.launch.py (or sim.launch.py) first.
-
-    ros2 launch cargo_bot slam.launch.py                      # real robot
-    ros2 launch cargo_bot slam.launch.py use_sim_time:=true   # Gazebo simulation
-"""
-import os
-
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-
-
-def generate_launch_description():
-    slam_launch = os.path.join(get_package_share_directory("slam_toolbox"), "launch", "online_async_launch.py")
-    params = os.path.join(get_package_share_directory("cargo_bot"), "config", "slam.yaml")
-    return LaunchDescription([
-        DeclareLaunchArgument("use_sim_time", default_value="false"),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(slam_launch), launch_arguments={
-            "slam_params_file": params,
-            "use_sim_time": LaunchConfiguration("use_sim_time"),
-        }.items()),
-    ])
-```
-
-### `robot_ws/src/cargo_bot/launch/nav.launch.py`
-
-```python
-"""Autonomous navigation on a saved map: map_server + AMCL + Nav2. Run robot.launch.py (or sim.launch.py) first.
-
-    ros2 launch cargo_bot nav.launch.py map:=$HOME/maps/lab.yaml                     # real robot
-    ros2 launch cargo_bot nav.launch.py map:=$HOME/maps/sim.yaml use_sim_time:=true  # Gazebo simulation
-"""
-import os
-
-from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
-from launch.launch_description_sources import PythonLaunchDescriptionSource
-from launch.substitutions import LaunchConfiguration
-
-
-def generate_launch_description():
-    bringup = os.path.join(get_package_share_directory("nav2_bringup"), "launch", "bringup_launch.py")
-    params = os.path.join(get_package_share_directory("cargo_bot"), "config", "nav2_params.yaml")
-    return LaunchDescription([
-        DeclareLaunchArgument("map", description="full path to the map .yaml saved in week 6"),
-        DeclareLaunchArgument("use_sim_time", default_value="false"),
-        IncludeLaunchDescription(PythonLaunchDescriptionSource(bringup), launch_arguments={
-            "map": LaunchConfiguration("map"),
-            "params_file": params,
-            "use_sim_time": LaunchConfiguration("use_sim_time"),
-            "autostart": "true",
-        }.items()),
-    ])
-```
-
-### `robot_ws/src/cargo_bot/config/robot.yaml`
-
-```yaml
-# Settings for the cargo_bot nodes. After editing: colcon build, then relaunch.
-# Keep the decimal point on decimal numbers (write 1.0, not 1) or ROS will refuse the value.
-# Pin numbers live in cargo_bot/pins.py.
-
-base_driver:
-  ros__parameters:
-    wheel_radius: 0.05          # m - fine-tune with the 3 m straight-line test (week 5)
-    wheel_separation: 0.33      # m - fine-tune with the 10-turn rotation test (week 5)
-    ticks_per_rev: 2464         # encoder counts per wheel turn - measure with tools/test_encoders.py
-    max_wheel_speed: 12.0       # rad/s (12 rad/s x 0.05 m = 0.6 m/s)
-    rate: 50.0
-    cmd_timeout: 0.5
-    kf: 0.05                    # from tools/test_motors.py --max
-    kp: 0.02
-    ki: 0.10
-    min_duty: 0.10              # from tools/test_motors.py --min
-    pwm_freq: 1000
-    invert_left_motor: false
-    invert_right_motor: false
-    invert_left_encoder: false
-    invert_right_encoder: false
-    use_estop_sense: true       # false if the 10k/3.3k divider on GPIO26 is not fitted yet
-
-payload_node:
-  ros__parameters:
-    scale: 22000.0              # from tools/test_hx711.py --calibrate
-    signs: [1, 1, 1, 1]
-    tare_on_start: true         # the cargo bed must be EMPTY when the robot starts
-    median_window: 5
-
-speed_limiter:
-  ros__parameters:
-    max_payload_kg: 15.0
-    min_factor: 0.5
-    overload_ratio: 1.1
-    max_linear: 0.5
-    max_angular: 1.5
-    weight_timeout: 2.0
-
-pusher_node:
-  ros__parameters:
-    duty_out: 1.0               # 0-1: motor power while pushing the cargo off
-    duty_in: 1.0                # 0-1: motor power while the blade returns
-    stroke_timeout: 45.0        # s - a stroke that takes longer is a fault (jammed, or no motor power)
-    dwell: 0.5                  # s - pause at the rear before returning
-    invert_motor: false         # from tools/test_pusher.py: true if "out" moves the blade to the FRONT
-    pwm_freq: 1000
-
-vision_node:
-  ros__parameters:
-    device: 0                   # /dev/video0
-    width: 640
-    height: 480
-    rate: 15.0
-    dark_line: true
-    roi_top: 0.55
-    min_area: 600
-    follow_speed: 0.12
-    k_turn: 1.5
-    lost_timeout: 0.5
-    aruco_dict: "DICT_4X4_50"
-    debug_image: true
-```
-
-### `robot_ws/src/cargo_bot/config/laser_filter.yaml`
-
-```yaml
-# Removes lidar points that hit the robot itself or the cargo on its back:
-# every point inside this box (in base_link coordinates) is deleted from /scan -> /scan_filtered.
-scan_to_scan_filter_chain:
-  ros__parameters:
-    filter1:
-      name: robot_body
-      type: laser_filters/LaserScanBoxFilter
-      params:
-        box_frame: base_link
-        min_x: -0.26
-        max_x: 0.26
-        min_y: -0.21
-        max_y: 0.21
-        min_z: -1.0
-        max_z: 1.0
-        invert: false
-```
-
-### `robot_ws/src/cargo_bot/config/gz_bridge.yaml`
-
-```yaml
-# Gazebo <-> ROS 2 topic bridge for the simulation (ros_gz_bridge parameter_bridge).
-# ROS side uses exactly the same topic names as the real robot.
-- ros_topic_name: "/clock"
-  gz_topic_name: "/clock"
-  ros_type_name: "rosgraph_msgs/msg/Clock"
-  gz_type_name: "gz.msgs.Clock"
-  direction: GZ_TO_ROS
-
-# speed_limiter output -> simulated wheels (on the real robot, base_driver listens to /cmd_vel_safe)
-- ros_topic_name: "/cmd_vel_safe"
-  gz_topic_name: "/cmd_vel"
-  ros_type_name: "geometry_msgs/msg/Twist"
-  gz_type_name: "gz.msgs.Twist"
-  direction: ROS_TO_GZ
-
-- ros_topic_name: "/odom"
-  gz_topic_name: "/odom"
-  ros_type_name: "nav_msgs/msg/Odometry"
-  gz_type_name: "gz.msgs.Odometry"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "/tf"
-  gz_topic_name: "/tf"
-  ros_type_name: "tf2_msgs/msg/TFMessage"
-  gz_type_name: "gz.msgs.Pose_V"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "/joint_states"
-  gz_topic_name: "/joint_states"
-  ros_type_name: "sensor_msgs/msg/JointState"
-  gz_type_name: "gz.msgs.Model"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "/scan"
-  gz_topic_name: "/scan"
-  ros_type_name: "sensor_msgs/msg/LaserScan"
-  gz_type_name: "gz.msgs.LaserScan"
-  direction: GZ_TO_ROS
-
-- ros_topic_name: "/camera/image_raw"
-  gz_topic_name: "/camera/image_raw"
-  ros_type_name: "sensor_msgs/msg/Image"
-  gz_type_name: "gz.msgs.Image"
-  direction: GZ_TO_ROS
-```
-
-### `robot_ws/src/cargo_bot/urdf/cargo_bot.urdf.xacro`
-
-```xml
-<?xml version="1.0"?>
-<!-- Cargo robot model (design v3). All numbers come from cad/robot_cad.py (converted to metres).
-     Frames: base_footprint (on the floor, under the axle centre) -> base_link (axle centre)
-             X = forward, Y = left, Z = up.
-     Used by the real robot (robot.launch.py) and by the Gazebo simulation (sim.launch.py, sim:=true).
-     Masses are estimates (total ~6 kg with the pusher); correct them after weighing the real robot.
-     The pusher is part of the body mesh (blade parked); it has no joint and does not move in the model. -->
-<robot name="cargo_bot" xmlns:xacro="http://www.ros.org/wiki/xacro">
-
-  <xacro:arg name="sim" default="false"/>
-
-  <xacro:property name="axle_z" value="0.05"/>          <!-- wheel radius -->
-  <xacro:property name="wheel_radius" value="0.05"/>
-  <xacro:property name="wheel_width" value="0.03"/>
-  <xacro:property name="wheel_y" value="0.165"/>
-  <xacro:property name="wheel_mass" value="0.15"/>
-  <xacro:property name="body_mass" value="5.6"/>
-  <!-- RPLIDAR orientation: if obstacles in front show up BEHIND the robot in RViz, change pi to 0.0 -->
-  <xacro:property name="laser_yaw" value="${pi}"/>
-
-  <material name="body"><color rgba="0.80 0.72 0.55 1"/></material>
-  <material name="black"><color rgba="0.1 0.1 0.1 1"/></material>
-
-  <link name="base_footprint"/>
-
-  <link name="base_link">
-    <!-- the real shape, exported from the CAD model (cad/export_ros_mesh.py), in mm -->
-    <visual>
-      <origin xyz="0 0 0"/>
-      <geometry><mesh filename="package://cargo_bot/meshes/cargo_bot_body.stl" scale="0.001 0.001 0.001"/></geometry>
-      <material name="body"/>
-    </visual>
-    <!-- simple box for physics: bottom plate underside (z 0.022) to cargo plate top (z 0.162) -->
-    <collision>
-      <origin xyz="0 0 0.092"/>
-      <geometry><box size="0.40 0.30 0.14"/></geometry>
-    </collision>
-    <inertial>
-      <origin xyz="0 0 0.06"/>
-      <mass value="${body_mass}"/>
-      <inertia ixx="${body_mass / 12 * (0.30**2 + 0.14**2)}" ixy="0" ixz="0"
-               iyy="${body_mass / 12 * (0.40**2 + 0.14**2)}" iyz="0"
-               izz="${body_mass / 12 * (0.40**2 + 0.30**2)}"/>
-    </inertial>
-  </link>
-
-  <joint name="base_joint" type="fixed">
-    <parent link="base_footprint"/>
-    <child link="base_link"/>
-    <origin xyz="0 0 ${axle_z}"/>
-  </joint>
-
-  <!-- drive wheels -->
-  <xacro:macro name="wheel" params="side y">
-    <link name="${side}_wheel_link">
-      <visual>
-        <origin rpy="${pi/2} 0 0"/>
-        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
-        <material name="black"/>
-      </visual>
-      <collision>
-        <origin rpy="${pi/2} 0 0"/>
-        <geometry><cylinder radius="${wheel_radius}" length="${wheel_width}"/></geometry>
-      </collision>
-      <inertial>
-        <mass value="${wheel_mass}"/>
-        <inertia ixx="${wheel_mass / 12 * (3 * wheel_radius**2 + wheel_width**2)}" ixy="0" ixz="0"
-                 iyy="${wheel_mass / 2 * wheel_radius**2}" iyz="0"
-                 izz="${wheel_mass / 12 * (3 * wheel_radius**2 + wheel_width**2)}"/>
-      </inertial>
-    </link>
-    <joint name="${side}_wheel_joint" type="continuous">
-      <parent link="base_link"/>
-      <child link="${side}_wheel_link"/>
-      <origin xyz="0 ${y} 0"/>
-      <axis xyz="0 1 0"/>
-    </joint>
-  </xacro:macro>
-  <xacro:wheel side="left" y="${wheel_y}"/>
-  <xacro:wheel side="right" y="${-wheel_y}"/>
-
-  <!-- 50 mm swivel casters: frictionless spheres in simulation -->
-  <xacro:macro name="caster" params="name x">
-    <link name="${name}_caster_link">
-      <visual>
-        <origin rpy="${pi/2} 0 0"/>
-        <geometry><cylinder radius="0.025" length="0.02"/></geometry>
-        <material name="black"/>
-      </visual>
-      <collision>
-        <geometry><sphere radius="0.025"/></geometry>
-      </collision>
-      <inertial>
-        <mass value="0.05"/>
-        <inertia ixx="1.25e-5" ixy="0" ixz="0" iyy="1.25e-5" iyz="0" izz="1.25e-5"/>
-      </inertial>
-    </link>
-    <joint name="${name}_caster_joint" type="fixed">
-      <parent link="base_link"/>
-      <child link="${name}_caster_link"/>
-      <origin xyz="${x} 0 -0.025"/>
-    </joint>
-  </xacro:macro>
-  <xacro:caster name="front" x="0.145"/>
-  <xacro:caster name="rear" x="-0.175"/>
-
-  <!-- RPLIDAR A1 (frame name must match the lidar driver's frame_id: laser) -->
-  <link name="laser"/>
-  <joint name="laser_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="laser"/>
-    <origin xyz="0.153 0 0.20" rpy="0 0 ${laser_yaw}"/>
-  </joint>
-
-  <!-- USB camera, tilted 35 degrees down -->
-  <link name="camera_link"/>
-  <joint name="camera_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="camera_link"/>
-    <origin xyz="0.212 0 0.048" rpy="0 0.611 0"/>
-  </joint>
-
-  <xacro:if value="$(arg sim)">
-    <xacro:include filename="$(find cargo_bot)/urdf/cargo_bot.gazebo.xacro"/>
-  </xacro:if>
-</robot>
-```
-
-### `robot_ws/src/cargo_bot/urdf/cargo_bot.gazebo.xacro`
-
-```xml
-<?xml version="1.0"?>
-<!-- Gazebo (Harmonic, the simulator for ROS 2 Jazzy) additions: wheel friction, drive plugin, lidar, camera.
-     Included by cargo_bot.urdf.xacro only when xacro is called with sim:=true.
-     The simulated robot uses the SAME topics and frames as the real one:
-       /cmd_vel_safe (in, from speed_limiter)  /odom  /tf (odom -> base_footprint)  /joint_states  /scan  /camera/image_raw -->
-<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
-
-  <gazebo reference="left_wheel_link"><mu1>1.0</mu1><mu2>1.0</mu2></gazebo>
-  <gazebo reference="right_wheel_link"><mu1>1.0</mu1><mu2>1.0</mu2></gazebo>
-  <gazebo reference="front_caster_link"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
-  <gazebo reference="rear_caster_link"><mu1>0.0</mu1><mu2>0.0</mu2></gazebo>
-
-  <gazebo>
-    <!-- replaces base_driver.py: takes the speed command, drives the wheels, publishes odometry + TF -->
-    <plugin filename="gz-sim-diff-drive-system" name="gz::sim::systems::DiffDrive">
-      <left_joint>left_wheel_joint</left_joint>
-      <right_joint>right_wheel_joint</right_joint>
-      <wheel_separation>0.33</wheel_separation>
-      <wheel_radius>0.05</wheel_radius>
-      <max_linear_acceleration>1.0</max_linear_acceleration>
-      <topic>/cmd_vel</topic>
-      <odom_topic>/odom</odom_topic>
-      <tf_topic>/tf</tf_topic>
-      <frame_id>odom</frame_id>
-      <child_frame_id>base_footprint</child_frame_id>
-      <odom_publish_frequency>50</odom_publish_frequency>
-    </plugin>
-    <plugin filename="gz-sim-joint-state-publisher-system" name="gz::sim::systems::JointStatePublisher">
-      <topic>/joint_states</topic>
-    </plugin>
-  </gazebo>
-
-  <!-- RPLIDAR A1: 360 samples, 0.15-12 m, ~7 Hz -->
-  <gazebo reference="laser">
-    <sensor name="lidar" type="gpu_lidar">
-      <topic>/scan</topic>
-      <gz_frame_id>laser</gz_frame_id>
-      <update_rate>7</update_rate>
-      <always_on>true</always_on>
-      <visualize>true</visualize>
-      <lidar>
-        <scan>
-          <horizontal>
-            <samples>360</samples>
-            <resolution>1</resolution>
-            <min_angle>-3.14159</min_angle>
-            <max_angle>3.14159</max_angle>
-          </horizontal>
-        </scan>
-        <range>
-          <min>0.15</min>
-          <max>12.0</max>
-          <resolution>0.01</resolution>
-        </range>
-        <noise>
-          <type>gaussian</type>
-          <mean>0.0</mean>
-          <stddev>0.01</stddev>
-        </noise>
-      </lidar>
-    </sensor>
-  </gazebo>
-
-  <!-- USB camera: 640x480, wide angle -->
-  <gazebo reference="camera_link">
-    <sensor name="camera" type="camera">
-      <topic>/camera/image_raw</topic>
-      <gz_frame_id>camera_link</gz_frame_id>
-      <update_rate>15</update_rate>
-      <always_on>true</always_on>
-      <camera>
-        <horizontal_fov>1.75</horizontal_fov>
-        <image>
-          <width>640</width>
-          <height>480</height>
-          <format>R8G8B8</format>
-        </image>
-        <clip>
-          <near>0.02</near>
-          <far>10.0</far>
-        </clip>
-      </camera>
-    </sensor>
-  </gazebo>
-</robot>
-```
-
-### `robot_ws/src/cargo_bot/worlds/test_area.sdf`
-
-```xml
-<?xml version="1.0"?>
-<!-- Simple 8 x 6 m test area for SLAM / Nav2 in Gazebo Harmonic: walls, a doorway, some boxes. -->
-<sdf version="1.8">
-  <world name="test_area">
-    <physics name="1ms" type="ignored">
-      <max_step_size>0.001</max_step_size>
-      <real_time_factor>1.0</real_time_factor>
-    </physics>
-    <plugin filename="gz-sim-physics-system" name="gz::sim::systems::Physics"/>
-    <plugin filename="gz-sim-user-commands-system" name="gz::sim::systems::UserCommands"/>
-    <plugin filename="gz-sim-scene-broadcaster-system" name="gz::sim::systems::SceneBroadcaster"/>
-    <plugin filename="gz-sim-sensors-system" name="gz::sim::systems::Sensors">
-      <render_engine>ogre2</render_engine>
-    </plugin>
-
-    <light type="directional" name="sun">
-      <cast_shadows>true</cast_shadows>
-      <pose>0 0 10 0 0 0</pose>
-      <diffuse>0.9 0.9 0.9 1</diffuse>
-      <specular>0.2 0.2 0.2 1</specular>
-      <direction>-0.4 0.2 -0.9</direction>
-    </light>
-
-    <model name="ground_plane">
-      <static>true</static>
-      <link name="link">
-        <collision name="collision">
-          <geometry><plane><normal>0 0 1</normal><size>30 30</size></plane></geometry>
-        </collision>
-        <visual name="visual">
-          <geometry><plane><normal>0 0 1</normal><size>30 30</size></plane></geometry>
-          <material><ambient>0.85 0.85 0.85 1</ambient><diffuse>0.85 0.85 0.85 1</diffuse></material>
-        </visual>
-      </link>
-    </model>
-
-    <!-- walls: 0.1 m thick, 0.5 m high. Room spans x -3..5, y -3..3; the robot starts at the origin. -->
-    <model name="walls">
-      <static>true</static>
-      <link name="link">
-        <collision name="north"><pose>1 3 0.25 0 0 0</pose><geometry><box><size>8.1 0.1 0.5</size></box></geometry></collision>
-        <visual name="north"><pose>1 3 0.25 0 0 0</pose><geometry><box><size>8.1 0.1 0.5</size></box></geometry></visual>
-        <collision name="south"><pose>1 -3 0.25 0 0 0</pose><geometry><box><size>8.1 0.1 0.5</size></box></geometry></collision>
-        <visual name="south"><pose>1 -3 0.25 0 0 0</pose><geometry><box><size>8.1 0.1 0.5</size></box></geometry></visual>
-        <collision name="west"><pose>-3 0 0.25 0 0 0</pose><geometry><box><size>0.1 6 0.5</size></box></geometry></collision>
-        <visual name="west"><pose>-3 0 0.25 0 0 0</pose><geometry><box><size>0.1 6 0.5</size></box></geometry></visual>
-        <collision name="east"><pose>5 0 0.25 0 0 0</pose><geometry><box><size>0.1 6 0.5</size></box></geometry></collision>
-        <visual name="east"><pose>5 0 0.25 0 0 0</pose><geometry><box><size>0.1 6 0.5</size></box></geometry></visual>
-        <!-- inner wall with a 0.9 m doorway between y = 1.4 and y = 2.3 -->
-        <collision name="inner_a"><pose>2 -0.8 0.25 0 0 0</pose><geometry><box><size>0.1 4.4 0.5</size></box></geometry></collision>
-        <visual name="inner_a"><pose>2 -0.8 0.25 0 0 0</pose><geometry><box><size>0.1 4.4 0.5</size></box></geometry></visual>
-        <collision name="inner_b"><pose>2 2.65 0.25 0 0 0</pose><geometry><box><size>0.1 0.7 0.5</size></box></geometry></collision>
-        <visual name="inner_b"><pose>2 2.65 0.25 0 0 0</pose><geometry><box><size>0.1 0.7 0.5</size></box></geometry></visual>
-      </link>
-    </model>
-
-    <model name="box_1">
-      <static>true</static>
-      <pose>0.5 -1.8 0.25 0 0 0.3</pose>
-      <link name="link">
-        <collision name="c"><geometry><box><size>0.5 0.5 0.5</size></box></geometry></collision>
-        <visual name="v"><geometry><box><size>0.5 0.5 0.5</size></box></geometry>
-          <material><ambient>0.6 0.4 0.2 1</ambient><diffuse>0.6 0.4 0.2 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="box_2">
-      <static>true</static>
-      <pose>3.5 -1.5 0.25 0 0 0</pose>
-      <link name="link">
-        <collision name="c"><geometry><box><size>0.6 0.4 0.5</size></box></geometry></collision>
-        <visual name="v"><geometry><box><size>0.6 0.4 0.5</size></box></geometry>
-          <material><ambient>0.2 0.4 0.6 1</ambient><diffuse>0.2 0.4 0.6 1</diffuse></material></visual>
-      </link>
-    </model>
-    <model name="pillar">
-      <static>true</static>
-      <pose>-1.5 1.5 0.5 0 0 0</pose>
-      <link name="link">
-        <collision name="c"><geometry><cylinder><radius>0.15</radius><length>1.0</length></cylinder></geometry></collision>
-        <visual name="v"><geometry><cylinder><radius>0.15</radius><length>1.0</length></cylinder></geometry></visual>
-      </link>
-    </model>
-  </world>
-</sdf>
-```
-
-### `robot_ws/src/cargo_bot/package.xml`
-
-```xml
-<?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
-<package format="3">
-  <name>cargo_bot</name>
-  <version>1.0.0</version>
-  <description>Autonomous cargo robot: motor/encoder/load-cell drivers, vision, missions and launch files</description>
-  <maintainer email="team@example.com">Cargo Bot Team</maintainer>
-  <license>MIT</license>
-
-  <exec_depend>rclpy</exec_depend>
-  <exec_depend>geometry_msgs</exec_depend>
-  <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>std_msgs</exec_depend>
-  <exec_depend>std_srvs</exec_depend>
-  <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>robot_state_publisher</exec_depend>
-  <exec_depend>xacro</exec_depend>
-  <exec_depend>rplidar_ros</exec_depend>
-  <exec_depend>laser_filters</exec_depend>
-  <exec_depend>nav2_simple_commander</exec_depend>
-  <exec_depend>python3-opencv</exec_depend>
-  <exec_depend>python3-yaml</exec_depend>
-  <!-- simulation only (sim.launch.py) -->
-  <exec_depend>ros_gz_sim</exec_depend>
-  <exec_depend>ros_gz_bridge</exec_depend>
-
-  <export>
-    <build_type>ament_python</build_type>
-  </export>
-</package>
-```
-
-### `robot_ws/src/cargo_bot/setup.py`
-
-```python
-from glob import glob
-
-from setuptools import setup
-
-package_name = "cargo_bot"
-
-setup(
-    name=package_name,
-    version="1.0.0",
-    packages=[package_name],
-    data_files=[
-        ("share/ament_index/resource_index/packages", ["resource/" + package_name]),
-        ("share/" + package_name, ["package.xml"]),
-        ("share/" + package_name + "/launch", glob("launch/*.launch.py")),
-        ("share/" + package_name + "/config", glob("config/*.yaml")),
-        ("share/" + package_name + "/urdf", glob("urdf/*.xacro")),
-        ("share/" + package_name + "/meshes", glob("meshes/*.stl")),
-        ("share/" + package_name + "/worlds", glob("worlds/*.sdf")),
-    ],
-    install_requires=["setuptools"],
-    zip_safe=True,
-    maintainer="Cargo Bot Team",
-    maintainer_email="team@example.com",
-    description="Autonomous cargo robot",
-    license="MIT",
-    entry_points={
-        "console_scripts": [
-            "base_driver = cargo_bot.base_driver:main",
-            "payload_node = cargo_bot.payload_node:main",
-            "speed_limiter = cargo_bot.speed_limiter:main",
-            "vision_node = cargo_bot.vision_node:main",
-            "pusher_node = cargo_bot.pusher_node:main",
-            "mission = cargo_bot.mission:main",
-        ],
-    },
-)
-```
-
-### `robot_ws/src/cargo_bot/setup.cfg`
-
-```ini
-[develop]
-script_dir=$base/lib/cargo_bot
-[install]
-install_scripts=$base/lib/cargo_bot
-```
-
-### `tools/common.py`
-
-```python
-"""Shared helpers for the bench-test tools (they run on the Pi without ROS)."""
-import sys
-from pathlib import Path
-
-import yaml
-
-ROOT = Path(__file__).resolve().parents[1]
-PKG = ROOT / "robot_ws" / "src" / "cargo_bot"
-sys.path.insert(0, str(PKG))            # lets the tools import cargo_bot.hw / cargo_bot.pins
-
-
-def config(node):
-    """ros__parameters of one node from robot_ws/src/cargo_bot/config/robot.yaml."""
-    data = yaml.safe_load((PKG / "config" / "robot.yaml").read_text())
-    return data[node]["ros__parameters"]
-```
-
-### `tools/test_motors.py`
-
-```python
-#!/usr/bin/env python3
-"""Motor + encoder bench test.   PUT THE ROBOT ON A BOX SO BOTH WHEELS ARE IN THE AIR.
-
-  python3 tools/test_motors.py          each wheel forward, then backward, 30 % for 2 s
-  python3 tools/test_motors.py --max    each wheel at 100 % for 3 s   -> prints kf
-  python3 tools/test_motors.py --min    slow ramp until the wheel moves -> prints min_duty
-
-Uses the invert_* and ticks_per_rev values from config/robot.yaml, so re-run it after changing them.
-"""
-import argparse
-import math
-import time
-
-import common
-from cargo_bot import hw
-from cargo_bot.pins import PINS
-
-
-def speed(enc, seconds, ticks):
-    c0 = enc.count
-    time.sleep(seconds)
-    return (enc.count - c0) / ticks * 2 * math.pi / seconds      # rad/s at the wheel
-
-
-def basic(motors, encs, ticks, duty):
-    for side in ("left", "right"):
-        for sign, name in ((1, "FORWARD"), (-1, "BACKWARD")):
-            input(f"\n[{side} wheel {name}] press Enter, watch the {side} wheel ...")
-            c0 = encs[side].count
-            motors[side].set(sign * duty)
-            time.sleep(2.0)
-            motors[side].set(0)
-            time.sleep(0.5)
-            delta = encs[side].count - c0
-            print(f"  encoder change: {delta:+d} counts ({delta / ticks:+.2f} wheel turns), "
-                  f"missed edges so far: {encs[side].errors}")
-            if delta == 0:
-                print("  !! encoder did not count: check encoder power (3.3 V), GND and A/B wires")
-            elif (delta > 0) != (sign > 0):
-                print(f"  !! count has the wrong sign: set invert_{side}_encoder: true in robot.yaml")
-    print("\nCheck by eye: on FORWARD, did each wheel turn the way that drives the robot FORWARD?")
-    print("If not, set invert_<side>_motor: true in robot.yaml, then run this test again "
-          "(the encoder sign must also come out right).")
-
-
-def max_speed(motors, encs, ticks):
-    speeds = {}
-    for side in ("left", "right"):
-        input(f"\n[{side} wheel 100 %] press Enter ...")
-        motors[side].set(1.0)
-        time.sleep(1.0)                                  # let it spin up
-        speeds[side] = speed(encs[side], 2.0, ticks)
-        motors[side].set(0)
-        print(f"  top speed {speeds[side]:.1f} rad/s = {speeds[side] * 30 / math.pi:.0f} rpm")
-    slowest = min(abs(s) for s in speeds.values())
-    print(f"\nPut this in config/robot.yaml:   kf: {1.0 / slowest:.3f}")
-
-
-def min_duty(motors, encs):
-    found = []
-    for side in ("left", "right"):
-        input(f"\n[{side} wheel ramp] press Enter ...")
-        duty, c0 = 0.0, encs[side].count
-        while duty < 0.5 and abs(encs[side].count - c0) < 20:
-            duty += 0.01
-            motors[side].set(duty)
-            time.sleep(0.3)
-        motors[side].set(0)
-        print(f"  started moving at {duty:.2f}")
-        found.append(duty)
-    print(f"\nPut this in config/robot.yaml:   min_duty: {0.9 * max(found):.2f}")
-
-
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--max", action="store_true")
-    ap.add_argument("--min", action="store_true")
-    ap.add_argument("--duty", type=float, default=0.3)
-    args = ap.parse_args()
-    cfg = common.config("base_driver")
-    ticks = cfg["ticks_per_rev"]
-
-    chip = hw.open_chip()
-    enable = hw.DigitalOut(chip, PINS["enable"], 0)
-    motors = {
-        "left": hw.Motor(chip, PINS["left_fwd"], PINS["left_rev"], invert=cfg["invert_left_motor"]),
-        "right": hw.Motor(chip, PINS["right_fwd"], PINS["right_rev"], invert=cfg["invert_right_motor"]),
-    }
-    encs = {
-        "left": hw.QuadratureEncoder(chip, PINS["left_enc_a"], PINS["left_enc_b"], cfg["invert_left_encoder"]),
-        "right": hw.QuadratureEncoder(chip, PINS["right_enc_a"], PINS["right_enc_b"], cfg["invert_right_encoder"]),
-    }
-    sense = hw.DigitalIn(chip, PINS["estop_sense"])
-    print("motor power:", "ON" if sense.read() else "OFF  (E-stop pressed, or the GPIO26 divider is missing)")
-    enable.write(1)
-    try:
-        if args.max:
-            max_speed(motors, encs, ticks)
-        elif args.min:
-            min_duty(motors, encs)
-        else:
-            basic(motors, encs, ticks, args.duty)
-    finally:
-        for m in motors.values():
-            m.set(0)
-        enable.write(0)
-        for part in list(motors.values()) + list(encs.values()) + [enable, sense]:
-            part.close()
-        hw.close_chip()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `tools/test_encoders.py`
-
-```python
-#!/usr/bin/env python3
-"""Live encoder counts. Measure ticks_per_rev:
-
-  1. python3 tools/test_encoders.py
-  2. put a tape mark on each tyre, turn the wheel by hand exactly 10 turns FORWARD
-  3. ticks_per_rev = count / 10   (both wheels should agree within ~1 %)
-Ctrl+C to stop.
-"""
-import time
-
-import common
-from cargo_bot import hw
-from cargo_bot.pins import PINS
-
-
-def main():
-    cfg = common.config("base_driver")
-    chip = hw.open_chip()
-    left = hw.QuadratureEncoder(chip, PINS["left_enc_a"], PINS["left_enc_b"], cfg["invert_left_encoder"])
-    right = hw.QuadratureEncoder(chip, PINS["right_enc_a"], PINS["right_enc_b"], cfg["invert_right_encoder"])
-    try:
-        while True:
-            print(f"\rleft {left.count:+8d}   right {right.count:+8d}   "
-                  f"(missed edges {left.errors}/{right.errors})   ", end="", flush=True)
-            time.sleep(0.1)
-    except KeyboardInterrupt:
-        print(f"\n\nleft  / 10 = {left.count / 10:.1f}\nright / 10 = {right.count / 10:.1f}")
-    finally:
-        left.close()
-        right.close()
-        hw.close_chip()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `tools/test_hx711.py`
-
-```python
-#!/usr/bin/env python3
-"""Load-cell test and calibration.
-
-  python3 tools/test_hx711.py                 live readings of the 4 cells + total kg (bed empty at start)
-  python3 tools/test_hx711.py --calibrate 2.0 calibrate with a known 2.0 kg weight -> prints scale + signs
-"""
-import argparse
-import time
-
-import common
-from cargo_bot import hw
-from cargo_bot.control import median
-from cargo_bot.pins import CORNERS, PINS
-
-
-def average(cells, n=30):
-    rows = [r for r in (cells.read_raw() for _ in range(n)) if r is not None]
-    if len(rows) < n // 2:
-        raise SystemExit(f"HX711 not answering - boards not ready: {cells.not_ready()}")
-    return [median([r[i] for r in rows]) for i in range(len(rows[0]))]
-
-
-def live(cells):
-    cfg = common.config("payload_node")
-    scale, signs = cfg["scale"], cfg["signs"]
-    print("zeroing - keep the cargo bed EMPTY ...")
-    zero = average(cells, 10)
-    print("change from zero (raw counts):")
-    print("   ".join(f"{c:>12}" for c in CORNERS) + "     total kg (uses scale/signs from robot.yaml)")
-    while True:
-        raw = cells.read_raw()
-        if raw is None:
-            print(f"not ready: {[CORNERS[i] for i in cells.not_ready()]}")
-            continue
-        delta = [s * (r - z) for r, z, s in zip(raw, zero, signs)]
-        print("   ".join(f"{d:12.0f}" for d in delta) + f"     {sum(delta) / scale:8.3f} kg")
-        time.sleep(0.2)
-
-
-def calibrate(cells, kg):
-    input("1) EMPTY the cargo bed, then press Enter ...")
-    zero = average(cells)
-    input(f"2) put the {kg} kg weight in the MIDDLE of the bed, then press Enter ...")
-    loaded = average(cells)
-    delta = [l - z for l, z in zip(loaded, zero)]
-    total = sum(delta)
-    majority = 1 if total >= 0 else -1
-    signs = [1 if d * majority >= 0 or abs(d) < 0.05 * abs(total) / 4 else -1 for d in delta]
-    for c, d, s in zip(CORNERS, delta, signs):
-        flag = "" if s == 1 else "   <-- opposite sign: swap this cell's A+/A- wires, or keep sign -1"
-        print(f"   {c:12s} change {d:+10.0f}{flag}")
-    scale = sum(s * d for s, d in zip(signs, delta)) / kg
-    print("\nPut this in config/robot.yaml (payload_node):")
-    print(f"    scale: {scale:.1f}")
-    print(f"    signs: {signs}")
-    if abs(scale) < 1000:
-        print("!! very small change - check the load-cell wiring (E+/E-/A+/A-)")
-
-
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--calibrate", type=float, metavar="KG")
-    args = ap.parse_args()
-    cells = hw.HX711Array(hw.open_chip(), PINS["hx711_sck"], PINS["hx711_dout"])
-    try:
-        calibrate(cells, args.calibrate) if args.calibrate else live(cells)
-    except KeyboardInterrupt:
-        pass
-    finally:
-        cells.close()
-        hw.close_chip()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `tools/test_pusher.py`
-
-```python
-#!/usr/bin/env python3
-"""Pusher bench test (design v3).   KEEP FINGERS AND WIRES AWAY FROM THE BLADE AND THE LEAD SCREW.
-
-  python3 tools/test_pusher.py              show the two limit switches; press each one by hand
-  python3 tools/test_pusher.py --jog out    run the blade towards the REAR for 1 s (stops on the END switch)
-  python3 tools/test_pusher.py --jog in     run the blade towards the FRONT for 1 s (stops on the HOME switch)
-  python3 tools/test_pusher.py --cycle      one full push: out to END, back to HOME, with the time of each stroke
-
-Uses invert_motor and the duty values of pusher_node in config/robot.yaml, so re-run it after changing them.
-Stop robot.launch.py first: only one program can use the GPIO pins at a time.
-"""
-import argparse
-import sys
-import time
-
-import common
-from cargo_bot import hw
-from cargo_bot.control import PusherCycle
-from cargo_bot.pins import PINS
-
-RATE = 50.0
-
-
-def watch(home, end):
-    print("Press each limit switch by hand (Ctrl+C to stop). Expected: '-' when released, 'PRESSED' when pressed.")
-    last = None
-    try:
-        while True:
-            now = (home.read(), end.read())
-            if now != last:
-                last = now
-                note = "   !! both pressed: a wire is off (C -> GND, NC -> the pin)" if all(now) else ""
-                print(f"  HOME: {'PRESSED' if now[0] else '-':8}  END: {'PRESSED' if now[1] else '-':8}{note}")
-            time.sleep(0.02)
-    except KeyboardInterrupt:
-        print()
-
-
-def jog(motor, home, end, direction, duty, seconds):
-    switch, sign, where = (end, 1, "REAR") if direction == "out" else (home, -1, "FRONT")
-    if switch.read():
-        print(f"the {'END' if direction == 'out' else 'HOME'} switch is already pressed - not moving")
-        return
-    input(f"[jog {direction}] the blade should move towards the {where}. Press Enter ...")
-    motor.set(sign * duty)
-    t_end = time.monotonic() + seconds
-    while time.monotonic() < t_end and not switch.read():
-        time.sleep(0.005)
-    motor.set(0)
-    print("  stopped on the limit switch" if switch.read() else f"  ran for {seconds:.1f} s")
-    print(f"Did it move towards the {where}? If it went the other way, set invert_motor: true under pusher_node\n"
-          "in robot.yaml. If it did not move at all, check the motor power (E-stop), wires P17-P19 and S31-S34.")
-
-
-def cycle(motor, home, end, cfg):
-    seq = PusherCycle(cfg["duty_out"], cfg["duty_in"], cfg["stroke_timeout"], cfg["dwell"])
-    seq.update(bool(home.read()), bool(end.read()), False, 0.0)
-    if seq.state != "home":
-        input("The blade is not parked. Press Enter to bring it HOME first ...")
-        seq.home()
-    else:
-        input("[cycle] the blade goes to the REAR and comes back. Bed clear? Press Enter ...")
-        seq.push()
-    started_push = seq.state == "pushing"
-    last, t_mark, dt = seq.state, time.monotonic(), 1.0 / RATE
-    while seq.state in ("pushing", "out", "returning"):
-        motor.set(seq.update(bool(home.read()), bool(end.read()), False, dt))
-        if seq.state != last:
-            if last in ("pushing", "returning"):
-                print(f"  {last}: {time.monotonic() - t_mark:.1f} s")
-            last, t_mark = seq.state, time.monotonic()
-        time.sleep(dt)
-    motor.set(0)
-    if seq.state == "fault":
-        print(f"  !! FAULT: {seq.reason}")
-    elif started_push:
-        print("  done: the blade is parked. A full stroke should take roughly 15-25 s.")
-    else:
-        print("  the blade is parked. Run --cycle again for a full push.")
-
-
-def main():
-    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--jog", choices=("out", "in"))
-    ap.add_argument("--cycle", action="store_true")
-    ap.add_argument("--seconds", type=float, default=1.0, help="length of a --jog")
-    args = ap.parse_args()
-    cfg = common.config("pusher_node")
-
-    chip = hw.open_chip()
-    parts = []
-    try:
-        try:
-            motor = hw.Motor(chip, PINS["pusher_out"], PINS["pusher_in"], cfg.get("pwm_freq", 1000), cfg["invert_motor"])
-            parts.append(motor)
-            home = hw.DigitalIn(chip, PINS["pusher_home"], pull_down=False)
-            parts.append(home)
-            end = hw.DigitalIn(chip, PINS["pusher_end"], pull_down=False)
-            parts.append(end)
-            sense = hw.DigitalIn(chip, PINS["estop_sense"])
-            parts.append(sense)
-        except Exception as e:
-            sys.exit(f"cannot use the pusher pins: {e}\n"
-                     "  'GPIO busy' means another program is using them (stop robot.launch.py),\n"
-                     "  or SPI is still enabled on the Pi (BUILD_GUIDE.md, section 3.3).")
-        print("motor power:", "ON" if sense.read() else "OFF  (E-stop pressed, or the GPIO26 divider is missing)")
-        if args.jog:
-            duty = cfg["duty_out"] if args.jog == "out" else cfg["duty_in"]
-            jog(motor, home, end, args.jog, duty, args.seconds)
-        elif args.cycle:
-            cycle(motor, home, end, cfg)
-        else:
-            watch(home, end)
-    finally:
-        for part in parts:
-            if isinstance(part, hw.Motor):
-                part.set(0)
-            part.close()
-        hw.close_chip()
-
-
-if __name__ == "__main__":
-    main()
-```
-
-### `tools/make_configs.py`
-
-```python
-#!/usr/bin/env python3
-"""Creates config/nav2_params.yaml and config/slam.yaml for this robot, starting from the default
-files installed with ROS 2 Jazzy (so they always match your installed Nav2 version).
-
-Run on the Pi after installing Nav2 + slam_toolbox, then rebuild the workspace:
-    python3 tools/make_configs.py
-"""
-from pathlib import Path
-
-import yaml
-
-SHARE = Path("/opt/ros/jazzy/share")
-OUT = Path(__file__).resolve().parents[1] / "robot_ws" / "src" / "cargo_bot" / "config"
-
-FOOTPRINT = "[[0.235, 0.19], [0.235, -0.19], [-0.215, -0.19], [-0.215, 0.19]]"   # metres, incl. wheels
-MAX_V = 0.35          # m/s (speed_limiter slows the robot further when it is loaded)
-MAX_W = 1.0           # rad/s
-SCAN = "/scan_filtered"
-
-# Regulated Pure Pursuit: simple, light on the CPU, never reverses (the cargo blocks the rear view)
-RPP = {
-    "plugin": "nav2_regulated_pure_pursuit_controller::RegulatedPurePursuitController",
-    "desired_linear_vel": MAX_V,
-    "lookahead_dist": 0.6,
-    "min_lookahead_dist": 0.3,
-    "max_lookahead_dist": 0.9,
-    "lookahead_time": 1.5,
-    "rotate_to_heading_angular_vel": 0.8,
-    "transform_tolerance": 0.2,
-    "use_velocity_scaled_lookahead_dist": False,
-    "min_approach_linear_velocity": 0.05,
-    "approach_velocity_scaling_dist": 0.6,
-    "use_collision_detection": True,
-    "max_allowed_time_to_collision_up_to_carrot": 1.0,
-    "use_regulated_linear_velocity_scaling": True,
-    "use_cost_regulated_linear_velocity_scaling": False,
-    "regulated_linear_scaling_min_radius": 0.9,
-    "regulated_linear_scaling_min_speed": 0.25,
-    "use_rotate_to_heading": True,
-    "rotate_to_heading_min_angle": 0.785,
-    "allow_reversing": False,
-    "max_angular_accel": 2.0,
-    "max_robot_pose_search_dist": 10.0,
+}  // namespace
+
+void settingsLoad() {
+  Preferences p;
+  p.begin("cargo", true);                 // read-only; missing keys keep their default
+  for (Entry &e : entries) *e.value = p.getFloat(e.name, *e.value);
+  p.end();
 }
 
+bool settingsSave() {
+  Preferences p;
+  if (!p.begin("cargo", false)) return false;
+  bool ok = true;
+  for (Entry &e : entries) ok &= p.putFloat(e.name, *e.value) == sizeof(float);
+  p.end();
+  return ok;
+}
 
-def use_filtered_scan(node):
-    """Point every lidar subscription at /scan_filtered (robot body + cargo removed)."""
-    if isinstance(node, dict):
-        for key, value in node.items():
-            if key in ("topic", "scan_topic") and value in ("scan", "/scan"):
-                node[key] = SCAN
-            else:
-                use_filtered_scan(value)
-    elif isinstance(node, list):
-        for value in node:
-            use_filtered_scan(value)
+void settingsDefaults() {
+  cfg = Settings();
+  Preferences p;
+  p.begin("cargo", false);
+  p.clear();
+  p.end();
+}
 
+bool settingsSet(const char *name, float value) {
+  Entry *e = find(name);
+  if (!e) return false;
+  *e->value = value;
+  return true;
+}
 
-def nav2():
-    p = yaml.safe_load((SHARE / "nav2_bringup" / "params" / "nav2_params.yaml").read_text())
-    use_filtered_scan(p)
-    for costmap in ("local_costmap", "global_costmap"):
-        prm = p[costmap][costmap]["ros__parameters"]
-        prm.pop("robot_radius", None)
-        prm["footprint"] = FOOTPRINT
-    p["controller_server"]["ros__parameters"]["FollowPath"] = RPP
-    vs = p["velocity_smoother"]["ros__parameters"]
-    vs["max_velocity"] = [MAX_V, 0.0, MAX_W]
-    vs["min_velocity"] = [0.0, 0.0, -MAX_W]
-    vs["max_accel"] = [0.5, 0.0, 1.5]          # gentle: the cargo must not slide
-    vs["max_decel"] = [-0.8, 0.0, -2.0]
-    p["amcl"]["ros__parameters"]["laser_max_range"] = 12.0
-    (OUT / "nav2_params.yaml").write_text(yaml.safe_dump(p, sort_keys=False))
-    print("wrote", OUT / "nav2_params.yaml")
+bool settingsGet(const char *name, float &value) {
+  Entry *e = find(name);
+  if (!e) return false;
+  value = *e->value;
+  return true;
+}
 
-
-def slam():
-    p = yaml.safe_load((SHARE / "slam_toolbox" / "config" / "mapper_params_online_async.yaml").read_text())
-    prm = p["slam_toolbox"]["ros__parameters"]
-    prm["scan_topic"] = SCAN
-    prm["max_laser_range"] = 12.0
-    prm["mode"] = "mapping"
-    (OUT / "slam.yaml").write_text(yaml.safe_dump(p, sort_keys=False))
-    print("wrote", OUT / "slam.yaml")
-
-
-if __name__ == "__main__":
-    nav2()
-    slam()
-    print("now rebuild:  cd ~/cargo_robot/robot_ws && colcon build --symlink-install")
+void settingsList(Print &out) {
+  for (Entry &e : entries) out.printf("  %-14s %g\n", e.name, *e.value);
+}
 ```
 
-### `tools/make_markers.py`
+### `firmware/cargo_robot/hw.h`
 
-```python
-#!/usr/bin/env python3
-"""Printable ArUco station markers (dictionary DICT_4X4_50, same as the vision node).
+```cpp
+// Hardware drivers for the cargo robot's ESP32.
+//
+//   Motor       one BTS7960 channel (RPWM = forward, LPWM = reverse), hardware PWM
+//   Encoder     quadrature counter in the ESP32's pulse-counter hardware (x4 decoding, no CPU load)
+//   HX711Array  the 4 HX711 boards on one shared clock line
+//   Expander    MCP23017 over I2C: line sensors, motor enable, buzzer, LEDs, start button
+//   sonar::     the 3 HC-SR04 on one TRIG line; echo times measured with interrupts
+//   BedServo    one servo signal (50 Hz pulses); no pulses = the servo goes limp
+//   sideMm()    VL53L0X distance to whatever is beside the robot's right side
+//   busVolts()  motor 12 V bus, through the divider
+//
+// Pin numbers come from config.h.
+#pragma once
+#include <Arduino.h>
+#include "driver/pulse_cnt.h"
 
-    python3 tools/make_markers.py 0 1 2      -> markers/marker_0.png, marker_1.png, marker_2.png
-Print each at 10 x 10 cm (the black square), tape it flat on the floor next to the line.
-"""
-import sys
-from pathlib import Path
+class Motor {
+ public:
+  void begin(int pinFwd, int pinRev);
+  void set(float duty);            // -1..1; 0 = brake
+  bool invert = false;
 
-import cv2
+ private:
+  int fwd_ = -1, rev_ = -1;
+};
 
-ids = [int(a) for a in sys.argv[1:]] or [0, 1, 2]
-aruco = cv2.aruco
-dictionary = aruco.getPredefinedDictionary(aruco.DICT_4X4_50)
-out = Path(__file__).resolve().parents[1] / "markers"
-out.mkdir(exist_ok=True)
-for i in ids:
-    if hasattr(aruco, "generateImageMarker"):
-        img = aruco.generateImageMarker(dictionary, i, 600)
-    else:
-        img = aruco.drawMarker(dictionary, i, 600)
-    img = cv2.copyMakeBorder(img, 100, 160, 100, 100, cv2.BORDER_CONSTANT, value=255)
-    cv2.putText(img, f"station {i}", (100, 790), cv2.FONT_HERSHEY_SIMPLEX, 1.5, 0, 3)
-    cv2.imwrite(str(out / f"marker_{i}.png"), img)
-    print("wrote", out / f"marker_{i}.png")
+class Encoder {
+ public:
+  bool begin(int pinA, int pinB);
+  long count();                    // x4 counts since start, negative when turning backwards
+  bool invert = false;
+
+ private:
+  pcnt_unit_handle_t unit_ = nullptr;
+};
+
+class HX711Array {
+ public:
+  void begin();
+  int notReady();                  // bit i set = board i has no new reading yet
+  bool read(long out[4], uint32_t timeoutMs = 300);   // signed 24-bit reading of every board
+};
+
+class Expander {
+ public:
+  bool begin();                    // Wire must already be running
+  uint8_t lineBits();              // bit i = output level of line sensor i + 1
+  bool buttonPressed();
+  void out(int pin, bool on);      // XP_MOTOR_EN, XP_BUZZER, XP_LED_GREEN, XP_LED_RED
+  bool ok = false;
+
+ private:
+  bool write(uint8_t reg, uint8_t value);
+  int read(uint8_t reg);
+  uint8_t olatB_ = 0;
+};
+
+namespace sonar {
+void begin();
+void update();                     // call often: pings every SONAR_PERIOD_MS
+float cm(int i);                   // 0 = left, 1 = centre, 2 = right; SONAR_MAX_CM = nothing there
+}  // namespace sonar
+
+class BedServo {
+ public:
+  void begin(int pin);
+  void pulse(float us);            // 500..2500 us
+  void off();
+  bool on() const { return on_; }
+
+ private:
+  int pin_ = -1;
+  bool on_ = false;
+};
+
+bool sideBegin();
+int sideMm();                      // latest reading, -1 = no sensor or no reading
+float busVolts();
+```
+
+### `firmware/cargo_robot/hw.cpp`
+
+```cpp
+#include "hw.h"
+
+#include <VL53L0X.h>
+#include <Wire.h>
+
+#include "config.h"
+
+// ---------------- Motor ----------------
+void Motor::begin(int pinFwd, int pinRev) {
+  fwd_ = pinFwd;
+  rev_ = pinRev;
+  ledcAttach(fwd_, DRIVE_PWM_HZ, 10);
+  ledcAttach(rev_, DRIVE_PWM_HZ, 10);
+  set(0);
+}
+
+void Motor::set(float duty) {
+  duty = constrain(duty, -1.0f, 1.0f);
+  if (invert) duty = -duty;
+  uint32_t d = (uint32_t)(fabsf(duty) * 1023.0f + 0.5f);
+  ledcWrite(duty >= 0 ? rev_ : fwd_, 0);          // both inputs low = both low-side switches on = brake
+  ledcWrite(duty >= 0 ? fwd_ : rev_, d);
+}
+
+// ---------------- Encoder ----------------
+bool Encoder::begin(int pinA, int pinB) {
+  pcnt_unit_config_t unit = {};
+  unit.low_limit = -30000;
+  unit.high_limit = 30000;
+  unit.flags.accum_count = 1;                     // keep counting past the limits
+  if (pcnt_new_unit(&unit, &unit_) != ESP_OK) return false;
+  pcnt_glitch_filter_config_t filter = {};
+  filter.max_glitch_ns = 1000;                    // ignore spikes shorter than 1 us
+  pcnt_unit_set_glitch_filter(unit_, &filter);
+  pcnt_chan_config_t a = {}, b = {};
+  a.edge_gpio_num = pinA;
+  a.level_gpio_num = pinB;
+  b.edge_gpio_num = pinB;
+  b.level_gpio_num = pinA;
+  pcnt_channel_handle_t chA, chB;
+  pcnt_new_channel(unit_, &a, &chA);
+  pcnt_new_channel(unit_, &b, &chB);
+  // x4 decoding: count every edge of A and of B, direction from the level of the other channel
+  pcnt_channel_set_edge_action(chA, PCNT_CHANNEL_EDGE_ACTION_DECREASE, PCNT_CHANNEL_EDGE_ACTION_INCREASE);
+  pcnt_channel_set_level_action(chA, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
+  pcnt_channel_set_edge_action(chB, PCNT_CHANNEL_EDGE_ACTION_INCREASE, PCNT_CHANNEL_EDGE_ACTION_DECREASE);
+  pcnt_channel_set_level_action(chB, PCNT_CHANNEL_LEVEL_ACTION_KEEP, PCNT_CHANNEL_LEVEL_ACTION_INVERSE);
+  pcnt_unit_add_watch_point(unit_, unit.high_limit);
+  pcnt_unit_add_watch_point(unit_, unit.low_limit);
+  pcnt_unit_enable(unit_);
+  pcnt_unit_clear_count(unit_);
+  pcnt_unit_start(unit_);
+  return true;
+}
+
+long Encoder::count() {
+  int c = 0;
+  if (unit_) pcnt_unit_get_count(unit_, &c);
+  return invert ? -c : c;
+}
+
+// ---------------- HX711Array ----------------
+static portMUX_TYPE hxMux = portMUX_INITIALIZER_UNLOCKED;
+
+void HX711Array::begin() {
+  pinMode(PIN_HX_SCK, OUTPUT);
+  digitalWrite(PIN_HX_SCK, LOW);                  // SCK low = the chips are powered up
+  for (int pin : PIN_HX_DT) pinMode(pin, INPUT_PULLUP);
+}
+
+int HX711Array::notReady() {
+  int bits = 0;
+  for (int i = 0; i < 4; i++)
+    if (digitalRead(PIN_HX_DT[i])) bits |= 1 << i;   // DOUT high = no new reading yet
+  return bits;
+}
+
+bool HX711Array::read(long out[4], uint32_t timeoutMs) {
+  uint32_t t0 = millis();
+  while (notReady()) {
+    if (millis() - t0 > timeoutMs) return false;
+    delay(1);
+  }
+  uint32_t v[4] = {0, 0, 0, 0};
+  portENTER_CRITICAL(&hxMux);                     // keep SCK high short: > 60 us high = the HX711 powers down
+  for (int bit = 0; bit < 24; bit++) {
+    digitalWrite(PIN_HX_SCK, HIGH);
+    delayMicroseconds(1);
+    digitalWrite(PIN_HX_SCK, LOW);
+    for (int i = 0; i < 4; i++) v[i] = (v[i] << 1) | digitalRead(PIN_HX_DT[i]);
+    delayMicroseconds(1);
+  }
+  digitalWrite(PIN_HX_SCK, HIGH);                 // 25th pulse: next reading = channel A, gain 128
+  delayMicroseconds(1);
+  digitalWrite(PIN_HX_SCK, LOW);
+  portEXIT_CRITICAL(&hxMux);
+  for (int i = 0; i < 4; i++) out[i] = (v[i] & 0x800000) ? (long)v[i] - 0x1000000L : (long)v[i];
+  return true;
+}
+
+// ---------------- Expander (MCP23017, registers with IOCON.BANK = 0) ----------------
+namespace {
+constexpr uint8_t IODIRA = 0x00, IODIRB = 0x01, GPPUA = 0x0C, GPPUB = 0x0D, GPIOA = 0x12, GPIOB = 0x13,
+                  OLATB = 0x15;
+constexpr uint8_t PORTB_INPUTS = 0xF0;           // GPB0-3 outputs, GPB4-7 inputs
+}  // namespace
+
+bool Expander::write(uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(MCP_ADDR);
+  Wire.write(reg);
+  Wire.write(value);
+  return Wire.endTransmission() == 0;
+}
+
+int Expander::read(uint8_t reg) {
+  Wire.beginTransmission(MCP_ADDR);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) return -1;
+  if (Wire.requestFrom((uint8_t)MCP_ADDR, (uint8_t)1) != 1) return -1;
+  return Wire.read();
+}
+
+bool Expander::begin() {
+  olatB_ = 0;                                     // motors disabled, buzzer and LEDs off
+  write(OLATB, olatB_);
+  write(IODIRA, 0xFF);                            // port A: 8 line-sensor inputs (the board drives them)
+  write(GPPUA, 0x00);
+  write(IODIRB, PORTB_INPUTS);
+  write(GPPUB, PORTB_INPUTS);                     // pull-ups on the button and the spare inputs
+  ok = read(IODIRB) == PORTB_INPUTS;
+  return ok;
+}
+
+uint8_t Expander::lineBits() {
+  int v = read(GPIOA);
+  return v < 0 ? 0 : (uint8_t)v;
+}
+
+bool Expander::buttonPressed() {
+  int v = read(GPIOB);
+  return v >= 0 && !(v & (1 << (XP_BUTTON - 8)));  // pressed = pulled to GND
+}
+
+void Expander::out(int pin, bool on) {
+  uint8_t mask = 1 << (pin - 8);
+  uint8_t next = on ? (olatB_ | mask) : (olatB_ & ~mask);
+  if (next != olatB_ && write(OLATB, next)) olatB_ = next;
+}
+
+// ---------------- sonar ----------------
+namespace sonar {
+namespace {
+volatile uint32_t riseUs[3];
+volatile uint32_t widthUs[3];
+volatile bool fresh[3];
+float lastCm[3] = {SONAR_MAX_CM, SONAR_MAX_CM, SONAR_MAX_CM};
+uint32_t lastPing = 0;
+
+void IRAM_ATTR onEcho(void *arg) {
+  int i = (int)(intptr_t)arg;
+  uint32_t now = micros();
+  if (digitalRead(PIN_ECHO[i])) {
+    riseUs[i] = now;
+  } else {
+    widthUs[i] = now - riseUs[i];
+    fresh[i] = true;
+  }
+}
+}  // namespace
+
+void begin() {
+  pinMode(PIN_SONAR_TRIG, OUTPUT);
+  digitalWrite(PIN_SONAR_TRIG, LOW);
+  for (int i = 0; i < 3; i++) {
+    pinMode(PIN_ECHO[i], INPUT);
+    attachInterruptArg(PIN_ECHO[i], onEcho, (void *)(intptr_t)i, CHANGE);
+  }
+}
+
+void update() {
+  if (millis() - lastPing < SONAR_PERIOD_MS) return;
+  lastPing = millis();
+  for (int i = 0; i < 3; i++) {                   // results of the previous ping
+    lastCm[i] = fresh[i] ? min(widthUs[i] / 58.0f, SONAR_MAX_CM) : SONAR_MAX_CM;
+    fresh[i] = false;
+  }
+  digitalWrite(PIN_SONAR_TRIG, HIGH);             // all 3 sensors ping at once
+  delayMicroseconds(10);
+  digitalWrite(PIN_SONAR_TRIG, LOW);
+}
+
+float cm(int i) { return lastCm[i]; }
+}  // namespace sonar
+
+// ---------------- BedServo ----------------
+void BedServo::begin(int pin) {
+  pin_ = pin;
+  ledcAttach(pin_, 50, 16);
+  off();
+}
+
+void BedServo::pulse(float us) {
+  ledcWrite(pin_, (uint32_t)(constrain(us, 500.0f, 2500.0f) * 65536.0f / 20000.0f));
+  on_ = true;
+}
+
+void BedServo::off() {
+  ledcWrite(pin_, 0);
+  on_ = false;
+}
+
+// ---------------- side distance sensor (VL53L0X) ----------------
+static VL53L0X side;
+static bool sideOk = false;
+static int sideLast = -1;
+
+bool sideBegin() {
+  side.setBus(&Wire);
+  side.setTimeout(50);
+  sideOk = side.init();
+  if (sideOk) side.startContinuous(50);
+  return sideOk;
+}
+
+int sideMm() {
+  if (!sideOk) return -1;
+  if (side.readReg(VL53L0X::RESULT_INTERRUPT_STATUS) & 0x07) {    // a new reading is waiting
+    uint16_t mm = side.readRangeContinuousMillimeters();
+    sideLast = (side.timeoutOccurred() || mm >= 8000) ? -1 : mm;
+  }
+  return sideLast;
+}
+
+// ---------------- motor bus voltage ----------------
+float busVolts() { return analogReadMilliVolts(PIN_BUS_SENSE) / 1000.0f * BUS_DIVIDER; }
+```
+
+### `firmware/cargo_robot/control.h`
+
+```cpp
+// Maths used by the main program (no hardware in here).
+#pragma once
+#include <Arduino.h>
+
+// Wheel speed controller: feed-forward + PI. Target and measurement in rad/s, output = motor duty -1..1.
+//   duty = sign(target) * (min_duty + kf * |target|) + kp * error + integral
+struct WheelPID {
+  float integral = 0;
+  float update(float target, float measured, float dt, float kf, float kp, float ki, float minDuty);
+  void reset() { integral = 0; }
+};
+
+struct LowPass {
+  float alpha, value = 0;
+  explicit LowPass(float a) : alpha(a) {}
+  float update(float x) { return value += alpha * (x - value); }
+};
+
+// Distance travelled (m) and heading change (rad, + = turned left) from the distance each wheel rolled.
+struct Odometry {
+  float distance = 0, heading = 0;
+  void update(float dLeft, float dRight, float wheelSep);
+};
+
+// Robot speed (v m/s forward, w rad/s turning left) -> wheel speeds (rad/s), scaled down together if too fast.
+void twistToWheels(float v, float w, float wheelSep, float wheelRadius, float maxWheel, float &left, float &right);
+
+// 1.0 empty -> minFactor at maxKg -> 0.0 (refuse to move) above maxKg * overload.
+float payloadFactor(float kg, float maxKg, float minFactor, float overload);
+
+// 1.0 when the way is clear -> 0.0 at stopCm. Side sensors only slow the robot (to 50 %), never stop it,
+// so the conveyor and walls beside the line do not stop it.
+float obstacleFactor(const float cm[3], float stopCm, float slowCm);
+
+// The 8 line sensors as a position: +1 = line under the leftmost sensor, -1 = rightmost, 0 = centred.
+struct Line {
+  int count = 0;                   // sensors on black
+  float pos = 0;
+  uint8_t black = 0;               // bit i = sensor i + 1 is on black
+};
+Line readLine(uint8_t bits, bool blackIsHigh);
+
+// Median of the last n values (n <= 9): removes the odd wild load-cell reading.
+class Median {
+ public:
+  explicit Median(int n) : n_(n) {}
+  float update(float x);
+  void clear() { count_ = 0; }
+
+ private:
+  float buf_[9];
+  int n_, count_ = 0, next_ = 0;
+};
+```
+
+### `firmware/cargo_robot/control.cpp`
+
+```cpp
+#include "control.h"
+
+float WheelPID::update(float target, float measured, float dt, float kf, float kp, float ki, float minDuty) {
+  if (fabsf(target) < 1e-3f) {
+    reset();
+    return 0;
+  }
+  float error = target - measured;
+  integral = constrain(integral + ki * error * dt, -0.3f, 0.3f);
+  float ff = copysignf(minDuty + kf * fabsf(target), target);
+  return constrain(ff + kp * error + integral, -1.0f, 1.0f);
+}
+
+void Odometry::update(float dLeft, float dRight, float wheelSep) {
+  distance += (dLeft + dRight) / 2;
+  heading += (dRight - dLeft) / wheelSep;
+}
+
+void twistToWheels(float v, float w, float wheelSep, float wheelRadius, float maxWheel, float &left, float &right) {
+  left = (v - w * wheelSep / 2) / wheelRadius;
+  right = (v + w * wheelSep / 2) / wheelRadius;
+  float biggest = max(fabsf(left), fabsf(right));
+  if (biggest > maxWheel) {                       // keep the curve, just slower
+    left *= maxWheel / biggest;
+    right *= maxWheel / biggest;
+  }
+}
+
+float payloadFactor(float kg, float maxKg, float minFactor, float overload) {
+  if (kg <= 0) return 1;
+  if (kg > maxKg * overload) return 0;
+  return 1 - (1 - minFactor) * min(kg / maxKg, 1.0f);
+}
+
+float obstacleFactor(const float cm[3], float stopCm, float slowCm) {
+  auto ramp = [&](float d) { return constrain((d - stopCm) / (slowCm - stopCm), 0.0f, 1.0f); };
+  float centre = ramp(cm[1]);
+  float sides = max(0.5f, ramp(min(cm[0], cm[2])));
+  return min(centre, sides);
+}
+
+Line readLine(uint8_t bits, bool blackIsHigh) {
+  Line l;
+  l.black = blackIsHigh ? bits : (uint8_t)~bits;
+  float sum = 0;
+  for (int i = 0; i < 8; i++) {
+    if (l.black & (1 << i)) {
+      sum += (3.5f - i) / 3.5f;                   // sensor 1 -> +1 ... sensor 8 -> -1
+      l.count++;
+    }
+  }
+  if (l.count) l.pos = sum / l.count;
+  return l;
+}
+
+float Median::update(float x) {
+  buf_[next_] = x;
+  next_ = (next_ + 1) % n_;
+  if (count_ < n_) count_++;
+  float s[9];
+  memcpy(s, buf_, count_ * sizeof(float));
+  for (int i = 1; i < count_; i++)                // insertion sort: at most 9 values
+    for (int j = i; j > 0 && s[j - 1] > s[j]; j--) std::swap(s[j - 1], s[j]);
+  return count_ % 2 ? s[count_ / 2] : (s[count_ / 2 - 1] + s[count_ / 2]) / 2;
+}
+```
+
+### `firmware/cargo_robot/robot.h`
+
+```cpp
+// The robot's parts and live readings, shared by the main program and the serial console.
+#pragma once
+#include "control.h"
+#include "hw.h"
+
+extern Motor motorL, motorR;
+extern Encoder encL, encR;
+extern HX711Array cells;
+extern Expander io;
+extern BedServo servoFront, servoRear;
+extern bool manualMotors;          // true while a bench test drives the motors directly (no wheel control)
+
+// Updated by robotUpdate().
+struct Readings {
+  float busV = 0;                  // motor 12 V bus; below BUS_ON_V = E-stop pressed
+  long raw[4] = {0, 0, 0, 0};      // load cells, raw counts: FL, FR, RL, RR
+  float cornerKg[4] = {0, 0, 0, 0};
+  float kg = 0;                    // total weight on the bed, median-filtered
+  bool cellsOk = false;            // the HX711s answered in the last second
+  Line line;
+  float sonarCm[3] = {0, 0, 0};    // left, centre, right
+  int sideMm = -1;                 // right side (VL53L0X); -1 = nothing in range
+  float wheelL = 0, wheelR = 0;    // rad/s
+  Odometry odom;
+  float bedDeg = 0;                // where the servos have been told to hold the bed
+};
+extern Readings rd;
+
+enum class Light { Off, On, Slow, Fast };
+
+void robotBegin();                 // start every part (called once from setup)
+void robotUpdate();                // call as often as possible: sensors, wheel control, bed, lights, buzzer
+void driveTarget(float v, float w);   // wanted speed: m/s forward, rad/s turning left (ramped by "accel")
+void driveStop();                  // stop now
+void motorsEnable(bool on);
+bool tare();                       // zero the scale - the bed must be empty
+void bedMove(float deg);           // move the bed smoothly (tip_speed) to deg; 0 = flat
+bool bedMoving();
+void bedRelax();                   // servos off: the bed rests flat on its two posts
+void lights(Light green, Light red);
+void beep(int ms);
+void applyInversions();            // after changing inv_* settings
+```
+
+### `firmware/cargo_robot/robot.cpp`
+
+```cpp
+#include "robot.h"
+
+#include <Wire.h>
+
+#include "config.h"
+#include "settings.h"
+
+Motor motorL, motorR;
+Encoder encL, encR;
+HX711Array cells;
+Expander io;
+BedServo servoFront, servoRear;
+bool manualMotors = false;
+Readings rd;
+
+namespace {
+WheelPID pidL, pidR;
+LowPass speedL(0.5f), speedR(0.5f);
+Median weightFilter(5);
+long offsets[4] = {0, 0, 0, 0};
+long lastCountL = 0, lastCountR = 0;
+uint32_t lastTick = 0, lastCellRead = 0, lastSide = 0, beepUntil = 0;
+float targetV = 0, targetW = 0, rampV = 0;
+float bedTarget = 0;
+bool motorsOn = false;
+Light greenMode = Light::Off, redMode = Light::Off;
+
+float sign(int i) {
+  const float s[4] = {cfg.sign_fl, cfg.sign_fr, cfg.sign_rl, cfg.sign_rr};
+  return s[i] < 0 ? -1.0f : 1.0f;
+}
+
+bool lit(Light mode) {
+  switch (mode) {
+    case Light::On: return true;
+    case Light::Slow: return millis() % 1000 < 150;
+    case Light::Fast: return millis() % 300 < 150;
+    default: return false;
+  }
+}
+
+void writeServos() {
+  float k = cfg.tip_deg != 0 ? rd.bedDeg / cfg.tip_deg : 0;
+  servoFront.pulse(cfg.f_flat_us + (cfg.f_tip_us - cfg.f_flat_us) * k);
+  servoRear.pulse(cfg.r_flat_us + (cfg.r_tip_us - cfg.r_flat_us) * k);
+}
+
+void controlTick(float dt) {
+  // wheels: encoder counts -> speeds and odometry
+  long cl = encL.count(), cr = encR.count();
+  float radPerTick = 2 * PI / cfg.ticks_per_rev;
+  float dl = (cl - lastCountL) * radPerTick, dr = (cr - lastCountR) * radPerTick;
+  lastCountL = cl;
+  lastCountR = cr;
+  rd.wheelL = speedL.update(dl / dt);
+  rd.wheelR = speedR.update(dr / dt);
+  rd.odom.update(dl * cfg.wheel_radius, dr * cfg.wheel_radius, cfg.wheel_sep);
+
+  // speed ramp: gentle starts and stops, so the package does not slide
+  float step = cfg.accel * dt;
+  rampV += constrain(targetV - rampV, -step, step);
+  if (!manualMotors) {
+    float left = 0, right = 0;
+    if (motorsOn) twistToWheels(rampV, targetW, cfg.wheel_sep, cfg.wheel_radius, cfg.max_wheel, left, right);
+    motorL.set(pidL.update(left, rd.wheelL, dt, cfg.kf, cfg.kp, cfg.ki, cfg.min_duty));
+    motorR.set(pidR.update(right, rd.wheelR, dt, cfg.kf, cfg.kp, cfg.ki, cfg.min_duty));
+  }
+
+  // line sensors
+  rd.line = readLine(io.lineBits(), cfg.line_black != 0);
+
+  // bed: move towards its target at tip_speed
+  if (servoFront.on()) {
+    float s = cfg.tip_speed * dt;
+    rd.bedDeg += constrain(bedTarget - rd.bedDeg, -s, s);
+    writeServos();
+  }
+}
+}  // namespace
+
+void robotBegin() {
+  Wire.begin(PIN_SDA, PIN_SCL, 400000);
+  if (!io.begin()) Serial.println("!! MCP23017 not found at 0x20: check SDA/SCL, 3.3 V and A0-A2 to GND");
+  motorL.begin(PIN_L_RPWM, PIN_L_LPWM);
+  motorR.begin(PIN_R_RPWM, PIN_R_LPWM);
+  if (!encL.begin(PIN_ENC_L_A, PIN_ENC_L_B) || !encR.begin(PIN_ENC_R_A, PIN_ENC_R_B))
+    Serial.println("!! encoder counter set-up failed");
+  applyInversions();
+  cells.begin();
+  sonar::begin();
+  if (!sideBegin()) Serial.println("!! VL53L0X side sensor not found: check its wires (or set tof_check 0)");
+  servoFront.begin(PIN_SERVO_FRONT);
+  servoRear.begin(PIN_SERVO_REAR);
+  motorsEnable(false);
+  lastTick = micros();
+}
+
+void applyInversions() {
+  motorL.invert = cfg.inv_l_motor != 0;
+  motorR.invert = cfg.inv_r_motor != 0;
+  encL.invert = cfg.inv_l_enc != 0;
+  encR.invert = cfg.inv_r_enc != 0;
+  lastCountL = encL.count();
+  lastCountR = encR.count();
+}
+
+void robotUpdate() {
+  rd.busV = busVolts();
+
+  // load cells: a new reading 10 times per second
+  if (cells.notReady() == 0) {
+    long raw[4];
+    if (cells.read(raw, 0)) {
+      float total = 0;
+      for (int i = 0; i < 4; i++) {
+        rd.raw[i] = raw[i];
+        rd.cornerKg[i] = sign(i) * (raw[i] - offsets[i]) / cfg.scale;
+        total += rd.cornerKg[i];
+      }
+      rd.kg = weightFilter.update(total);
+      lastCellRead = millis();
+    }
+  }
+  rd.cellsOk = millis() - lastCellRead < 1000;
+
+  sonar::update();
+  for (int i = 0; i < 3; i++) rd.sonarCm[i] = sonar::cm(i);
+  if (millis() - lastSide >= 20) {
+    lastSide = millis();
+    rd.sideMm = sideMm();
+  }
+
+  uint32_t now = micros();
+  if (now - lastTick >= 1000000 / CONTROL_HZ) {
+    float dt = (now - lastTick) * 1e-6f;
+    lastTick = now;
+    controlTick(dt);
+  }
+
+  io.out(XP_LED_GREEN, lit(greenMode));
+  io.out(XP_LED_RED, lit(redMode));
+  io.out(XP_BUZZER, (int32_t)(beepUntil - millis()) > 0);
+}
+
+void driveTarget(float v, float w) {
+  targetV = v;
+  targetW = w;
+}
+
+void driveStop() {
+  targetV = targetW = rampV = 0;
+  pidL.reset();
+  pidR.reset();
+  motorL.set(0);
+  motorR.set(0);
+}
+
+void motorsEnable(bool on) {
+  if (!on) driveStop();
+  motorsOn = on;
+  io.out(XP_MOTOR_EN, on);
+}
+
+bool tare() {
+  long sum[4] = {0, 0, 0, 0};
+  int n = 0;
+  for (int k = 0; k < 15; k++) {
+    long raw[4];
+    if (!cells.read(raw)) continue;
+    for (int i = 0; i < 4; i++) sum[i] += raw[i];
+    n++;
+  }
+  if (n < 8) return false;
+  for (int i = 0; i < 4; i++) offsets[i] = sum[i] / n;
+  weightFilter.clear();
+  rd.kg = 0;
+  return true;
+}
+
+void bedMove(float deg) {
+  if (!servoFront.on()) {                         // waking up: the bed is resting flat on its posts
+    rd.bedDeg = 0;
+    writeServos();
+  }
+  bedTarget = constrain(deg, 0.0f, 45.0f);
+}
+
+bool bedMoving() { return servoFront.on() && fabsf(rd.bedDeg - bedTarget) > 0.1f; }
+
+void bedRelax() {
+  servoFront.off();
+  servoRear.off();
+  rd.bedDeg = bedTarget = 0;
+}
+
+void lights(Light green, Light red) {
+  greenMode = green;
+  redMode = red;
+}
+
+void beep(int ms) { beepUntil = millis() + ms; }
+```
+
+### `firmware/cargo_robot/console.h`
+
+```cpp
+// Serial-Monitor commands (115200 baud, line ending "Newline"): bench tests, calibration and settings.
+// Type "help" for the list.
+#pragma once
+
+void consolePoll();                // call from loop(): runs a command when a whole line has arrived
+void startMission(int deliveries); // defined in cargo_robot.ino
+void stopMission();
+const char *stateName();
+```
+
+### `firmware/cargo_robot/console.cpp`
+
+```cpp
+#include "console.h"
+
+#include "config.h"
+#include "robot.h"
+#include "settings.h"
+
+namespace {
+
+String lineBuf;
+
+// ---------------- helpers for the tests ----------------
+bool keyPressed() {
+  if (!Serial.available()) return false;
+  while (Serial.available()) Serial.read();
+  return true;
+}
+
+void waitEnter(const char *prompt) {
+  Serial.print(prompt);
+  Serial.println("  (press Enter)");
+  while (!Serial.available()) robotUpdate();
+  while (Serial.available()) {
+    Serial.read();
+    delay(2);
+  }
+}
+
+// Repeat print() 5 times a second until a key is pressed.
+template <typename F>
+void monitor(F print, int periodMs = 200) {
+  Serial.println("(press Enter to stop)");
+  uint32_t last = 0;
+  while (!keyPressed()) {
+    robotUpdate();
+    if (millis() - last >= (uint32_t)periodMs) {
+      last = millis();
+      print();
+    }
+  }
+}
+
+void runFor(float seconds) {
+  uint32_t t0 = millis();
+  while (millis() - t0 < seconds * 1000) robotUpdate();
+}
+
+const char *SIDES[2] = {"left", "right"};
+Motor *motors[2] = {&motorL, &motorR};
+Encoder *encs[2] = {&encL, &encR};
+
+void powerCheck() {
+  robotUpdate();
+  Serial.printf("motor power: %s (%.1f V)\n", rd.busV > BUS_ON_V ? "ON" : "OFF - E-stop pressed or battery out",
+                rd.busV);
+}
+
+// ---------------- motor and encoder tests (wheels in the air!) ----------------
+void testEncoders() {
+  Serial.println("Turn each wheel FORWARD by hand: its count must go UP.");
+  monitor([] {
+    Serial.printf("left %8ld (%+6.2f turns)    right %8ld (%+6.2f turns)\n", encL.count(),
+                  encL.count() / cfg.ticks_per_rev, encR.count(), encR.count() / cfg.ticks_per_rev);
+  });
+}
+
+void testMotors(float duty) {
+  powerCheck();
+  manualMotors = true;
+  motorsEnable(true);
+  for (int s = 0; s < 2; s++) {
+    for (int dir : {1, -1}) {
+      Serial.printf("\n[%s wheel %s]", SIDES[s], dir > 0 ? "FORWARD" : "BACKWARD");
+      waitEnter(" watch the wheel");
+      long c0 = encs[s]->count();
+      motors[s]->set(dir * duty);
+      runFor(2.0f);
+      motors[s]->set(0);
+      runFor(0.5f);
+      long delta = encs[s]->count() - c0;
+      Serial.printf("  encoder change: %+ld counts (%+.2f wheel turns)\n", delta, delta / cfg.ticks_per_rev);
+      if (delta == 0)
+        Serial.println("  !! the encoder did not count: check its 3.3 V, GND, A/B wires and the 10k pull-ups");
+      else if ((delta > 0) != (dir > 0))
+        Serial.printf("  !! count has the wrong sign: type   set inv_%c_enc %d   then run motortest again\n",
+                      SIDES[s][0], (s == 0 ? cfg.inv_l_enc : cfg.inv_r_enc) == 0 ? 1 : 0);
+    }
+  }
+  motorsEnable(false);
+  manualMotors = false;
+  Serial.println("\nBy eye: on FORWARD, did each wheel turn the way that drives the robot FORWARD?");
+  Serial.println("If not: set inv_l_motor 1 (or inv_r_motor 1), then run motortest again. Type save when done.");
+}
+
+void testMaxSpeed() {
+  powerCheck();
+  manualMotors = true;
+  motorsEnable(true);
+  float slowest = 1e9;
+  for (int s = 0; s < 2; s++) {
+    Serial.printf("\n[%s wheel 100 %%]", SIDES[s]);
+    waitEnter("");
+    motors[s]->set(1.0f);
+    runFor(1.0f);                                 // let it spin up
+    long c0 = encs[s]->count();
+    runFor(2.0f);
+    float w = (encs[s]->count() - c0) / cfg.ticks_per_rev * 2 * PI / 2.0f;
+    motors[s]->set(0);
+    runFor(0.5f);
+    Serial.printf("  top speed %.1f rad/s = %.0f rpm\n", w, w * 30 / PI);
+    slowest = min(slowest, fabsf(w));
+  }
+  motorsEnable(false);
+  manualMotors = false;
+  if (slowest > 0.1f) Serial.printf("\nType:   set kf %.3f   then   save\n", 1.0f / slowest);
+}
+
+void testMinDuty() {
+  powerCheck();
+  manualMotors = true;
+  motorsEnable(true);
+  float found = 0;
+  for (int s = 0; s < 2; s++) {
+    Serial.printf("\n[%s wheel slow ramp]", SIDES[s]);
+    waitEnter("");
+    float duty = 0;
+    long c0 = encs[s]->count();
+    while (duty < 0.5f && labs(encs[s]->count() - c0) < 20) {
+      duty += 0.01f;
+      motors[s]->set(duty);
+      runFor(0.3f);
+    }
+    motors[s]->set(0);
+    Serial.printf("  started moving at %.2f\n", duty);
+    found = max(found, duty);
+  }
+  motorsEnable(false);
+  manualMotors = false;
+  Serial.printf("\nType:   set min_duty %.2f   then   save\n", 0.9f * found);
+}
+
+void testOneMotor(char side, float duty, float seconds) {
+  powerCheck();
+  manualMotors = true;
+  motorsEnable(true);
+  Motor *m = side == 'r' ? &motorR : &motorL;
+  m->set(duty);
+  uint32_t t0 = millis();
+  while (millis() - t0 < seconds * 1000 && !keyPressed()) robotUpdate();
+  m->set(0);
+  motorsEnable(false);
+  manualMotors = false;
+}
+
+void testDrive(float v, float w, float seconds) {
+  powerCheck();
+  Odometry start = rd.odom;
+  motorsEnable(true);
+  driveTarget(v, w);
+  uint32_t t0 = millis(), last = 0;
+  Serial.println("(press Enter to stop early)");
+  while (millis() - t0 < seconds * 1000 && !keyPressed()) {
+    robotUpdate();
+    if (millis() - last >= 250) {
+      last = millis();
+      Serial.printf("wheels L %+5.2f R %+5.2f rad/s\n", rd.wheelL, rd.wheelR);
+    }
+  }
+  driveTarget(0, 0);
+  runFor(1.5f);                                   // ramp down
+  motorsEnable(false);
+  Serial.printf("odometry: %.3f m forward, turned %.1f deg\n", rd.odom.distance - start.distance,
+                (rd.odom.heading - start.heading) * 180 / PI);
+}
+
+// ---------------- load cells ----------------
+const char *CORNERS[4] = {"front-left", "front-right", "rear-left", "rear-right"};
+
+void testCells() {
+  if (!tare()) {
+    Serial.println("!! HX711 boards not answering: check their VCC, GND, SCK and DT wires");
+    return;
+  }
+  Serial.println("zeroed - corners in kg, then the total (uses scale and sign_* from the settings)");
+  monitor([] {
+    for (int i = 0; i < 4; i++) Serial.printf("%s %7.3f   ", CORNERS[i], rd.cornerKg[i]);
+    Serial.printf("| total %7.3f kg\n", rd.kg);
+  });
+}
+
+bool average(float out[4]) {                      // 1.5 s of readings, per cell
+  long raw[4];
+  float sum[4] = {0, 0, 0, 0};
+  int n = 0;
+  for (int k = 0; k < 15; k++) {
+    if (!cells.read(raw)) continue;
+    for (int i = 0; i < 4; i++) sum[i] += raw[i];
+    n++;
+  }
+  for (int i = 0; i < 4; i++) out[i] = sum[i] / max(n, 1);
+  if (n < 8) Serial.println("!! HX711 boards not answering: check their VCC, GND, SCK and DT wires");
+  return n >= 8;
+}
+
+void calibrate(float kg) {
+  float zero[4], loaded[4];
+  waitEnter("1) EMPTY the cargo bed");
+  if (!average(zero)) return;
+  Serial.printf("2) put the %.2f kg weight in the MIDDLE of the bed", kg);
+  waitEnter("");
+  if (!average(loaded)) return;
+  float delta[4], total = 0;
+  for (int i = 0; i < 4; i++) {
+    delta[i] = loaded[i] - zero[i];
+    total += delta[i];
+  }
+  float majority = total >= 0 ? 1 : -1, scale = 0;
+  float *signs[4] = {&cfg.sign_fl, &cfg.sign_fr, &cfg.sign_rl, &cfg.sign_rr};
+  for (int i = 0; i < 4; i++) {
+    bool same = delta[i] * majority >= 0 || fabsf(delta[i]) < 0.05f * fabsf(total) / 4;
+    *signs[i] = same ? 1 : -1;
+    scale += *signs[i] * delta[i];
+    Serial.printf("   %-12s change %+10.0f%s\n", CORNERS[i], delta[i],
+                  same ? "" : "   <-- opposite sign: swap this cell's A+/A- wires, or keep sign -1");
+  }
+  cfg.scale = scale / kg;
+  Serial.printf("\nscale %.1f, signs %g %g %g %g - now in use. Type save to keep them.\n", cfg.scale, cfg.sign_fl,
+                cfg.sign_fr, cfg.sign_rl, cfg.sign_rr);
+  if (fabsf(cfg.scale) < 1000) Serial.println("!! very small change - check the load-cell wiring (E+/E-/A+/A-)");
+  tare();
+}
+
+// ---------------- sensors ----------------
+void testLine() {
+  Serial.println("sensor 1 (left) .. 8 (right): # = black");
+  monitor([] {
+    char s[9];
+    for (int i = 0; i < 8; i++) s[i] = rd.line.black & (1 << i) ? '#' : '.';
+    s[8] = 0;
+    Serial.printf("%s   on black %d   position %+.2f%s\n", s, rd.line.count, rd.line.pos,
+                  rd.line.count >= cfg.mark_min ? "   STATION MARK" : "");
+  }, 100);
+}
+
+void testSonar() {
+  monitor([] {
+    Serial.printf("left %5.0f cm   centre %5.0f cm   right %5.0f cm   (%.0f = nothing)\n", rd.sonarCm[0],
+                  rd.sonarCm[1], rd.sonarCm[2], SONAR_MAX_CM);
+  });
+}
+
+void testSide() {
+  monitor([] {
+    if (rd.sideMm < 0) Serial.println("side: nothing in range (or no sensor)");
+    else Serial.printf("side: %d mm%s\n", rd.sideMm,
+                       rd.sideMm >= cfg.tof_min_mm && rd.sideMm <= cfg.tof_max_mm ? "   OK to tip" : "");
+  });
+}
+
+// ---------------- bed ----------------
+void testServo(char which, const String &arg) {
+  BedServo *s = which == 'r' ? &servoRear : &servoFront;
+  if (arg == "off") {
+    s->off();
+    return;
+  }
+  powerCheck();
+  s->pulse(arg.toFloat());
+  Serial.printf("%s servo at %.0f us. Change it in small steps (10-20 us); \"servo %c off\" to release.\n",
+                which == 'r' ? "rear" : "front", arg.toFloat(), which);
+}
+
+void testTip() {
+  powerCheck();
+  Serial.printf("on the bed: %.2f kg - tipping to %.0f deg ...\n", rd.kg, cfg.tip_deg);
+  uint32_t t0 = millis();
+  bedMove(cfg.tip_deg);
+  while (bedMoving()) robotUpdate();
+  Serial.printf("tipped after %.1f s, holding %.1f s\n", (millis() - t0) / 1000.0f, cfg.tip_hold_s);
+  runFor(cfg.tip_hold_s);
+  bedMove(0);
+  while (bedMoving()) robotUpdate();
+  runFor(0.5f);
+  bedRelax();
+  runFor(1.0f);                                   // weigh with the bed flat: tipped, the cells feel less weight
+  Serial.printf("bed flat again: %.2f kg on it - %s\n", rd.kg,
+                rd.kg < cfg.load_kg / 2 ? "delivered" : "the package did NOT slide off");
+}
+
+// ---------------- status ----------------
+void status() {
+  char bits[9];
+  for (int i = 0; i < 8; i++) bits[i] = rd.line.black & (1 << i) ? '#' : '.';
+  bits[8] = 0;
+  Serial.printf("%-7s | %4.1f V | %6.3f kg%s | line %s | sonar %3.0f %3.0f %3.0f cm | side %4d mm | bed %4.1f deg\n",
+                stateName(), rd.busV, rd.kg, rd.cellsOk ? "" : " (no HX711)", bits, rd.sonarCm[0], rd.sonarCm[1],
+                rd.sonarCm[2], rd.sideMm, rd.bedDeg);
+}
+
+void help() {
+  Serial.println(R"(
+MISSION    run [n]          start (n deliveries, 0 = until stopped); the start button does the same
+           stop             stop everything
+           status | watch   one line of readings | the same, twice a second
+DRIVE      enc              encoder counts (turn the wheels by hand)          WHEELS IN THE AIR for:
+           motortest        each wheel forward/back 30 %, checks directions
+           mintest | maxtest   measure min_duty | kf
+           motor l|r <duty> [s]   one motor open loop, duty -1..1
+           drive <v> <w> [s]      closed loop: v m/s, w rad/s, default 2 s; prints odometry
+LOAD CELLS hx               live corners + total kg (zeroes first: bed empty)
+           tare             zero the scale (bed empty)
+           cal <kg>         calibrate with a known weight
+SENSORS    line | sonar | tof   live line sensors | ultrasonic | side distance
+BED        servo f|r <us>   one servo to a raw pulse (calibration); servo f|r off
+           bed <deg>        both servos smoothly to deg (0 = flat); bed off = release
+           tip              tip, wait until empty, lower
+SETTINGS   list | get <name> | set <name> <value> | save | defaults)");
+}
+
+void settingsCommand(const String &cmd, const String &a1, const String &a2) {
+  if (cmd == "list") {
+    settingsList(Serial);
+  } else if (cmd == "get") {
+    float v;
+    if (settingsGet(a1.c_str(), v)) Serial.printf("%s = %g\n", a1.c_str(), v);
+    else Serial.println("unknown setting (type list)");
+  } else if (cmd == "set") {
+    if (!settingsSet(a1.c_str(), a2.toFloat())) {
+      Serial.println("unknown setting (type list)");
+      return;
+    }
+    applyInversions();
+    Serial.printf("%s = %g (in use now; type save to keep it after power-off)\n", a1.c_str(), a2.toFloat());
+  } else if (cmd == "save") {
+    Serial.println(settingsSave() ? "saved" : "!! save failed");
+  } else if (cmd == "defaults") {
+    settingsDefaults();
+    applyInversions();
+    Serial.println("back to the defaults (also in flash)");
+  }
+}
+
+void runCommand(String line) {
+  line.trim();
+  line.toLowerCase();
+  if (!line.length()) return;
+  String w[4];
+  int n = 0;
+  for (int start = 0; n < 4 && start < (int)line.length();) {
+    int sp = line.indexOf(' ', start);
+    if (sp < 0) sp = line.length();
+    if (sp > start) w[n++] = line.substring(start, sp);
+    start = sp + 1;
+  }
+  const String &c = w[0];
+  if (c == "stop") return stopMission();
+  if (c == "status") return status();
+  if (c == "help") return help();
+  if (strcmp(stateName(), "IDLE") != 0) {
+    Serial.println("busy: type stop first");
+    return;
+  }
+  if (c == "run") return startMission(w[1].toInt());
+  if (c == "watch") return monitor(status, 500);
+  if (c == "enc") return testEncoders();
+  if (c == "motortest") return testMotors(w[1].length() ? w[1].toFloat() : 0.3f);
+  if (c == "mintest") return testMinDuty();
+  if (c == "maxtest") return testMaxSpeed();
+  if (c == "motor") return testOneMotor(w[1][0], w[2].toFloat(), w[3].length() ? w[3].toFloat() : 2.0f);
+  if (c == "drive") return testDrive(w[1].toFloat(), w[2].toFloat(), w[3].length() ? w[3].toFloat() : 2.0f);
+  if (c == "hx") return testCells();
+  if (c == "tare") return (void)Serial.println(tare() ? "zeroed" : "!! HX711 boards not answering");
+  if (c == "cal") return calibrate(w[1].toFloat() > 0 ? w[1].toFloat() : 2.0f);
+  if (c == "line") return testLine();
+  if (c == "sonar") return testSonar();
+  if (c == "tof") return testSide();
+  if (c == "servo") return testServo(w[1][0], w[2]);
+  if (c == "bed") {
+    if (w[1] == "off") return bedRelax();
+    bedMove(w[1].toFloat());
+    while (bedMoving()) robotUpdate();
+    return;
+  }
+  if (c == "tip") return testTip();
+  if (c == "list" || c == "get" || c == "set" || c == "save" || c == "defaults") return settingsCommand(c, w[1], w[2]);
+  Serial.println("unknown command - type help");
+}
+
+}  // namespace
+
+void consolePoll() {
+  while (Serial.available()) {
+    char ch = Serial.read();
+    if (ch == '\n' || ch == '\r') {
+      if (lineBuf.length()) {
+        Serial.printf("> %s\n", lineBuf.c_str());
+        runCommand(lineBuf);
+      }
+      lineBuf = "";
+    } else if (lineBuf.length() < 80) {
+      lineBuf += ch;
+    }
+  }
+}
+```
+
+### `firmware/cargo_robot/cargo_robot.ino`
+
+```cpp
+// Cargo robot - main program for the ESP32 (Arduino IDE 2, board "ESP32 Dev Module").
+//
+// The robot follows a black tape line. Stations are short strips of tape across the line ("station marks"):
+// the pickup and the drop-off (the conveyor, on the robot's RIGHT). It carries one package on its tilting bed.
+//
+//   LOAD     at the pickup: wait until a package is on the bed (weight > load_kg for hold_s)
+//   FOLLOW   follow the line to the next station mark: slower when loaded, slow or stop for obstacles
+//   DOCK     drive on stop_mm so the middle of the bed is level with the mark, then stop
+//   CHECK    at the drop-off: the side sensor must see the belt beside the robot (tof_check)
+//   TIP      tip the bed to tip_deg (at tip_speed); the package slides off to the right
+//   HOLD     keep it tipped for tip_hold_s
+//   LOWER    lower the bed, switch the servos off, weigh: empty -> zero the scale and FOLLOW on to the pickup
+// Always:  E-stop pressed -> everything stops.  Overload -> refuse to move.  Line lost, no belt or package still
+//          on the bed -> ALARM: red LED + beeps; fix it, then press the start button to carry on.
+//
+// Start a mission with the start button or "run" in the Serial Monitor (115200 baud, Newline).
+// "help" lists the test and calibration commands. Wiring: config.h. Settings: settings.h.
+#include "config.h"
+#include "console.h"
+#include "robot.h"
+#include "settings.h"
+
+enum State { IDLE, LOAD, FOLLOW, DOCK, CHECK, TIP, HOLD, LOWER, ALARM, ESTOP };
+const char *NAMES[] = {"IDLE", "LOAD", "FOLLOW", "DOCK", "CHECK", "TIP", "HOLD", "LOWER", "ALARM", "ESTOP"};
+
+State state = IDLE, resumeTo = IDLE;    // resumeTo: where ALARM goes back to when the button is pressed
+bool toDropoff = true;                  // the next station mark is the drop-off (else the pickup)
+int deliveriesLeft = 0;                 // 0 = until stopped
+uint32_t since = 0, condSince = 0;      // when the state started / when the condition we wait for became true
+float dockStart = 0;
+bool buttonWas = false;
+bool relaxWhenFlat = false;             // after "stop": lower the bed, then switch the servos off
+
+const char *stateName() { return NAMES[state]; }
+
+void go(State s) {
+  state = s;
+  since = millis();
+  condSince = 0;
+  Serial.printf("[%s]\n", NAMES[s]);
+}
+
+// true once cond has held for seconds without a break
+bool heldFor(bool cond, float seconds) {
+  if (!cond) {
+    condSince = 0;
+    return false;
+  }
+  if (!condSince) condSince = millis();
+  return millis() - condSince >= seconds * 1000;
+}
+
+void alarm(const char *why, State retry) {
+  driveStop();
+  motorsEnable(false);
+  resumeTo = retry;
+  Serial.printf("!! ALARM: %s - fix it, then press the start button\n", why);
+  go(ALARM);
+}
+
+void startMission(int deliveries) {
+  if (rd.busV < BUS_ON_V) {
+    Serial.println("motor power is off: release the E-stop first");
+    return;
+  }
+  deliveriesLeft = deliveries;
+  bedRelax();
+  Serial.println(deliveries ? "mission started" : "mission started (until stopped)");
+  go(LOAD);
+}
+
+void stopMission() {
+  driveStop();
+  motorsEnable(false);
+  if (servoFront.on()) {
+    bedMove(0);
+    relaxWhenFlat = true;
+  }
+  go(IDLE);
+}
+
+bool buttonPressed() {                  // one press = one event
+  bool now = io.buttonPressed();
+  bool edge = now && !buttonWas;
+  buttonWas = now;
+  return edge;
+}
+
+// ---------------- line following ----------------
+bool markArmed = true;
+int markTicks = 0;
+float lastPos = 0, lastPosTime = 0;
+uint32_t lostSince = 0, obstacleSince = 0;
+
+// Steer along the line at the speed allowed by the load and the obstacles. Returns true when a station mark
+// has just been crossed (6 or more sensors on black for 2 readings in a row).
+bool follow() {
+  const Line &l = rd.line;
+  if (l.count == 0) {
+    if (!lostSince) lostSince = millis();
+    if (millis() - lostSince > cfg.lost_s * 1000) {
+      alarm("line lost", state);
+      return false;
+    }
+  } else {
+    lostSince = 0;
+  }
+
+  float load = payloadFactor(rd.kg, cfg.max_kg, cfg.min_factor, cfg.overload);
+  if (load == 0) {
+    alarm("overload - take some weight off", state);
+    return false;
+  }
+  float clear = obstacleFactor(rd.sonarCm, cfg.stop_cm, cfg.slow_cm);
+  if (clear == 0) {                     // something in front: stop and ask for it to be moved
+    if (!obstacleSince) Serial.println("obstacle - please remove it");
+    obstacleSince = millis();
+    lights(Light::On, Light::Fast);
+    if (millis() % 1000 < 30) beep(120);
+  } else if (obstacleSince && millis() - obstacleSince < cfg.clear_s * 1000) {
+    clear = 0;                          // wait until the way has been clear for clear_s
+  } else {
+    obstacleSince = 0;
+    lights(Light::On, Light::Off);
+  }
+
+  float pos = l.count ? l.pos : lastPos;  // line just lost: keep turning the way it went
+  float now = millis() / 1000.0f;
+  float dpos = (now > lastPosTime && lastPosTime > 0) ? (pos - lastPos) / (now - lastPosTime) : 0;
+  lastPos = pos;
+  lastPosTime = now;
+  float v = cfg.follow_speed * load * clear;
+  float w = (cfg.k_line * pos + cfg.kd_line * dpos) * (v / cfg.follow_speed);
+  driveTarget(v, w);
+
+  if (l.count >= cfg.mark_min) {
+    if (markArmed && ++markTicks >= 2) {
+      markArmed = false;
+      return true;
+    }
+  } else {
+    markTicks = 0;
+    if (l.count <= 3) markArmed = true;
+  }
+  return false;
+}
+
+// ---------------- the mission ----------------
+void step() {
+  bool power = rd.busV > BUS_ON_V;
+  if (!power && state != ESTOP && state != IDLE) {
+    driveStop();
+    motorsEnable(false);
+    bedRelax();                         // the servos have lost power too; never jump back to an old angle
+    Serial.println("E-STOP: motor power is off");
+    lights(Light::Off, Light::On);
+    go(ESTOP);
+    return;
+  }
+  bool button = buttonPressed();
+
+  switch (state) {
+    case IDLE:
+      lights(Light::Slow, power ? Light::Off : Light::On);
+      if (relaxWhenFlat && !bedMoving()) {
+        bedRelax();
+        relaxWhenFlat = false;
+      }
+      if (button) startMission(0);
+      break;
+
+    case ESTOP:
+      if (heldFor(power, 1.0f)) {
+        Serial.println("motor power is back - press the start button or type run");
+        go(IDLE);
+      }
+      break;
+
+    case LOAD:
+      lights(Light::On, Light::Off);
+      motorsEnable(false);
+      if (heldFor(rd.cellsOk && rd.kg > cfg.load_kg, cfg.hold_s)) {
+        Serial.printf("package on: %.2f kg\n", rd.kg);
+        beep(200);
+        toDropoff = true;
+        motorsEnable(true);
+        markArmed = true;
+        go(FOLLOW);
+      }
+      break;
+
+    case FOLLOW:
+      if (follow()) {
+        dockStart = rd.odom.distance;
+        go(DOCK);
+      }
+      break;
+
+    case DOCK:
+      follow();
+      if (state == DOCK && rd.odom.distance - dockStart >= cfg.stop_mm / 1000) {
+        driveStop();
+        motorsEnable(false);
+        if (toDropoff) {
+          go(CHECK);
+        } else if (deliveriesLeft && --deliveriesLeft == 0) {
+          Serial.println("all deliveries done");
+          go(IDLE);
+        } else {
+          go(LOAD);
+        }
+      }
+      break;
+
+    case CHECK:
+      if (millis() - since < 500) break;  // let the robot settle
+      if (cfg.tof_check != 0 && !(rd.sideMm >= cfg.tof_min_mm && rd.sideMm <= cfg.tof_max_mm)) {
+        alarm("nothing beside the robot's right side - not at the conveyor?", CHECK);
+        break;
+      }
+      bedMove(cfg.tip_deg);
+      lights(Light::Fast, Light::Off);
+      go(TIP);
+      break;
+
+    case TIP:
+      if (!bedMoving()) go(HOLD);
+      break;
+
+    case HOLD:
+      if (millis() - since >= cfg.tip_hold_s * 1000) {
+        bedMove(0);
+        go(LOWER);
+      }
+      break;
+
+    case LOWER:                         // weigh only with the bed flat: tipped, the cells feel less weight
+      if (bedMoving()) break;
+      if (servoFront.on()) {
+        bedRelax();                     // resting on its posts now
+        since = millis();
+      } else if (millis() - since > 1000) {
+        if (rd.cellsOk && rd.kg > cfg.load_kg / 2) {
+          alarm("the package is still on the bed - press the button to tip again", CHECK);
+          break;
+        }
+        Serial.println("package delivered");
+        if (!tare()) Serial.println("!! could not zero the scale");
+        toDropoff = false;
+        motorsEnable(true);
+        markArmed = true;
+        lights(Light::On, Light::Off);
+        go(FOLLOW);
+      }
+      break;
+
+    case ALARM:
+      lights(Light::Off, Light::On);
+      if (millis() % 2000 < 30) beep(150);
+      if (button) {
+        Serial.println("carrying on");
+        if (resumeTo == FOLLOW || resumeTo == DOCK) motorsEnable(true);
+        go(resumeTo);
+      }
+      break;
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(300);
+  Serial.println("\nCargo robot (ESP32) - type help");
+  settingsLoad();
+  robotBegin();
+  delay(500);                           // let the HX711s settle
+  if (!tare()) Serial.println("!! HX711 boards not answering - the scale is not zeroed");
+  else Serial.println("scale zeroed (the bed must be empty at power-on)");
+  robotUpdate();
+  Serial.printf("motor power %s (%.1f V)\n", rd.busV > BUS_ON_V ? "ON" : "OFF", rd.busV);
+  go(IDLE);
+}
+
+void loop() {
+  robotUpdate();
+  consolePoll();
+  step();
+}
 ```

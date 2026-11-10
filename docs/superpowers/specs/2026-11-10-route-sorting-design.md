@@ -38,9 +38,20 @@ package to the right company.
   - **Hardware:** no new sensors. The conveyor feeds from the robot's right.
   - **No walls on the bed** (the user, 2026-11-10, declining the low walls I proposed for the front, back
     and left edges). So the robot's hardware does not change at all.
-  - The right-facing side distance sensor (VL53L0X) now checks, at the pickup, that the conveyor is there.
+  - ~~The side distance sensor checks the conveyor at the pickup~~: **the side sensor was removed** (the user,
+    2026-11-10), so nothing checks that the conveyor is beside the robot.
   - Two companies (one split) for now, but a route is stored as a **list of turns** so more companies can be
     added later.
+- **Hardware changes since this design was written (the user, 2026-11-10), already in the repo:** JGB37-520
+  110 RPM motor sets with 65 mm wheels (the robot sits 17.5 mm lower: bed top about 218 mm), printed ball
+  casters, **3 IR line sensors** 18 mm apart instead of the 8-sensor array, no I/O expander, **no side
+  sensor**. The numbers below are updated for them.
+- **No load cells** (the user, 2026-11-10, "remove the weight aspect of this project"). This is already done in
+  the repo: the cargo plate stands on 4 printed risers, and the firmware no longer weighs. It changes this
+  design in two places, marked **[no load cells]** below:
+  - The robot **can't feel the package land**, so "a package on the bed" (step 3 above) is no longer
+    something it can check. What tells it to set off is an open question (section 13).
+  - Speed by weight, the overload refusal and the "package still on the bed" check after tipping are gone.
 
 ## 3. Goals
 
@@ -97,7 +108,7 @@ branch B.
     P). Nothing may be within **30 cm** of an end mark: that is the circle the robot's corners sweep when it
     turns on the spot (about 27.5 cm radius).
 - **No other tape** within 10 cm of a line: the coloured stripes go at least 10 cm from the black line, on
-  either side. The line sensor is about 10 cm wide, and the black stripes in black/yellow tape would
+  either side. The 3 line sensors see about 5 cm of floor, and the black stripes in black/yellow tape would
   otherwise look like a second line. (This replaces the "5 cm" said in chat.)
 - More companies later: a branch can split again. Each extra split adds one turn to that company's route.
 
@@ -110,24 +121,20 @@ The robot knows the track only as this pattern. It does not store a map.
 - The robot stops at P facing out, with the middle of the bed level with P (as it does now with
   `stop_mm`). The conveyor is on its right.
 - **The belt ends beside the robot's path, not over it** (my call, after the review): nothing hangs over
-  the robot. The belt surface is **0.5-2 cm above the bed top** (bed top about 236 mm, so the belt top is
-  about 240-255 mm). The package leaves the end of the belt, crosses a **gap of about 3-5 cm** and lands
-  on the bed with almost no drop. This keeps the impact on the load cells small, and keeps the conveyor
-  out of the ultrasonic sensor's view.
+  the robot. The belt surface is **0.5-2 cm above the bed top** (bed top about 218 mm, so the belt top is
+  about 222-237 mm). The package leaves the end of the belt, crosses a **gap of about 3-5 cm** and lands
+  on the bed with almost no drop. This keeps the bed from being knocked, and keeps the conveyor out of
+  the ultrasonic sensor's view.
   - **There are no walls**, so the package has to come to rest on the bed by itself: the belt must run
     slowly enough that the package stops before the bed's left edge (the bed is 28 cm across). To be
     checked with the real conveyor.
   - Packages must be at least about 10 cm long in the direction the belt moves, so they can't fall into
     the gap.
   - The gap is there because the robot also drives past the belt end on its way in, with the conveyor on
-    its LEFT. So no part of the conveyor may come within **19 cm of the line** at any height above 11 cm
-    (the robot's deck and bed reach about 15 cm out), or within **22 cm** of the line lower down
-    (the wheels reach 18 cm). Those numbers include about 4 cm for the robot wobbling on the line.
+    its LEFT. So no part of the conveyor may come within **19 cm of the line** at any height above 7 cm
+    (the robot's deck and bed reach about 15 cm out), or within **23 cm** of the line lower down
+    (the 65 mm wheels reach 19 cm). Those numbers include about 4 cm for the robot wobbling on the line.
 - The conveyor stays outside the 30 cm turning circle of the main-line end mark.
-- For the pickup check: something solid on the conveyor (its frame below the belt end, a leg or a small
-  plate) at **140-180 mm height**, **20-150 mm** to the right of the side sensor, beside the middle of the
-  robot when it is stopped at P. If the conveyor can't offer that, the check is switched off with a
-  setting (`tof_check 0`), as today.
 - The conveyor runs without any electronics talking to it. The person loading it puts **one package at a
   time** on the belt, only when the robot says it is ready (see 7.2).
 - This **replaces** the old conveyor interface in `BUILD_GUIDE.md` 8.2 (belt top below 200 mm, conveyor
@@ -149,7 +156,9 @@ The robot knows the track only as this pattern. It does not store a map.
   on the company"). Moving a branch means editing that table only.
 - `route ...` also works typed in the Serial Monitor, so the robot can be tested with no laptop at all.
 - **Rules for the waiting route** (my calls, after the review; they keep a route from ever reaching the
-  wrong package):
+  wrong package). **[no load cells]** These rules assumed the robot feels the package land. Without load
+  cells, the rules that depend on that ("empty bed", "no package lands", "a package on the bed with no
+  route") must be redone once section 13, question 1 is answered:
   - The robot accepts a route **only while it is waiting at P with an empty bed**. At any other time it
     answers "not ready". (A package put on the belt while the robot is away would fall on the floor
     anyway, so the laptop never needs to send early.)
@@ -177,16 +186,13 @@ prints everything the robot says. The user tests the whole robot with it, and th
 ### 8.1 One delivery
 
 1. **Wait at P** (green light). The bed is empty and level. The robot says "ready" to the laptop.
-2. **Package and route.** It sets off when there has been more than `load_kg` on the bed for `hold_s`
-   **and** it has a waiting route. If a package is on the bed and no route has come after a time limit
-   (setting, default about 10 s), it raises an alarm "no route from the laptop".
-   The side-sensor check that the conveyor is there happens here, before it moves (`tof_check`).
-3. **Out along the main line**, at the speed allowed by the weight and obstacles, as now.
+2. **Package and route.** **[no load cells]** It sets off once it has a route **and** the package is on the
+   bed. How it knows the package is on the bed is open (section 13, question 1).
+3. **Out along the main line**, at the speed allowed by obstacles, as now.
 4. **At each split**, it takes the next turn of the route.
 5. **On the branch**: the first mark is D. It stops level with it, tips the package off to the right,
-   holds, lowers, weighs with the bed flat (empty -> zero the scale; still loaded -> alarm), exactly as the
-   current TIP/HOLD/LOWER steps do. The alarm "nothing beside the right side" at the drop-off goes away
-   (the side sensor's job is now the pickup).
+   holds and lowers, exactly as the current TIP/HOLD/LOWER steps do. **[no load cells]** It can't check
+   that the package fell off.
 6. **On to the end mark X** of the branch, stop, **turn around on the spot**.
 7. **Back**: it passes D again, and at each split on the way back takes the **opposite side** of what it took
    going out, in reverse order. Example: out `RL` (right at the 1st split, left at the 2nd) -> back: right
@@ -200,7 +206,8 @@ after turning = P. While it is passing a split it must not count it as a mark.
 
 ### 8.2 Splits
 
-- A split shows up on the line sensor as **two separate black patches** with a white gap between them.
+- A split shows up on the 3 line sensors as **left and right on black, middle on the floor** (the two
+  branches either side of the middle sensor).
 - Going through a split, the robot steers by the left or right patch, as its route says, until it is
   clearly on one line again, then follows normally.
 - If it misses a split, it drives straight between the branches, loses the line and raises the "line lost"
@@ -218,16 +225,15 @@ after turning = P. While it is passing a split it must not count it as a mark.
 
 ### 8.4 What stays the same
 
-Speed by weight (and refusing above 3.6 kg), obstacle slow/stop, line-lost alarm, E-stop, alarm-then-press-
+Obstacle slow/stop, line-lost alarm, E-stop, alarm-then-press-
 start-to-carry-on, `run` / `run N` / `stop`, the start button, settings saved in flash, all bench and
 calibration commands.
 
 ## 9. Hardware
 
-- **Nothing changes**: no walls (the user's decision), same sensors, same pins, same wires, same 3D model.
-  The ESP32's built-in Wi-Fi is the laptop link. (The battery-sense pin, GPIO33, is on ADC1, so Wi-Fi does
-  not disturb it.)
-- The VL53L0X stays where it is; only its job changes (pickup instead of drop-off).
+- **Nothing changes for this design**: no walls (the user's decision). The ESP32's built-in Wi-Fi is the
+  laptop link. (The battery-sense pin, GPIO33, is on ADC1, so Wi-Fi does not disturb it.)
+- The other hardware changes of 2026-11-10 (section 2) are already in the repo.
 
 ## 10. What has to be updated in the repo
 
@@ -243,8 +249,7 @@ calibration commands.
   mission (week 8) and the conveyor interface (8.2); joining the robot's Wi-Fi and the laptop test program;
   the test tables (a new route-accuracy test, e.g. 10 packages each way, right branch every time); the
   troubleshooting table; Appendix B (regenerated).
-- **`cad/README.md`**: the bed now drops packages into the drop box, and the side sensor checks the
-  conveyor at the pickup.
+- **`cad/README.md`**: the bed now drops packages into the drop box.
 - **Laptop test program** (section 7.3), e.g. under `tools/`.
 - No new backup folder: the current version stays in git history (`backup_v2/` stays as it is).
 
@@ -276,11 +281,15 @@ back with it and approve this document.
 Answered:
 
 - **The conveyor is not built yet** (the user, 2026-11-10). So it can be built to section 7.1 (belt top at
-  about 240-255 mm, ending beside the robot), and the old interface does not constrain it.
+  about 222-237 mm, ending beside the robot), and the old interface does not constrain it.
 
 Still open, and only the user can answer:
 
-1. **The laptop's network**: does the laptop need the internet or another Wi-Fi network while it runs (an
+1. **[no load cells] What tells the robot the package is on the bed?** Two simple options, no new parts:
+   the laptop sends the route only once it has seen the package leave the belt (the route is the "go"),
+   or a person presses the start button after the package lands. The first keeps people out of the loop;
+   the second needs nobody to trust the camera's timing.
+2. **The laptop's network**: does the laptop need the internet or another Wi-Fi network while it runs (an
    online label-reading service, a camera that connects over Wi-Fi)? If yes, the robot should join a phone
    hotspot or small router instead of making its own network (7.2).
 - **The person loading the conveyor** must wait for "ready" (the conveyor has no electronics to stop it).

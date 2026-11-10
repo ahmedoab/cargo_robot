@@ -17,10 +17,6 @@ Entry entries[] = {
     {"ki", &cfg.ki},                     {"min_duty", &cfg.min_duty},   {"accel", &cfg.accel},
     {"inv_l_motor", &cfg.inv_l_motor},   {"inv_r_motor", &cfg.inv_r_motor},
     {"inv_l_enc", &cfg.inv_l_enc},       {"inv_r_enc", &cfg.inv_r_enc},
-    {"scale", &cfg.scale},               {"sign_fl", &cfg.sign_fl},     {"sign_fr", &cfg.sign_fr},
-    {"sign_rl", &cfg.sign_rl},           {"sign_rr", &cfg.sign_rr},     {"max_kg", &cfg.max_kg},
-    {"min_factor", &cfg.min_factor},     {"overload", &cfg.overload},   {"load_kg", &cfg.load_kg},
-    {"hold_s", &cfg.hold_s},
     {"line_black", &cfg.line_black},     {"follow_speed", &cfg.follow_speed}, {"k_line", &cfg.k_line},
     {"kd_line", &cfg.kd_line},           {"lost_s", &cfg.lost_s},       {"mark_min", &cfg.mark_min},
     {"stop_mm", &cfg.stop_mm},
@@ -28,8 +24,7 @@ Entry entries[] = {
     {"tip_deg", &cfg.tip_deg},           {"tip_speed", &cfg.tip_speed},
     {"f_flat_us", &cfg.f_flat_us},       {"f_tip_us", &cfg.f_tip_us},
     {"r_flat_us", &cfg.r_flat_us},       {"r_tip_us", &cfg.r_tip_us},
-    {"tip_hold_s", &cfg.tip_hold_s},     {"tof_check", &cfg.tof_check},
-    {"tof_min_mm", &cfg.tof_min_mm},     {"tof_max_mm", &cfg.tof_max_mm},
+    {"tip_hold_s", &cfg.tip_hold_s},
 };
 
 Entry *find(const char *name) {

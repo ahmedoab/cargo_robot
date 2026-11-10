@@ -25,28 +25,13 @@ struct Odometry {
 // Robot speed (v m/s forward, w rad/s turning left) -> wheel speeds (rad/s), scaled down together if too fast.
 void twistToWheels(float v, float w, float wheelSep, float wheelRadius, float maxWheel, float &left, float &right);
 
-// 1.0 empty -> minFactor at maxKg -> 0.0 (refuse to move) above maxKg * overload.
-float payloadFactor(float kg, float maxKg, float minFactor, float overload);
-
 // 1.0 when the way ahead is clear (beyond slowCm) -> 0.0 at stopCm and closer.
 float obstacleFactor(float cm, float stopCm, float slowCm);
 
-// The 8 line sensors as a position: +1 = line under the leftmost sensor, -1 = rightmost, 0 = centred.
+// The line sensors as a position: +1 = line under the leftmost sensor, -1 = rightmost, 0 = centred.
 struct Line {
   int count = 0;                   // sensors on black
   float pos = 0;
   uint8_t black = 0;               // bit i = sensor i + 1 is on black
 };
-Line readLine(uint8_t bits, bool blackIsHigh);
-
-// Median of the last n values (n <= 9): removes the odd wild load-cell reading.
-class Median {
- public:
-  explicit Median(int n) : n_(n) {}
-  float update(float x);
-  void clear() { count_ = 0; }
-
- private:
-  float buf_[9];
-  int n_, count_ = 0, next_ = 0;
-};
+Line readLine(uint8_t bits, int n, bool blackIsHigh);   // n sensors, bit i = sensor i + 1

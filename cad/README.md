@@ -1,14 +1,14 @@
 # Cargo robot: mechanical design v2 with a tilting bed (Phase II)
 
-**Overall size:** 407 × 360 × 236 mm (L × W × H) with the bed flat.
+**Overall size:** 407 × 382 × 218 mm (L × W × H) with the bed flat.
 
 **Layout:**
 
-- Two drive wheels in the middle, and swivel casters (M8 threaded stems) at the front and rear.
+- Two drive wheels in the middle (JGB37-520 110 RPM motor sets with 65 mm wheels), and a printed ball caster at the front and rear (a 25 mm steel ball in a cup, on an M8 bolt whose nuts set the height).
 - The bottom plate (6 mm plywood) carries the electronics: ESP32, motor drivers, battery, two buck converters.
 - The top deck (5 mm acrylic) sits on 6 M6 threaded rods. The E-stop and master switch are at its front, the start button and two LEDs at its rear.
-- **Tilting bed:** a 6 mm plywood tilting plate carries the 4 load cells and the acrylic cargo plate. Two 60 kg·cm servos on the deck's right edge, one at each end of the bed, turn it about their shafts (the shafts are the hinge). The bed tips 40° to the right and the package slides off onto the conveyor. Flat, it rests on two printed posts.
-- **Sensors:** an 8-channel IR line sensor under the bottom plate (in front of the wheels, nothing sticks out), one HC-SR04 ultrasonic sensor at the front of the electronics bay looking ahead, and a VL53L0X distance sensor under the deck's right edge (it checks that the belt is there before the bed tips).
+- **Tilting bed:** a 6 mm plywood tilting plate carries the acrylic cargo plate on 4 printed risers. Two 60 kg·cm servos on the deck's right edge, one at each end of the bed, turn it about their shafts (the shafts are the hinge). The bed tips 40° to the right and the package slides off onto the conveyor. Flat, it rests on two printed posts.
+- **Sensors:** 3 IR line sensors on a printed bar under the bottom plate (in front of the wheels, nothing sticks out), and one HC-SR04 ultrasonic sensor at the front of the electronics bay looking ahead. Everything is wired straight to the ESP32 (no I/O expander, no I2C).
 
 ![The robot, bed tipped](output/views/render_tipped.png)
 
@@ -34,15 +34,15 @@
 
 - **E01 System block diagram:** every part and how power and signals flow between them.
 - **E02 Power distribution:** battery → fuse → master switch → E-stop → motor drivers, motors and the 7.4 V servo buck; the 5.1 V buck for the ESP32 and sensors; the battery/E-stop sense divider. Wire IDs P1–P19 match the power wire list in `BUILD_GUIDE.md` (week 2).
-- **E03 ESP32 wiring:** the DevKit's 38 pins with every used one, the motor/encoder cables, both BTS7960 drivers, the 4 HX711 boards with their load cells, the ultrasonic sensors with their dividers, and the servo signals.
-- **E04 I2C, line sensor and panel:** the MCP23017 I/O expander, the line sensor, the VL53L0X, the start button, LEDs, buzzer and the pull resistors.
+- **E03 ESP32 wiring:** the DevKit's 38 pins with every used one, the motor/encoder cables, both BTS7960 drivers, the ultrasonic sensor with its divider, and the servo signals.
+- **E04 Line sensors and panel:** the 3 IR modules, the start button, LEDs, buzzer and the motor-enable pull-down.
 
 Pin numbers come from `firmware/cargo_robot/config.h`: change a pin there and re-run `make_schematics.py`.
 
 ## Assembly and connections
 
 - `autocad/CargoRobot_v2_assembly.pdf`: every component (bought, laser-cut, 3D-printed), the tools, and the assembly in 11 steps with a picture of each stage; then drawing sheets 01, 02 and 07.
-- `autocad/CargoRobot_v2_connections.pdf`: every wire (power P1–P19, signal S1–S38), the parts on the I/O board, the connections of each part pin by pin, then the 4 schematic sheets.
+- `autocad/CargoRobot_v2_connections.pdf`: every wire (power P1–P19, signal S1–S28), the parts on the I/O board, the connections of each part pin by pin, then the 4 schematic sheets.
 
 Both are made by `make_docs.py` from `robot_cad.py` (parts), `wiring.py` (wires) and `firmware/cargo_robot/config.h` (pin numbers).
 
@@ -59,12 +59,12 @@ Both are made by `make_docs.py` from `robot_cad.py` (parts), `wiring.py` (wires)
 |---|---|
 | `output/dxf/bottom_plate.dxf`, `tilt_plate.dxf` | Laser-cut 6 mm plywood |
 | `output/dxf/top_deck.dxf`, `cargo_plate.dxf` | Laser-cut 5 mm acrylic. Every hole and slot is in the files. |
-| `output/parts/*.stl` (printed parts, see below) | 3D print, PETG |
+| `output/parts/*.stl` (ONLY the printed parts, see below) | 3D print, PETG. Each file already lies in its printing position. |
 | `output/bom.csv` | Everything else (bought parts, rods, nuts) |
 
-Printed parts: `servo_mount_front`, `servo_mount_rear`, `horn_adapter_front`, `horn_adapter_rear`, `bed_rest` (× 2), `load_cell_spacer` (× 8), `line_sensor_bracket`, `sonar_bracket`, `tof_bracket`. The other STLs in `output/parts/` are the plates, for reference.
+Printed parts (11 files, 19 prints): `servo_mount_front`, `servo_mount_rear`, `servo_clamp` (× 4), `horn_adapter_front`, `horn_adapter_rear`, `bed_rest` (× 2), `bed_riser` (× 4), `line_sensor_bar`, `sonar_bracket`, `caster_cup` (× 2), `caster_ring` (× 2). The plates are not in `output/parts/`: they are the DXF files, for the laser.
 
-> **Check your servo before printing the servo mounts.** No seller lists the tab-hole spacing of the DS5160-type servo; the mount assumes 74 × 18 mm. Measure yours and change `hole_l` / `hole_w` in `SERVO` at the top of `robot_cad.py` if it differs.
+> **How the prints were checked.** `check_render.py` runs a rod slightly thinner than each bolt through every bolt path (57 of them) to prove the holes line up through all the parts they join, checks every part against every other with the bed at 0–45°, and checks that each printed part is one piece, fits a 200 × 200 mm printer and has a flat face on the bed. The servo mounts follow the DS5160 maker's drawing (65 × 30 mm body, 75 mm over the ears, ears 31 mm above the bottom); they clamp the ears and slide ±4 mm, so they don't depend on the details the maker doesn't publish. The casters and the line sensors adjust on the robot for whatever height your motor brackets give.
 
 ## Change it
 
@@ -72,7 +72,7 @@ Edit the parameters at the top of `robot_cad.py`, then run:
 
 ```
 .venv\Scripts\python robot_cad.py       # regenerate every file
-.venv\Scripts\python check_render.py    # collision check (bed flat and tipped), wheels on the floor, torque, PNG renders
+.venv\Scripts\python check_render.py    # bolt paths, collisions (bed flat and tipped), printability, wheels on the floor, torque, PNG renders
 .venv\Scripts\python make_autocad.py    # AutoCAD DXF (3D model + 10 drawing sheets) + PDF
 .venv\Scripts\python make_schematics.py # electrical schematics DXF + PDF
 .venv\Scripts\python make_docs.py       # assembly PDF + connections PDF (+ updates BUILD_GUIDE.md's wire tables)

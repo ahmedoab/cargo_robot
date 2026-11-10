@@ -1,14 +1,10 @@
 #include "robot.h"
 
-#include <Wire.h>
-
 #include "config.h"
 #include "settings.h"
 
 Motor motorL, motorR;
 Encoder encL, encR;
-HX711Array cells;
-Expander io;
 BedServo servoFront, servoRear;
 bool manualMotors = false;
 Readings rd;
@@ -16,19 +12,12 @@ Readings rd;
 namespace {
 WheelPID pidL, pidR;
 LowPass speedL(0.5f), speedR(0.5f);
-Median weightFilter(5);
-long offsets[4] = {0, 0, 0, 0};
 long lastCountL = 0, lastCountR = 0;
-uint32_t lastTick = 0, lastCellRead = 0, lastSide = 0, beepUntil = 0;
+uint32_t lastTick = 0, beepUntil = 0;
 float targetV = 0, targetW = 0, rampV = 0;
 float bedTarget = 0;
 bool motorsOn = false;
 Light greenMode = Light::Off, redMode = Light::Off;
-
-float sign(int i) {
-  const float s[4] = {cfg.sign_fl, cfg.sign_fr, cfg.sign_rl, cfg.sign_rr};
-  return s[i] < 0 ? -1.0f : 1.0f;
-}
 
 bool lit(Light mode) {
   switch (mode) {
@@ -67,7 +56,7 @@ void controlTick(float dt) {
   }
 
   // line sensors
-  rd.line = readLine(io.lineBits(), cfg.line_black != 0);
+  rd.line = readLine(lineBits(), LINE_N, cfg.line_black != 0);
 
   // bed: move towards its target at tip_speed
   if (servoFront.on()) {
@@ -79,16 +68,13 @@ void controlTick(float dt) {
 }  // namespace
 
 void robotBegin() {
-  Wire.begin(PIN_SDA, PIN_SCL, 400000);
-  if (!io.begin()) Serial.println("!! MCP23017 not found at 0x20: check SDA/SCL, 3.3 V and A0-A2 to GND");
+  panelBegin();
   motorL.begin(PIN_L_RPWM, PIN_L_LPWM);
   motorR.begin(PIN_R_RPWM, PIN_R_LPWM);
   if (!encL.begin(PIN_ENC_L_A, PIN_ENC_L_B) || !encR.begin(PIN_ENC_R_A, PIN_ENC_R_B))
     Serial.println("!! encoder counter set-up failed");
   applyInversions();
-  cells.begin();
   sonar::begin();
-  if (!sideBegin()) Serial.println("!! VL53L0X side sensor not found: check its wires (or set tof_check 0)");
   servoFront.begin(PIN_SERVO_FRONT);
   servoRear.begin(PIN_SERVO_REAR);
   motorsEnable(false);
@@ -106,29 +92,8 @@ void applyInversions() {
 
 void robotUpdate() {
   rd.busV = busVolts();
-
-  // load cells: a new reading 10 times per second
-  if (cells.notReady() == 0) {
-    long raw[4];
-    if (cells.read(raw, 0)) {
-      float total = 0;
-      for (int i = 0; i < 4; i++) {
-        rd.raw[i] = raw[i];
-        rd.cornerKg[i] = sign(i) * (raw[i] - offsets[i]) / cfg.scale;
-        total += rd.cornerKg[i];
-      }
-      rd.kg = weightFilter.update(total);
-      lastCellRead = millis();
-    }
-  }
-  rd.cellsOk = millis() - lastCellRead < 1000;
-
   sonar::update();
   rd.sonarCm = sonar::cm();
-  if (millis() - lastSide >= 20) {
-    lastSide = millis();
-    rd.sideMm = sideMm();
-  }
 
   uint32_t now = micros();
   if (now - lastTick >= 1000000 / CONTROL_HZ) {
@@ -137,9 +102,9 @@ void robotUpdate() {
     controlTick(dt);
   }
 
-  io.out(XP_LED_GREEN, lit(greenMode));
-  io.out(XP_LED_RED, lit(redMode));
-  io.out(XP_BUZZER, (int32_t)(beepUntil - millis()) > 0);
+  panelOut(PIN_LED_GREEN, lit(greenMode));
+  panelOut(PIN_LED_RED, lit(redMode));
+  panelOut(PIN_BUZZER, (int32_t)(beepUntil - millis()) > 0);
 }
 
 void driveTarget(float v, float w) {
@@ -158,23 +123,7 @@ void driveStop() {
 void motorsEnable(bool on) {
   if (!on) driveStop();
   motorsOn = on;
-  io.out(XP_MOTOR_EN, on);
-}
-
-bool tare() {
-  long sum[4] = {0, 0, 0, 0};
-  int n = 0;
-  for (int k = 0; k < 15; k++) {
-    long raw[4];
-    if (!cells.read(raw)) continue;
-    for (int i = 0; i < 4; i++) sum[i] += raw[i];
-    n++;
-  }
-  if (n < 8) return false;
-  for (int i = 0; i < 4; i++) offsets[i] = sum[i] / n;
-  weightFilter.clear();
-  rd.kg = 0;
-  return true;
+  panelOut(PIN_MOTOR_EN, on);
 }
 
 void bedMove(float deg) {

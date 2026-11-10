@@ -172,70 +172,13 @@ void testDrive(float v, float w, float seconds) {
                 (rd.odom.heading - start.heading) * 180 / PI);
 }
 
-// ---------------- load cells ----------------
-const char *CORNERS[4] = {"front-left", "front-right", "rear-left", "rear-right"};
-
-void testCells() {
-  if (!tare()) {
-    Serial.println("!! HX711 boards not answering: check their VCC, GND, SCK and DT wires");
-    return;
-  }
-  Serial.println("zeroed - corners in kg, then the total (uses scale and sign_* from the settings)");
-  monitor([] {
-    for (int i = 0; i < 4; i++) Serial.printf("%s %7.3f   ", CORNERS[i], rd.cornerKg[i]);
-    Serial.printf("| total %7.3f kg\n", rd.kg);
-  });
-}
-
-bool average(float out[4]) {                      // 1.5 s of readings, per cell
-  long raw[4];
-  float sum[4] = {0, 0, 0, 0};
-  int n = 0;
-  for (int k = 0; k < 15; k++) {
-    if (!cells.read(raw)) continue;
-    for (int i = 0; i < 4; i++) sum[i] += raw[i];
-    n++;
-  }
-  for (int i = 0; i < 4; i++) out[i] = sum[i] / max(n, 1);
-  if (n < 8) Serial.println("!! HX711 boards not answering: check their VCC, GND, SCK and DT wires");
-  return n >= 8;
-}
-
-void calibrate(float kg) {
-  float zero[4], loaded[4];
-  waitEnter("1) EMPTY the cargo bed");
-  if (!average(zero)) return;
-  Serial.printf("2) put the %.2f kg weight in the MIDDLE of the bed", kg);
-  waitEnter("");
-  if (!average(loaded)) return;
-  float delta[4], total = 0;
-  for (int i = 0; i < 4; i++) {
-    delta[i] = loaded[i] - zero[i];
-    total += delta[i];
-  }
-  float majority = total >= 0 ? 1 : -1, scale = 0;
-  float *signs[4] = {&cfg.sign_fl, &cfg.sign_fr, &cfg.sign_rl, &cfg.sign_rr};
-  for (int i = 0; i < 4; i++) {
-    bool same = delta[i] * majority >= 0 || fabsf(delta[i]) < 0.05f * fabsf(total) / 4;
-    *signs[i] = same ? 1 : -1;
-    scale += *signs[i] * delta[i];
-    Serial.printf("   %-12s change %+10.0f%s\n", CORNERS[i], delta[i],
-                  same ? "" : "   <-- opposite sign: swap this cell's A+/A- wires, or keep sign -1");
-  }
-  cfg.scale = scale / kg;
-  Serial.printf("\nscale %.1f, signs %g %g %g %g - now in use. Type save to keep them.\n", cfg.scale, cfg.sign_fl,
-                cfg.sign_fr, cfg.sign_rl, cfg.sign_rr);
-  if (fabsf(cfg.scale) < 1000) Serial.println("!! very small change - check the load-cell wiring (E+/E-/A+/A-)");
-  tare();
-}
-
 // ---------------- sensors ----------------
 void testLine() {
-  Serial.println("sensor 1 (left) .. 8 (right): # = black");
+  Serial.println("sensor 1 (left) .. 3 (right): # = black");
   monitor([] {
-    char s[9];
-    for (int i = 0; i < 8; i++) s[i] = rd.line.black & (1 << i) ? '#' : '.';
-    s[8] = 0;
+    char s[LINE_N + 1];
+    for (int i = 0; i < LINE_N; i++) s[i] = rd.line.black & (1 << i) ? '#' : '.';
+    s[LINE_N] = 0;
     Serial.printf("%s   on black %d   position %+.2f%s\n", s, rd.line.count, rd.line.pos,
                   rd.line.count >= cfg.mark_min ? "   STATION MARK" : "");
   }, 100);
@@ -244,14 +187,6 @@ void testLine() {
 void testSonar() {
   monitor([] {
     Serial.printf("ahead %5.0f cm   (%.0f = nothing there)\n", rd.sonarCm, SONAR_MAX_CM);
-  });
-}
-
-void testSide() {
-  monitor([] {
-    if (rd.sideMm < 0) Serial.println("side: nothing in range (or no sensor)");
-    else Serial.printf("side: %d mm%s\n", rd.sideMm,
-                       rd.sideMm >= cfg.tof_min_mm && rd.sideMm <= cfg.tof_max_mm ? "   OK to tip" : "");
   });
 }
 
@@ -270,7 +205,7 @@ void testServo(char which, const String &arg) {
 
 void testTip() {
   powerCheck();
-  Serial.printf("on the bed: %.2f kg - tipping to %.0f deg ...\n", rd.kg, cfg.tip_deg);
+  Serial.printf("tipping to %.0f deg ...\n", cfg.tip_deg);
   uint32_t t0 = millis();
   bedMove(cfg.tip_deg);
   while (bedMoving()) robotUpdate();
@@ -280,18 +215,16 @@ void testTip() {
   while (bedMoving()) robotUpdate();
   runFor(0.5f);
   bedRelax();
-  runFor(1.0f);                                   // weigh with the bed flat: tipped, the cells feel less weight
-  Serial.printf("bed flat again: %.2f kg on it - %s\n", rd.kg,
-                rd.kg < cfg.load_kg / 2 ? "delivered" : "the package did NOT slide off");
+  Serial.println("bed flat again - did the package slide off?");
 }
 
 // ---------------- status ----------------
 void status() {
-  char bits[9];
-  for (int i = 0; i < 8; i++) bits[i] = rd.line.black & (1 << i) ? '#' : '.';
-  bits[8] = 0;
-  Serial.printf("%-7s | %4.1f V | %6.3f kg%s | line %s | ahead %3.0f cm | side %4d mm | bed %4.1f deg\n",
-                stateName(), rd.busV, rd.kg, rd.cellsOk ? "" : " (no HX711)", bits, rd.sonarCm, rd.sideMm, rd.bedDeg);
+  char bits[LINE_N + 1];
+  for (int i = 0; i < LINE_N; i++) bits[i] = rd.line.black & (1 << i) ? '#' : '.';
+  bits[LINE_N] = 0;
+  Serial.printf("%-7s | %4.1f V | line %s | ahead %3.0f cm | bed %4.1f deg\n", stateName(), rd.busV, bits,
+                rd.sonarCm, rd.bedDeg);
 }
 
 void help() {
@@ -304,13 +237,10 @@ DRIVE      enc              encoder counts (turn the wheels by hand)          WH
            mintest | maxtest   measure min_duty | kf
            motor l|r <duty> [s]   one motor open loop, duty -1..1
            drive <v> <w> [s]      closed loop: v m/s, w rad/s, default 2 s; prints odometry
-LOAD CELLS hx               live corners + total kg (zeroes first: bed empty)
-           tare             zero the scale (bed empty)
-           cal <kg>         calibrate with a known weight
-SENSORS    line | sonar | tof   live line sensors | ultrasonic | side distance
+SENSORS    line | sonar     live line sensors | ultrasonic
 BED        servo f|r <us>   one servo to a raw pulse (calibration); servo f|r off
            bed <deg>        both servos smoothly to deg (0 = flat); bed off = release
-           tip              tip, wait until empty, lower
+           tip              tip, hold, lower
 SETTINGS   list | get <name> | set <name> <value> | save | defaults)");
 }
 
@@ -365,12 +295,8 @@ void runCommand(String line) {
   if (c == "maxtest") return testMaxSpeed();
   if (c == "motor") return testOneMotor(w[1][0], w[2].toFloat(), w[3].length() ? w[3].toFloat() : 2.0f);
   if (c == "drive") return testDrive(w[1].toFloat(), w[2].toFloat(), w[3].length() ? w[3].toFloat() : 2.0f);
-  if (c == "hx") return testCells();
-  if (c == "tare") return (void)Serial.println(tare() ? "zeroed" : "!! HX711 boards not answering");
-  if (c == "cal") return calibrate(w[1].toFloat() > 0 ? w[1].toFloat() : 2.0f);
   if (c == "line") return testLine();
   if (c == "sonar") return testSonar();
-  if (c == "tof") return testSide();
   if (c == "servo") return testServo(w[1][0], w[2]);
   if (c == "bed") {
     if (w[1] == "off") return bedRelax();

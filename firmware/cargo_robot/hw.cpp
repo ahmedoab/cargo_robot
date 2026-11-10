@@ -1,8 +1,5 @@
 #include "hw.h"
 
-#include <VL53L0X.h>
-#include <Wire.h>
-
 #include "config.h"
 
 // ---------------- Motor ----------------
@@ -59,93 +56,26 @@ long Encoder::count() {
   return invert ? -c : c;
 }
 
-// ---------------- HX711Array ----------------
-static portMUX_TYPE hxMux = portMUX_INITIALIZER_UNLOCKED;
-
-void HX711Array::begin() {
-  pinMode(PIN_HX_SCK, OUTPUT);
-  digitalWrite(PIN_HX_SCK, LOW);                  // SCK low = the chips are powered up
-  for (int pin : PIN_HX_DT) pinMode(pin, INPUT_PULLUP);
+// ---------------- panel and line sensors (plain ESP32 pins) ----------------
+void panelBegin() {
+  for (int pin : {PIN_MOTOR_EN, PIN_BUZZER, PIN_LED_GREEN, PIN_LED_RED}) {
+    digitalWrite(pin, LOW);                       // motors disabled, buzzer and LEDs off
+    pinMode(pin, OUTPUT);
+  }
+  for (int pin : PIN_LINE) pinMode(pin, INPUT);   // the modules drive their outputs
+  pinMode(PIN_BUTTON, INPUT_PULLUP);
 }
 
-int HX711Array::notReady() {
-  int bits = 0;
-  for (int i = 0; i < 4; i++)
-    if (digitalRead(PIN_HX_DT[i])) bits |= 1 << i;   // DOUT high = no new reading yet
+uint8_t lineBits() {
+  uint8_t bits = 0;
+  for (int i = 0; i < LINE_N; i++)
+    if (digitalRead(PIN_LINE[i])) bits |= 1 << i;
   return bits;
 }
 
-bool HX711Array::read(long out[4], uint32_t timeoutMs) {
-  uint32_t t0 = millis();
-  while (notReady()) {
-    if (millis() - t0 > timeoutMs) return false;
-    delay(1);
-  }
-  uint32_t v[4] = {0, 0, 0, 0};
-  portENTER_CRITICAL(&hxMux);                     // keep SCK high short: > 60 us high = the HX711 powers down
-  for (int bit = 0; bit < 24; bit++) {
-    digitalWrite(PIN_HX_SCK, HIGH);
-    delayMicroseconds(1);
-    digitalWrite(PIN_HX_SCK, LOW);
-    for (int i = 0; i < 4; i++) v[i] = (v[i] << 1) | digitalRead(PIN_HX_DT[i]);
-    delayMicroseconds(1);
-  }
-  digitalWrite(PIN_HX_SCK, HIGH);                 // 25th pulse: next reading = channel A, gain 128
-  delayMicroseconds(1);
-  digitalWrite(PIN_HX_SCK, LOW);
-  portEXIT_CRITICAL(&hxMux);
-  for (int i = 0; i < 4; i++) out[i] = (v[i] & 0x800000) ? (long)v[i] - 0x1000000L : (long)v[i];
-  return true;
-}
+bool buttonDown() { return digitalRead(PIN_BUTTON) == LOW; }   // pressed = pulled to GND
 
-// ---------------- Expander (MCP23017, registers with IOCON.BANK = 0) ----------------
-namespace {
-constexpr uint8_t IODIRA = 0x00, IODIRB = 0x01, GPPUA = 0x0C, GPPUB = 0x0D, GPIOA = 0x12, GPIOB = 0x13,
-                  OLATB = 0x15;
-constexpr uint8_t PORTB_INPUTS = 0xF0;           // GPB0-3 outputs, GPB4-7 inputs
-}  // namespace
-
-bool Expander::write(uint8_t reg, uint8_t value) {
-  Wire.beginTransmission(MCP_ADDR);
-  Wire.write(reg);
-  Wire.write(value);
-  return Wire.endTransmission() == 0;
-}
-
-int Expander::read(uint8_t reg) {
-  Wire.beginTransmission(MCP_ADDR);
-  Wire.write(reg);
-  if (Wire.endTransmission(false) != 0) return -1;
-  if (Wire.requestFrom((uint8_t)MCP_ADDR, (uint8_t)1) != 1) return -1;
-  return Wire.read();
-}
-
-bool Expander::begin() {
-  olatB_ = 0;                                     // motors disabled, buzzer and LEDs off
-  write(OLATB, olatB_);
-  write(IODIRA, 0xFF);                            // port A: 8 line-sensor inputs (the board drives them)
-  write(GPPUA, 0x00);
-  write(IODIRB, PORTB_INPUTS);
-  write(GPPUB, PORTB_INPUTS);                     // pull-ups on the button and the spare inputs
-  ok = read(IODIRB) == PORTB_INPUTS;
-  return ok;
-}
-
-uint8_t Expander::lineBits() {
-  int v = read(GPIOA);
-  return v < 0 ? 0 : (uint8_t)v;
-}
-
-bool Expander::buttonPressed() {
-  int v = read(GPIOB);
-  return v >= 0 && !(v & (1 << (XP_BUTTON - 8)));  // pressed = pulled to GND
-}
-
-void Expander::out(int pin, bool on) {
-  uint8_t mask = 1 << (pin - 8);
-  uint8_t next = on ? (olatB_ | mask) : (olatB_ & ~mask);
-  if (next != olatB_ && write(OLATB, next)) olatB_ = next;
-}
+void panelOut(int pin, bool on) { digitalWrite(pin, on ? HIGH : LOW); }
 
 // ---------------- sonar ----------------
 namespace sonar {
@@ -201,28 +131,6 @@ void BedServo::pulse(float us) {
 void BedServo::off() {
   ledcWrite(pin_, 0);
   on_ = false;
-}
-
-// ---------------- side distance sensor (VL53L0X) ----------------
-static VL53L0X side;
-static bool sideOk = false;
-static int sideLast = -1;
-
-bool sideBegin() {
-  side.setBus(&Wire);
-  side.setTimeout(50);
-  sideOk = side.init();
-  if (sideOk) side.startContinuous(50);
-  return sideOk;
-}
-
-int sideMm() {
-  if (!sideOk) return -1;
-  if (side.readReg(VL53L0X::RESULT_INTERRUPT_STATUS) & 0x07) {    // a new reading is waiting
-    uint16_t mm = side.readRangeContinuousMillimeters();
-    sideLast = (side.timeoutOccurred() || mm >= 8000) ? -1 : mm;
-  }
-  return sideLast;
 }
 
 // ---------------- motor bus voltage ----------------

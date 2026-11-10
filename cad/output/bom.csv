@@ -1,28 +1,24 @@
 Group,Item,Qty,Make/Buy
 Compute,"ESP32 DevKitC 38-pin (ESP32-WROOM-32, USB) + 38-pin screw-terminal breakout board",1,buy (get 2)
-Compute,MCP23017 I2C 16-bit I/O expander module (address 0x20),1,buy
-Drive,JGB37-520 12V 170 RPM gear motor with Hall encoder (6 wires),2,buy
-Drive,Steel mounting bracket for 37 mm gear motor (+ its M3 screws),2,buy
-Drive,Wheel 100 mm x 30 mm with 6 mm D-shaft hub,2,buy
-Drive,"Swivel caster 50 mm, M8 threaded stem, >= 20 kg rating",2,buy
+Drive,JGB37-520 12 V 110 RPM gear motor SET: motor with Hall encoder (6 wires) + steel bracket + hex coupling + 65 mm wheel,2,buy
 Drive,BTS7960 (IBT-2) 43 A motor driver,2,buy
-Sensors,"8-channel IR line sensor array, TCRT5000, digital outputs, 3.3-5 V",1,buy
-Sensors,Line sensor bracket (line_sensor_bracket.stl),1,3D print PETG
+Drive,Ball caster: cup (caster_cup.stl) + ring (caster_ring.stl),2,3D print PETG
+Drive,"Steel bearing ball 25.4 mm (1 inch), or a 25 mm glass marble",2,buy (get 3)
+Drive,M8 x 50 bolt + 2 M8 nuts + 2 M8 washers (one set per caster),2,buy
+Sensors,"IR obstacle-avoidance module, 3 pins (VCC, GND, OUT), one blue pot (FC-51 / HW-201 type)",3,buy (get 4)
+Sensors,Line sensor bar (line_sensor_bar.stl),1,3D print PETG
 Sensors,HC-SR04 ultrasonic distance sensor,1,buy (get 2)
 Sensors,Ultrasonic sensor bracket (sonar_bracket.stl),1,3D print PETG
-Sensors,VL53L0X time-of-flight distance sensor module,1,buy
-Sensors,Side sensor bracket (tof_bracket.stl),1,3D print PETG
-Payload,"Straight-bar load cell 10 kg, 80x12.7x12.7 mm",4,buy
-Payload,HX711 module,4,buy
-Payload,Load-cell spacer (load_cell_spacer.stl),8,3D print PETG 100 %
-Payload,Cargo plate 260x280x5 (cargo_plate.dxf),1,laser-cut acrylic
+Tilting bed,Cargo plate 260x280x5 (cargo_plate.dxf),1,laser-cut acrylic
+Tilting bed,Bed riser (bed_riser.stl),4,3D print PETG
 Tilting bed,Tilting plate 236x247x6 (tilt_plate.dxf),1,laser-cut 6 mm plywood
-Tilting bed,"Servo 60 kg.cm, metal gears, 180 deg, 6-8.4 V, 25T spline, about 65x30x48 mm (e.g. DS5160)",2,buy
-Tilting bed,"25T aluminium disc servo horn, about 38 mm (often included with the servo)",2,buy
+Tilting bed,"Servo DS5160, 60 kg.cm, metal gears, 180 deg, 6-8.4 V, 65 x 30 x 48 mm",2,buy
+Tilting bed,"Aluminium DISC servo horn for the servo's spline (25T on most DS5160), 38 mm or smaller (not the 4-arm horn: its arms hit the deck)",2,buy
 Tilting bed,Servo mount (servo_mount_front.stl + servo_mount_rear.stl),2,3D print PETG
+Tilting bed,Servo ear clamp (servo_clamp.stl),4,3D print PETG
 Tilting bed,Horn adapter (horn_adapter_front.stl + horn_adapter_rear.stl),2,3D print PETG 100 %
 Tilting bed,Bed rest post (bed_rest.stl) + 18 mm self-adhesive rubber pad 2 mm,2,3D print PETG
-Tilting bed,"Buck converter 10 A (e.g. 300 W XL4016 module), set to 7.4 V for the servos",1,buy
+Tilting bed,"Buck converter XL4016 8 A, set to 7.4 V for the servos",1,buy
 Power,3S LiPo 11.1 V 5000 mAh XT60 + balance charger + LiPo bag + voltage alarm,1,buy
 Power,XL4015 5 A buck converter (5.1 V for the ESP32 and sensors),1,buy
 Power,"Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs",1,buy
@@ -35,6 +31,6 @@ Chassis,Bottom plate 400x300x6 (bottom_plate.dxf),1,laser-cut 6 mm plywood
 Chassis,Top deck 400x300x5 (top_deck.dxf),1,laser-cut 5 mm acrylic
 Chassis,"M6 threaded rod, cut to 130 mm",6,cut from 1 m rod
 Chassis,M6 nut + M6 washer,24,buy
-Chassis,M8 nut + M8 washer (casters),4,buy
-Hardware,"M4x12 screws + nylock nuts (motor brackets, servo mounts, rest posts), M4x16 + nuts (horn adapters), M4/M5x16 (load cells), M3 screws + nuts (sensor brackets), M2.5/M3 for the boards, VHB tape, velcro strap, zip ties",1,buy
-Hardware,"Resistors 1k x1, 2k x1, 10k x5, 2.2k x1, 4.7k x2, 100 nF x1, small perfboard x2",1,buy
+Hardware,"M4: x10 (bed rests, 2), x12 (servo mounts, 6), x16 (servo ear clamps, 4), x20 (horn adapters 4 + risers from below 8), x20 COUNTERSUNK (risers through the cargo plate, 8); 32 M4 nuts; M4 washers",1,buy
+Hardware,"M3: x10 (servo horns, 8), x8 countersunk (caster rings, 6), x12 + nut (line sensor bar 2, IR modules 3, sonar bracket 2); screws for the motor brackets (holes drilled by hand)",1,buy
+Hardware,"Resistors 1k x1, 2k x1, 10k x5, 2.2k x1, 100 nF x1, small perfboard; VHB tape, velcro strap, zip ties, a little grease (casters)",1,buy

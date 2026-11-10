@@ -4,11 +4,11 @@ Electrical schematics of the cargo robot (design v2, ESP32, tilting bed) - AutoC
 Run:   .venv\\Scripts\\python make_schematics.py
 Writes ./autocad/
   CargoRobot_v2_schematics.dxf   4 A3 layout tabs (open in AutoCAD, Save As .dwg):
-      E01 SYSTEM BLOCK DIAGRAM   E02 POWER DISTRIBUTION   E03 ESP32 WIRING   E04 I2C, LINE SENSOR AND PANEL
+      E01 SYSTEM BLOCK DIAGRAM   E02 POWER DISTRIBUTION   E03 ESP32 WIRING   E04 LINE SENSORS AND PANEL
   CargoRobot_v2_schematics.pdf   the same 4 sheets (colour, A3)
   previews/E0x_*.png
 
-The pin numbers come from firmware/cargo_robot/config.h (through wiring.py) and the wire IDs (P1..P19, S1..S38) match the
+The pin numbers come from firmware/cargo_robot/config.h (through wiring.py) and the wire IDs (P1..P19, S1..S28) match the
 wire lists in BUILD_GUIDE.md (weeks 2 and 3).
 """
 from pathlib import Path
@@ -265,19 +265,16 @@ def sheet_block_diagram():
         "prot": (95, 245, 145, 272, "F1 + SW1", ["10 A fuse", "master switch"]),
         "estop": (165, 245, 215, 272, "S1 E-STOP", ["latching, NC", "cuts motor 12 V"]),
         "drv": (240, 245, 300, 272, "U2 + U3", ["2 x BTS7960", "motor drivers"]),
-        "mot": (330, 245, 400, 272, "M1 + M2", ["JGB37-520 12 V", "+ Hall encoders"]),
+        "mot": (330, 245, 400, 272, "M1 + M2", ["JGB37-520 12 V 110 RPM", "+ Hall encoders"]),
         "buck": (165, 200, 215, 225, "U1 BUCK 5.1 V", ["XL4015", "ESP32 + sensors"]),
-        "sbuck": (165, 160, 215, 185, "U5 BUCK 7.4 V", ["10 A", "bed servos"]),
-        "esp": (240, 95, 300, 225, "ESP32", ["DevKitC 38-pin", "", "line following", "speed by weight",
-                                              "obstacles", "tilting bed", "mission + safety"]),
-        "hx": (330, 205, 400, 230, "4 x HX711", ["+ 4 x 10 kg", "load cells"]),
+        "sbuck": (165, 160, 215, 185, "U5 BUCK 7.4 V", ["XL4016 8 A", "bed servos"]),
+        "esp": (240, 95, 300, 225, "ESP32", ["DevKitC 38-pin", "", "line following", "obstacles",
+                                              "tilting bed", "mission + safety"]),
         "servo": (330, 165, 400, 190, "SV1 + SV2", ["60 kg.cm servos", "tilt the bed"]),
         "sonar": (330, 125, 400, 150, "HC-SR04", ["ultrasonic, front", "ECHO via 1k/2k"]),
-        "mcp": (165, 95, 215, 135, "U4 MCP23017", ["I2C 0x20", "I/O expander"]),
-        "tof": (95, 140, 145, 162, "VL53L0X", ["side distance", "I2C 0x29"]),
-        "line": (95, 105, 145, 127, "LINE SENSOR", ["8 x TCRT5000"]),
+        "line": (95, 105, 145, 127, "LINE SENSORS", ["3 x IR module", "under the plate"]),
         "ui": (95, 70, 145, 92, "PANEL", ["button, 2 LEDs", "buzzer"]),
-        "laptop": (28, 70, 78, 92, "LAPTOP", ["Arduino IDE", "(USB, programming)"]),
+        "laptop": (28, 58, 78, 76, "LAPTOP", ["Arduino IDE", "(USB, programming)"]),
     }
     for x0, y0, x1, y1, title, lines in B.values():
         block(psp, x0, y0, x1, y1, title, lines)
@@ -301,23 +298,21 @@ def sheet_block_diagram():
     line(psp, [(365, 245), (365, 238), (310, 238), (310, 222), (300, 222)], "NET-SIGNAL")
     arrow(psp, (305, 222), (300, 222), "NET-SIGNAL")
     text(psp, "encoders A/B x2", (338, 239.5), h=2.0, align=TA.BOTTOM_CENTER, layer="NET-SIGNAL")
-    arrow(psp, (330, 214), (300, 214), "NET-SIGNAL", "DT x4 + SCK", label_pos=(315, 208))
     arrow(psp, (300, 180), (330, 180), "NET-SIGNAL", "2 x signal")
     arrow(psp, (330, 137), (300, 137), "NET-SIGNAL", "TRIG + ECHO", both=True, label_pos=(315, 139))
-    arrow(psp, (215, 115), (240, 115), "NET-SIGNAL", "I2C", both=True)
-    line(psp, [(228, 115), (228, 151), (145, 151)], "NET-SIGNAL")
-    dot(psp, (228, 115), "NET-SIGNAL")
-    arrow(psp, (145, 116), (165, 116), "NET-SIGNAL", "8 x OUT")
-    arrow(psp, (165, 102), (145, 81), "NET-SIGNAL", both=True)
-    text(psp, "button, LEDs, buzzer", (157, 88), h=1.8, align=TA.MIDDLE_LEFT, layer="NET-SIGNAL")
-    arrow(psp, (215, 128), (240, 245), "NET-SIGNAL")
-    text(psp, "MOTOR_EN", (226, 190), h=1.8, align=TA.MIDDLE_LEFT, layer="NET-SIGNAL", rot=73)
+    arrow(psp, (145, 116), (240, 116), "NET-SIGNAL", "3 x OUT")
+    arrow(psp, (145, 84), (240, 106), "NET-SIGNAL", both=True)
+    text(psp, "button, LEDs, buzzer", (160, 96), h=1.8, align=TA.MIDDLE_LEFT, layer="NET-SIGNAL", rot=13)
+    arrow(psp, (288, 225), (288, 245), "NET-SIGNAL")
+    text(psp, "MOTOR_EN", (291, 235), h=1.8, align=TA.MIDDLE_LEFT, layer="NET-SIGNAL")
     line(psp, [(190, 245), (190, 238), (248, 238), (248, 225)], "NET-SIGNAL")
     arrow(psp, (248, 230), (248, 225), "NET-SIGNAL")
     text(psp, "battery V / E-stop sense", (200, 240), h=1.8, align=TA.BOTTOM_LEFT, layer="NET-SIGNAL")
-    arrow(psp, (78, 81), (240, 98), "NET-USB", "USB", label_pos=(110, 97))
+    line(psp, [(78, 64), (232, 64), (232, 98)], "NET-USB")
+    arrow(psp, (232, 98), (240, 98), "NET-USB")
+    text(psp, "USB", (150, 66), h=2.0, align=TA.BOTTOM_CENTER, layer="NET-USB")
     legend(psp, 28, 228)
-    text(psp, "Details: E02 power, E03 ESP32 wiring, E04 I2C, line sensor and panel.", (28, 180), h=2.1)
+    text(psp, "Details: E02 power, E03 ESP32 wiring, E04 line sensors and panel.", (28, 180), h=2.1)
     text(psp, "Pin numbers: firmware/cargo_robot/config.h.", (28, 176), h=2.1)
     return psp
 
@@ -395,7 +390,7 @@ def sheet_power():
     line(psp, [(300, 112), (320, 112)], "NET-12V-MOTOR")
     text(psp, "P17", (305, 113.5), h=1.9, layer="NET-12V-MOTOR")
     rect(psp, 320, 92, 360, 124)
-    text(psp, "U5 BUCK 10 A", (340, 121), h=2.2, align=TA.TOP_CENTER)
+    text(psp, "U5 BUCK XL4016 8 A", (340, 121), h=2.2, align=TA.TOP_CENTER)
     text(psp, "set 7.4 V", (340, 116.5), h=1.9, align=TA.TOP_CENTER)
     text(psp, "IN+", (321, 112), h=1.8, align=TA.MIDDLE_LEFT)
     text(psp, "IN-", (321, 97), h=1.8, align=TA.MIDDLE_LEFT)
@@ -424,7 +419,7 @@ def sheet_power():
          layer="NET-SIGNAL")
     resistor_v(psp, 270, 80, 66, "R2", "2.2 k", "NET-GND")
     ground(psp, (270, 66))
-    text(psp, "S38", (272, 83), h=1.9, layer="NET-SIGNAL")
+    text(psp, "S30", (272, 83), h=1.9, layer="NET-SIGNAL")
     # LiPo alarm + notes
     rect(psp, 28, 150, 92, 168)
     text(psp, "LiPo voltage alarm", (60, 165), h=2.1, align=TA.TOP_CENTER)
@@ -459,13 +454,14 @@ def esp_nets():
     """GPIO number -> net name, from config.h."""
     names = {"PIN_L_RPWM": "L_RPWM", "PIN_L_LPWM": "L_LPWM", "PIN_R_RPWM": "R_RPWM", "PIN_R_LPWM": "R_LPWM",
              "PIN_ENC_L_A": "ENC_L_A", "PIN_ENC_L_B": "ENC_L_B", "PIN_ENC_R_A": "ENC_R_A", "PIN_ENC_R_B": "ENC_R_B",
-             "PIN_HX_SCK": "HX_SCK", "PIN_SONAR_TRIG": "SONAR_TRIG", "PIN_SERVO_FRONT": "SERVO_F_SIG",
-             "PIN_SERVO_REAR": "SERVO_R_SIG", "PIN_SDA": "SDA", "PIN_SCL": "SCL", "PIN_BUS_SENSE": "BUS_SENSE"}
+             "PIN_SONAR_TRIG": "SONAR_TRIG", "PIN_SERVO_FRONT": "SERVO_F_SIG",
+             "PIN_SERVO_REAR": "SERVO_R_SIG", "PIN_BUS_SENSE": "BUS_SENSE", "PIN_MOTOR_EN": "MOTOR_EN",
+             "PIN_BUTTON": "BUTTON", "PIN_LED_GREEN": "LED_G", "PIN_LED_RED": "LED_R", "PIN_BUZZER": "BUZZER"}
     nets = {"3V3": "3V3", "GND": "GND", "5V": "+5V"}
     for key, net in names.items():
         nets[str(P[key])] = net
-    for gpio, corner in zip(P["PIN_HX_DT"], ("FL", "FR", "RL", "RR")):
-        nets[str(gpio)] = f"HX_{corner}_DT"
+    for i, gpio in enumerate(P["PIN_LINE"]):
+        nets[str(gpio)] = f"LINE_{i + 1}"
     nets[str(P["PIN_SONAR_ECHO"])] = "SONAR_ECHO"
     return nets
 
@@ -495,7 +491,7 @@ def sheet_esp32():
                 if net:
                     line(psp, [(xr, y), (246, y)], net_layer(net))
                     net_label(psp, (248, y), net, TA.MIDDLE_LEFT)
-    text(psp, "SD0-SD3, CMD, CLK: flash - never use.  GPIO 0 and 15: free.", (150, 154), h=1.8)
+    text(psp, "SD0-SD3, CMD, CLK: flash - never use.  GPIO 0, 5, 15: free (start-up pins).", (150, 154), h=1.8)
     text(psp, "GPIO 12 must be LOW at start-up: only the rear servo signal on it.", (150, 150.5), h=1.8)
     # motor + encoder cables (left)
     for side, top_y, drv in (("LEFT", 262, "U2"), ("RIGHT", 222, "U3")):
@@ -523,35 +519,14 @@ def sheet_esp32():
             ("VCC", "3V3", ""),
             ("GND", "GND", ""),
         ], side="left", stub=8)
-    text(psp, "MOTOR_EN comes from the MCP23017 (E04)", (300, 166), h=1.8)
-    text(psp, "with a 10k pull-down: motors off at power-up.", (300, 162.5), h=1.8)
+    text(psp, f"MOTOR_EN = GPIO {P['PIN_MOTOR_EN']}, with a 10k pull-down", (300, 166), h=1.8)
+    text(psp, "to GND (E04): motors off at power-up.", (300, 162.5), h=1.8)
     # servo signals
     connector(psp, 340, 152, 36, "BED SERVOS (signal)", [
         ("SV1 FRONT", "SERVO_F_SIG", "orange"),
         ("SV2 REAR", "SERVO_R_SIG", "orange"),
     ], side="left", stub=8)
     text(psp, "red/brown: +7V4 bus (E02)", (340, 132), h=1.7)
-    # HX711 boards + load cells (bottom left)
-    for i, corner in enumerate(("FL", "FR", "RL", "RR")):
-        x0 = 28 + i * 47
-        rect(psp, x0, 100, x0 + 40, 116)
-        text(psp, f"HX711 {corner}", (x0 + 20, 108), h=2.2, align=TA.MIDDLE_CENTER)
-        for k, (pin, net) in enumerate((("VCC", "3V3"), ("GND", "GND"), ("DT", f"HX_{corner}_DT"), ("SCK", "HX_SCK"))):
-            x = x0 + 5 + k * 10
-            text(psp, pin, (x, 114.5), h=1.4, align=TA.TOP_CENTER)
-            line(psp, [(x, 116), (x, 121)], net_layer(net))
-            text(psp, net, (x + 0.8, 122), h=1.8, align=TA.MIDDLE_LEFT, layer=net_layer(net), rot=90)
-        for k, (pin, color, cname) in enumerate((("E+", 1, "red"), ("E-", 7, "blk"), ("A-", 8, "wht"), ("A+", 3, "grn"))):
-            x = x0 + 5 + k * 10
-            text(psp, pin, (x, 101.5), h=1.4, align=TA.BOTTOM_CENTER)
-            line(psp, [(x, 100), (x, 92)], "WIRE-COLOURS", color=color)
-            text(psp, cname, (x + 0.8, 96), h=1.3, align=TA.MIDDLE_LEFT, layer="WIRE-COLOURS")
-        rect(psp, x0, 84, x0 + 40, 92)
-        text(psp, f"LOAD CELL {corner} 10 kg", (x0 + 20, 88), h=1.8, align=TA.MIDDLE_CENTER)
-    text(psp, "On the tilting plate. FL/FR/RL/RR = front-left ... rear-right, looking down, front away from you.",
-         (28, 79), h=1.8)
-    text(psp, "A cell that reads negative: swap its A+/A- (green/white), or keep sign -1 (\"cal\" sets it).",
-         (28, 75.5), h=1.8)
     # ultrasonic sensor (bottom right)
     x0 = 296
     rect(psp, x0, 100, x0 + 30, 116)
@@ -570,38 +545,24 @@ def sheet_esp32():
     resistor_v(psp, xe, 81, 67, "", "2k", "NET-GND")
     ground(psp, (xe, 67))
     text(psp, "ECHO is 5 V: the 1k / 2k divider makes it 3.3 V.", (296, 121), h=1.8)
-    text(psp, "Same net name = same wire. Wire IDs S1..S38: BUILD_GUIDE.md week 3.", (28, 70), h=1.9)
+    text(psp, "Same net name = same wire. Wire IDs S1..S28: BUILD_GUIDE.md week 3.", (28, 70), h=1.9)
     return psp
 
 
-# ============================== E04 I2C, line sensor, panel ==============================
+# ============================== E04 line sensors and panel ==============================
 def sheet_io():
-    psp = new_sheet(4, "I2C, LINE SENSOR AND PANEL", "I2C, LINE SENSOR AND PANEL")
-    port_b = {P["XP_MOTOR_EN"]: ("MOTOR_EN", ""), P["XP_BUZZER"]: ("BUZZER", ""),
-              P["XP_LED_GREEN"]: ("LED_G", ""), P["XP_LED_RED"]: ("LED_R", ""), P["XP_BUTTON"]: ("BUTTON", "")}
-    left = [(f"GPA{i}", f"LINE_{i + 1}", "") for i in range(8)]
-    left += [("VDD", "3V3", ""), ("VSS", "GND", ""), ("A0 A1 A2", "GND", "addr 0x20"), ("RESET", "3V3", "")]
-    right = [(f"GPB{i}", port_b.get(8 + i, ("", ""))[0], port_b.get(8 + i, ("", "spare"))[1] or "") for i in range(8)]
-    right += [("SCL", "SCL", ""), ("SDA", "SDA", "")]
-    connector(psp, 175, 262, 34, "U4 MCP23017 (left side)", left, pitch=5, side="left", stub=12)
-    connector(psp, 215, 262, 34, "U4 (right side)", right, pitch=5, side="right", stub=12)
-    # line sensor board
-    connector(psp, 28, 262, 34, "LINE SENSOR (8 x TCRT5000)", [("VCC", "3V3", ""), ("GND", "GND", "")] +
-              [(f"OUT{i}", f"LINE_{i}", "left" if i == 1 else ("right" if i == 8 else "")) for i in range(1, 9)],
-              pitch=5, stub=10)
-    text(psp, "OUT1 = leftmost sensor (looking forward).", (28, 200), h=1.8)
-    text(psp, "Set each sensor's pot so its LED goes on over", (28, 196.5), h=1.8)
-    text(psp, "black tape and off over the floor.", (28, 193), h=1.8)
-    # VL53L0X
-    connector(psp, 330, 262, 34, "VL53L0X (right side)", [("VIN", "3V3", ""), ("GND", "GND", ""),
-                                                          ("SCL", "SCL", ""), ("SDA", "SDA", ""),
-                                                          ("XSHUT", "", "n.c."), ("GPIO1", "", "n.c.")],
-              pitch=5, side="left", stub=10)
-    text(psp, f"ESP32: SDA = GPIO {P['PIN_SDA']}, SCL = GPIO {P['PIN_SCL']}", (300, 218), h=2.0)
-    text(psp, "4.7k pull-ups: SDA and SCL to 3V3 (once, on the I/O board)", (300, 214), h=1.8)
+    psp = new_sheet(4, "LINE SENSORS AND PANEL", "LINE SENSORS AND PANEL")
+    for k, where in enumerate(("LEFT", "MIDDLE", "RIGHT")):
+        connector(psp, 28 + k * 80, 262, 34, f"IR SENSOR {k + 1} ({where})",
+                  [("VCC", "3V3", ""), ("GND", "GND", ""), ("OUT", f"LINE_{k + 1}", "")], pitch=5, stub=10)
+    pins = ", ".join(f"LINE_{i + 1} = GPIO {g}" for i, g in enumerate(P["PIN_LINE"]))
+    text(psp, f"3-pin IR obstacle-avoidance modules (FC-51 type), on the printed bar under the bottom plate. {pins}.",
+         (28, 232), h=1.9)
+    text(psp, "Power them from 3V3, NOT 5 V: then their OUT is safe for the ESP32. Each blue pot: set so the module's "
+              "LED switches between the floor and the black tape.", (28, 228), h=1.9)
     # panel: button, LEDs, buzzer, motor-enable pull-down
     y = 170
-    text(psp, "PANEL AND PULL-RESISTORS (on the I/O perfboard)", (28, y + 18), h=2.4)
+    text(psp, f"PANEL (BUTTON = GPIO {P['PIN_BUTTON']}, LED_G = {P['PIN_LED_GREEN']}, LED_R = {P['PIN_LED_RED']}, BUZZER = {P['PIN_BUZZER']}) AND PULL-DOWN (on the I/O perfboard)", (28, y + 18), h=2.4)
     switch_h(psp, 40, 80, y, "S2 START", "12 mm, NO", "NET-SIGNAL")
     net_label(psp, (38, y), "BUTTON", TA.MIDDLE_RIGHT)
     ground(psp, (80, y))
@@ -628,15 +589,10 @@ def sheet_io():
     ground(psp, (x, y - 18))
     text(psp, "keeps the drivers OFF until", (x + 10, y - 22), h=1.7)
     text(psp, "the ESP32 has started", (x + 10, y - 25), h=1.7)
-    for k, net in enumerate(("SDA", "SCL")):
-        xx = 340 + k * 25
-        net_label(psp, (xx, y - 20), net, TA.TOP_CENTER)
-        resistor_v(psp, xx, y + 2, y - 18, "", "4.7 k", "NET-SIGNAL")
-        net_label(psp, (xx, y + 4), "3V3", TA.BOTTOM_CENTER)
     text(psp, "NOTES", (28, 120), h=2.8)
     for k, s in enumerate([
-        "1. All logic on this sheet runs on 3.3 V from the ESP32's 3V3 pin. Never feed 5 V to the MCP23017 or VL53L0X.",
-        "2. Line sensor: 1 = output HIGH over black tape (setting line_black). Check with the \"line\" command.",
+        "1. All logic on this sheet runs on 3.3 V from the ESP32's 3V3 pin. No I2C and no I/O expander.",
+        "2. Line sensors: output HIGH over black tape (setting line_black). Check with the \"line\" command.",
         "3. Same net name = same wire. Pin numbers: firmware/cargo_robot/config.h.",
     ]):
         text(psp, s, (28, 114 - k * 4.5), h=2.0)

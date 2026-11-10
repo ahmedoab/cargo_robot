@@ -1,27 +1,30 @@
 // Cargo robot - main program for the ESP32 (Arduino IDE 2, board "ESP32 Dev Module").
 //
 // The robot follows a black tape line. Stations are short strips of tape across the line ("station marks"):
-// the pickup and the drop-off (the conveyor, on the robot's RIGHT). It carries one package on its tilting bed.
+// the pickup and the drop-off (on the robot's RIGHT). It carries one package on its tilting bed. 3 IR sensors
+// see the line; all 3 on black = a station mark.
 //
-//   LOAD     at the pickup: wait until a package is on the bed (weight > load_kg for hold_s)
-//   FOLLOW   follow the line to the next station mark: slower when loaded, slow or stop for obstacles
+//   LOAD     at the pickup: wait for the start button (put the package on the bed, then press it)
+//   FOLLOW   follow the line to the next station mark: slow or stop for obstacles
 //   DOCK     drive on stop_mm so the middle of the bed is level with the mark, then stop
-//   CHECK    at the drop-off: the side sensor must see the belt beside the robot (tof_check)
+//   SETTLE   at the drop-off: wait half a second for the robot to stand still
 //   TIP      tip the bed to tip_deg (at tip_speed); the package slides off to the right
 //   HOLD     keep it tipped for tip_hold_s
-//   LOWER    lower the bed, switch the servos off, weigh: empty -> zero the scale and FOLLOW on to the pickup
-// Always:  E-stop pressed -> everything stops.  Overload -> refuse to move.  Line lost, no belt or package still
-//          on the bed -> ALARM: red LED + beeps; fix it, then press the start button to carry on.
+//   LOWER    lower the bed, switch the servos off and FOLLOW on to the pickup
+// Always:  E-stop pressed -> everything stops.  Line lost -> ALARM: red LED + beeps; fix it, then press the
+//          start button to carry on.
+// The robot does not weigh anything: keep packages within the limit in BUILD_GUIDE.md.
 //
-// Start a mission with the start button or "run" in the Serial Monitor (115200 baud, Newline).
+// Start a mission with the start button or "run" in the Serial Monitor (115200 baud, Newline). The robot must
+// stand at the pickup with the first package on its bed: it sets off at once.
 // "help" lists the test and calibration commands. Wiring: config.h. Settings: settings.h.
 #include "config.h"
 #include "console.h"
 #include "robot.h"
 #include "settings.h"
 
-enum State { IDLE, LOAD, FOLLOW, DOCK, CHECK, TIP, HOLD, LOWER, ALARM, ESTOP };
-const char *NAMES[] = {"IDLE", "LOAD", "FOLLOW", "DOCK", "CHECK", "TIP", "HOLD", "LOWER", "ALARM", "ESTOP"};
+enum State { IDLE, LOAD, FOLLOW, DOCK, SETTLE, TIP, HOLD, LOWER, ALARM, ESTOP };
+const char *NAMES[] = {"IDLE", "LOAD", "FOLLOW", "DOCK", "SETTLE", "TIP", "HOLD", "LOWER", "ALARM", "ESTOP"};
 
 State state = IDLE, resumeTo = IDLE;    // resumeTo: where ALARM goes back to when the button is pressed
 bool toDropoff = true;                  // the next station mark is the drop-off (else the pickup)
@@ -58,6 +61,8 @@ void alarm(const char *why, State retry) {
   go(ALARM);
 }
 
+void depart();
+
 void startMission(int deliveries) {
   if (rd.busV < BUS_ON_V) {
     Serial.println("motor power is off: release the E-stop first");
@@ -66,7 +71,7 @@ void startMission(int deliveries) {
   deliveriesLeft = deliveries;
   bedRelax();
   Serial.println(deliveries ? "mission started" : "mission started (until stopped)");
-  go(LOAD);
+  depart();
 }
 
 void stopMission() {
@@ -80,7 +85,7 @@ void stopMission() {
 }
 
 bool buttonPressed() {                  // one press = one event
-  bool now = io.buttonPressed();
+  bool now = buttonDown();
   bool edge = now && !buttonWas;
   buttonWas = now;
   return edge;
@@ -92,8 +97,8 @@ int markTicks = 0;
 float lastPos = 0, lastPosTime = 0;
 uint32_t lostSince = 0, obstacleSince = 0;
 
-// Steer along the line at the speed allowed by the load and the obstacles. Returns true when a station mark
-// has just been crossed (6 or more sensors on black for 2 readings in a row).
+// Steer along the line at the speed allowed by the obstacles. Returns true when a station mark
+// has just been crossed (mark_min = all 3 sensors on black, for 2 readings in a row).
 bool follow() {
   const Line &l = rd.line;
   if (l.count == 0) {
@@ -106,11 +111,6 @@ bool follow() {
     lostSince = 0;
   }
 
-  float load = payloadFactor(rd.kg, cfg.max_kg, cfg.min_factor, cfg.overload);
-  if (load == 0) {
-    alarm("overload - take some weight off", state);
-    return false;
-  }
   float clear = obstacleFactor(rd.sonarCm, cfg.stop_cm, cfg.slow_cm);
   if (clear == 0) {                     // something in front: stop and ask for it to be moved
     if (!obstacleSince) Serial.println("obstacle - please remove it");
@@ -129,7 +129,7 @@ bool follow() {
   float dpos = (now > lastPosTime && lastPosTime > 0) ? (pos - lastPos) / (now - lastPosTime) : 0;
   lastPos = pos;
   lastPosTime = now;
-  float v = cfg.follow_speed * load * clear;
+  float v = cfg.follow_speed * clear;
   float w = (cfg.k_line * pos + cfg.kd_line * dpos) * (v / cfg.follow_speed);
   driveTarget(v, w);
 
@@ -140,12 +140,21 @@ bool follow() {
     }
   } else {
     markTicks = 0;
-    if (l.count <= 3) markArmed = true;
+    if (l.count <= 1) markArmed = true;     // back on the plain line: the next mark can count
   }
   return false;
 }
 
 // ---------------- the mission ----------------
+void depart() {                         // leave the pickup with a package on the bed
+  Serial.println("off to the drop-off");
+  beep(200);
+  toDropoff = true;
+  motorsEnable(true);
+  markArmed = true;
+  go(FOLLOW);
+}
+
 void step() {
   bool power = rd.busV > BUS_ON_V;
   if (!power && state != ESTOP && state != IDLE) {
@@ -179,14 +188,7 @@ void step() {
     case LOAD:
       lights(Light::On, Light::Off);
       motorsEnable(false);
-      if (heldFor(rd.cellsOk && rd.kg > cfg.load_kg, cfg.hold_s)) {
-        Serial.printf("package on: %.2f kg\n", rd.kg);
-        beep(200);
-        toDropoff = true;
-        motorsEnable(true);
-        markArmed = true;
-        go(FOLLOW);
-      }
+      if (button) depart();
       break;
 
     case FOLLOW:
@@ -202,22 +204,19 @@ void step() {
         driveStop();
         motorsEnable(false);
         if (toDropoff) {
-          go(CHECK);
+          go(SETTLE);
         } else if (deliveriesLeft && --deliveriesLeft == 0) {
           Serial.println("all deliveries done");
           go(IDLE);
         } else {
+          Serial.println("at the pickup: put the next package on the bed, then press the start button");
           go(LOAD);
         }
       }
       break;
 
-    case CHECK:
-      if (millis() - since < 500) break;  // let the robot settle
-      if (cfg.tof_check != 0 && !(rd.sideMm >= cfg.tof_min_mm && rd.sideMm <= cfg.tof_max_mm)) {
-        alarm("nothing beside the robot's right side - not at the conveyor?", CHECK);
-        break;
-      }
+    case SETTLE:
+      if (millis() - since < 500) break;  // let the robot stand still
       bedMove(cfg.tip_deg);
       lights(Light::Fast, Light::Off);
       go(TIP);
@@ -234,24 +233,15 @@ void step() {
       }
       break;
 
-    case LOWER:                         // weigh only with the bed flat: tipped, the cells feel less weight
+    case LOWER:
       if (bedMoving()) break;
-      if (servoFront.on()) {
-        bedRelax();                     // resting on its posts now
-        since = millis();
-      } else if (millis() - since > 1000) {
-        if (rd.cellsOk && rd.kg > cfg.load_kg / 2) {
-          alarm("the package is still on the bed - press the button to tip again", CHECK);
-          break;
-        }
-        Serial.println("package delivered");
-        if (!tare()) Serial.println("!! could not zero the scale");
-        toDropoff = false;
-        motorsEnable(true);
-        markArmed = true;
-        lights(Light::On, Light::Off);
-        go(FOLLOW);
-      }
+      bedRelax();                       // resting flat on its posts now
+      Serial.println("package delivered");
+      toDropoff = false;
+      motorsEnable(true);
+      markArmed = true;
+      lights(Light::On, Light::Off);
+      go(FOLLOW);
       break;
 
     case ALARM:
@@ -272,9 +262,6 @@ void setup() {
   Serial.println("\nCargo robot (ESP32) - type help");
   settingsLoad();
   robotBegin();
-  delay(500);                           // let the HX711s settle
-  if (!tare()) Serial.println("!! HX711 boards not answering - the scale is not zeroed");
-  else Serial.println("scale zeroed (the bed must be empty at power-on)");
   robotUpdate();
   Serial.printf("motor power %s (%.1f V)\n", rd.busV > BUS_ON_V ? "ON" : "OFF", rd.busV);
   go(IDLE);

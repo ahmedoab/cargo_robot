@@ -18,7 +18,7 @@ CONFIG = Path(__file__).resolve().parents[1] / "firmware" / "cargo_robot" / "con
 def read_pins():
     """Every 'constexpr int NAME = n;' (or '= {a, b, ...}') in config.h."""
     pins = {}
-    for m in re.finditer(r"constexpr int (\w+)(?:\[\d+\])? = (\{[^}]*\}|0x[0-9A-Fa-f]+|\d+);", CONFIG.read_text()):
+    for m in re.finditer(r"constexpr int (\w+)(?:\[\w+\])? = (\{[^}]*\}|0x[0-9A-Fa-f]+|\d+);", CONFIG.read_text()):
         v = m.group(2)
         pins[m.group(1)] = [int(x) for x in v.strip("{}").split(",")] if v.startswith("{") else int(v, 0)
     return pins
@@ -31,18 +31,11 @@ def gpio(key, i=None):
     return f"GPIO {P[key] if i is None else P[key][i]}"
 
 
-def xp(key):
-    """MCP23017 pin name (GPA0..GPB7) of an XP_ constant."""
-    n = P[key]
-    return f"GP{'A' if n < 8 else 'B'}{n % 8}"
-
-
 ESP = "ESP32 (breakout)"
-MCP = "MCP23017 U4"
 L_DRV, R_DRV = "BTS7960 left U2", "BTS7960 right U3"
 L_MOT, R_MOT = "Left motor M1", "Right motor M2"
-CORNERS = ("front-left", "front-right", "rear-left", "rear-right")
 SONAR = "HC-SR04 (front)"
+LINE = ("IR line sensor 1 (left)", "IR line sensor 2 (middle)", "IR line sensor 3 (right)")
 
 POWER = [
     ("P1", "Battery BT1", "+ (XT60)", "Fuse holder F1", "in", "16 AWG red, 10 cm", "XT60 soldered"),
@@ -82,8 +75,8 @@ SIGNAL = [
     ("S2", L_DRV, "LPWM", ESP, gpio("PIN_L_LPWM"), J, "reverse PWM"),
     ("S3", R_DRV, "RPWM", ESP, gpio("PIN_R_RPWM"), J, "forward PWM"),
     ("S4", R_DRV, "LPWM", ESP, gpio("PIN_R_LPWM"), J, "reverse PWM"),
-    ("S5", L_DRV, "R_EN + L_EN (linked)", MCP, xp("XP_MOTOR_EN"), J, "MOTOR_EN; 10k pull-down to GND"),
-    ("S5", R_DRV, "R_EN + L_EN (linked)", MCP, xp("XP_MOTOR_EN"), J, "MOTOR_EN"),
+    ("S5", L_DRV, "R_EN + L_EN (linked)", ESP, gpio("PIN_MOTOR_EN"), J, "MOTOR_EN; 10k pull-down to GND"),
+    ("S5", R_DRV, "R_EN + L_EN (linked)", ESP, gpio("PIN_MOTOR_EN"), J, "MOTOR_EN"),
     ("S6", L_DRV, "VCC", "3V3 bus", "", J, "3.3 V, not 5 V"),
     ("S6", R_DRV, "VCC", "3V3 bus", "", J, "3.3 V, not 5 V"),
     ("S7", L_DRV, "GND (logic)", "GND bus", "", J, ""),
@@ -96,55 +89,33 @@ SIGNAL = [
     ("S13", R_MOT, "black (encoder GND)", "GND bus", "", J, ""),
     ("S14", R_MOT, "yellow (encoder A)", ESP, gpio("PIN_ENC_R_A") + " (VP)", J, "10k pull-up to 3V3"),
     ("S15", R_MOT, "green (encoder B)", ESP, gpio("PIN_ENC_R_B") + " (VN)", J, "10k pull-up to 3V3"),
-]
-for i, c in enumerate(CORNERS):
-    SIGNAL.append(("S16", f"HX711 {c}", "VCC", "3V3 bus", "", J, "bus on the tilting plate, 1 wire down"))
-for i, c in enumerate(CORNERS):
-    SIGNAL.append(("S17", f"HX711 {c}", "GND", "GND bus", "", J, "bus on the tilting plate, 1 wire down"))
-for i, c in enumerate(CORNERS):
-    SIGNAL.append(("S18", f"HX711 {c}", "SCK", ESP, gpio("PIN_HX_SCK"), J, "bus on the tilting plate, 1 wire down"))
-for i, c in enumerate(CORNERS):
-    SIGNAL.append((f"S{19 + i}", f"HX711 {c}", "DT", ESP, gpio("PIN_HX_DT", i), J, ""))
-for c in CORNERS:
-    for wire, pin in (("red", "E+"), ("black", "E-"), ("white", "A-"), ("green", "A+")):
-        SIGNAL.append(("S23", f"Load cell {c}", wire, f"HX711 {c}", pin, "the cell's own wires", ""))
-SIGNAL += [
-    ("S24", SONAR, "VCC", "WAGO +5 V", "", J, "5 V"),
-    ("S25", SONAR, "GND", "GND bus", "", J, ""),
-    ("S26", SONAR, "TRIG", ESP, gpio("PIN_SONAR_TRIG"), J, ""),
-    ("S27", SONAR, "ECHO", ESP, gpio("PIN_SONAR_ECHO"), J, "through a 1k / 2k divider (5 V -> 3.3 V)"),
-    ("S28", "Front servo SV1", "orange (signal)", ESP, gpio("PIN_SERVO_FRONT"), "servo lead", ""),
-    ("S29", "Rear servo SV2", "orange (signal)", ESP, gpio("PIN_SERVO_REAR"), "servo lead",
+    ("S16", SONAR, "VCC", "WAGO +5 V", "", J, "5 V"),
+    ("S17", SONAR, "GND", "GND bus", "", J, ""),
+    ("S18", SONAR, "TRIG", ESP, gpio("PIN_SONAR_TRIG"), J, ""),
+    ("S19", SONAR, "ECHO", ESP, gpio("PIN_SONAR_ECHO"), J, "through a 1k / 2k divider (5 V -> 3.3 V)"),
+    ("S20", "Front servo SV1", "orange (signal)", ESP, gpio("PIN_SERVO_FRONT"), "servo lead", ""),
+    ("S21", "Rear servo SV2", "orange (signal)", ESP, gpio("PIN_SERVO_REAR"), "servo lead",
      "nothing else on this pin (must be LOW at start-up)"),
-    ("S30", ESP, gpio("PIN_SDA") + " (SDA)", MCP, "SDA", J, "4.7k pull-up to 3V3"),
-    ("S30", ESP, gpio("PIN_SDA") + " (SDA)", "VL53L0X", "SDA", J, ""),
-    ("S31", ESP, gpio("PIN_SCL") + " (SCL)", MCP, "SCL", J, "4.7k pull-up to 3V3"),
-    ("S31", ESP, gpio("PIN_SCL") + " (SCL)", "VL53L0X", "SCL", J, ""),
-    ("S32", ESP, "3V3", "3V3 bus", "", J, "feeds every 3.3 V part"),
-    ("S32", ESP, "GND", "GND bus", "", J, ""),
-    ("S32", MCP, "VDD, RESET", "3V3 bus", "", J, ""),
-    ("S32", MCP, "VSS, A0, A1, A2", "GND bus", "", J, "address 0x20"),
-    ("S32", "VL53L0X", "VIN", "3V3 bus", "", J, ""),
-    ("S32", "VL53L0X", "GND", "GND bus", "", J, ""),
-    ("S33", "Line sensor", "VCC", "3V3 bus", "", J, ""),
-    ("S33", "Line sensor", "GND", "GND bus", "", J, ""),
+    ("S22", ESP, "3V3", "3V3 bus", "", J, "feeds every 3.3 V part"),
+    ("S22", ESP, "GND", "GND bus", "", J, ""),
 ]
-for i in range(8):
-    SIGNAL.append(("S34", "Line sensor", f"OUT{i + 1}", MCP, f"GPA{P['XP_LINE_FIRST'] + i}", J,
-                   "OUT1 = leftmost" if i == 0 else ("OUT8 = rightmost" if i == 7 else "")))
+for i, part in enumerate(LINE):
+    SIGNAL += [("S23", part, "VCC", "3V3 bus", "", J, "3.3 V, not 5 V"), ("S23", part, "GND", "GND bus", "", J, "")]
+for i, part in enumerate(LINE):
+    SIGNAL.append(("S24", part, "OUT", ESP, gpio("PIN_LINE", i), J, ("left", "middle", "right")[i]))
 SIGNAL += [
-    ("S35", "Start button S2", "terminal 1", MCP, xp("XP_BUTTON"), J, "internal pull-up"),
-    ("S35", "Start button S2", "terminal 2", "GND bus", "", J, ""),
-    ("S36", "Green LED D1", "+ (long leg)", MCP, xp("XP_LED_GREEN"), J, "through 330 ohm"),
-    ("S36", "Green LED D1", "- (short leg)", "GND bus", "", J, ""),
-    ("S36", "Red LED D2", "+ (long leg)", MCP, xp("XP_LED_RED"), J, "through 330 ohm"),
-    ("S36", "Red LED D2", "- (short leg)", "GND bus", "", J, ""),
-    ("S37", "Buzzer module", "VCC", "3V3 bus", "", J, ""),
-    ("S37", "Buzzer module", "GND", "GND bus", "", J, ""),
-    ("S37", "Buzzer module", "I/O", MCP, xp("XP_BUZZER"), J, ""),
-    ("S38", "Bus-sense divider", "top of 10k", "WAGO +12 V MOTOR", "", J, "after the E-stop"),
-    ("S38", "Bus-sense divider", "bottom of 2.2k", "GND bus", "", J, "100 nF across the 2.2k"),
-    ("S38", "Bus-sense divider", "junction", ESP, gpio("PIN_BUS_SENSE"), J,
+    ("S25", "Start button S2", "terminal 1", ESP, gpio("PIN_BUTTON"), J, "internal pull-up"),
+    ("S25", "Start button S2", "terminal 2", "GND bus", "", J, ""),
+    ("S26", "Green LED D1", "+ (long leg)", ESP, gpio("PIN_LED_GREEN"), J, "through 330 ohm"),
+    ("S26", "Green LED D1", "- (short leg)", "GND bus", "", J, ""),
+    ("S26", "Red LED D2", "+ (long leg)", ESP, gpio("PIN_LED_RED"), J, "through 330 ohm"),
+    ("S26", "Red LED D2", "- (short leg)", "GND bus", "", J, ""),
+    ("S27", "Buzzer module", "VCC", "3V3 bus", "", J, ""),
+    ("S27", "Buzzer module", "GND", "GND bus", "", J, ""),
+    ("S27", "Buzzer module", "I/O", ESP, gpio("PIN_BUZZER"), J, ""),
+    ("S28", "Bus-sense divider", "top of 10k", "WAGO +12 V MOTOR", "", J, "after the E-stop"),
+    ("S28", "Bus-sense divider", "bottom of 2.2k", "GND bus", "", J, "100 nF across the 2.2k"),
+    ("S28", "Bus-sense divider", "junction", ESP, gpio("PIN_BUS_SENSE"), J,
      "about 2.3 V at 12.6 V; 0 V = E-stop pressed"),
 ]
 
@@ -152,9 +123,7 @@ ALL = POWER + SIGNAL
 
 # Small parts soldered on the I/O perfboard (sheet E04)
 IO_BOARD = [
-    ("MCP23017 module", "I2C I/O expander, address 0x20 (A0-A2 to GND, RESET to 3V3)"),
-    ("2 x 4.7k", "SDA -> 3V3, SCL -> 3V3"),
-    ("1 x 10k", f"MOTOR_EN ({xp('XP_MOTOR_EN')}) -> GND: motors off until the ESP32 has started"),
+    ("1 x 10k", f"MOTOR_EN (GPIO {P['PIN_MOTOR_EN']}) -> GND: motors off until the ESP32 has started"),
     ("4 x 10k", f"encoder lines GPIO {P['PIN_ENC_L_A']}, {P['PIN_ENC_L_B']}, {P['PIN_ENC_R_A']}, "
                 f"{P['PIN_ENC_R_B']} -> 3V3 (these pins have no pull-ups inside)"),
     ("1k + 2k", "ultrasonic ECHO divider: ECHO - 1k - junction - 2k - GND; junction to the ESP32"),

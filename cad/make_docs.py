@@ -33,7 +33,7 @@ OUT = HERE / "autocad"
 GUIDE = HERE.parent / "BUILD_GUIDE.md"
 FIRMWARE = HERE.parent / "firmware" / "cargo_robot"
 PROJECT = "Autonomous cargo robot - design v2"
-DATE = "22 October 2026"
+DATE = "10 November 2026"
 
 ss = getSampleStyleSheet()
 BODY = ParagraphStyle("body", parent=ss["Normal"], fontSize=9.5, leading=12.5)

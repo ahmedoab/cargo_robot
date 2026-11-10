@@ -37,7 +37,7 @@ VP_C, VP_S = (215, 148.5), (390, 277)  # paper-space viewport covering the frame
 N_SHEETS = 10
 PROJECT = "AUTONOMOUS CARGO ROBOT - DESIGN v2"
 SCHOOL = "ARAB ACADEMY FOR SCIENCE, TECHNOLOGY & MARITIME TRANSPORT - GRADUATION PROJECT II"
-DATE = "22/10/2026"
+DATE = "10/11/2026"
 
 dd = DxfDocument(dxfversion="AC1032", setup=True, doc_units=ezdxf.units.MM)
 doc, msp = dd.document, dd.msp

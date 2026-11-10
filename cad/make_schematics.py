@@ -25,7 +25,7 @@ TB = (230, 10, 410, 62)
 N_SHEETS = 4
 PROJECT = "AUTONOMOUS CARGO ROBOT - DESIGN v2"
 SCHOOL = "ARAB ACADEMY FOR SCIENCE, TECHNOLOGY & MARITIME TRANSPORT - GRADUATION PROJECT II"
-DATE = "22/10/2026"
+DATE = "10/11/2026"
 
 doc = ezdxf.new("R2018", setup=True, units=ezdxf.units.MM)
 # net colour (AutoCAD colour index) per layer

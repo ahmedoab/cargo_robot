@@ -1,23 +1,28 @@
 """
-Shopping list of the parts still to buy (12 Nov 2026): the 3D-printed parts and the laser-cut plates (all 6 mm
-acrylic) are done, and so are the parts listed in HAVE.
+Procurement list: the parts still to purchase for the cargo robot (Rev. A, 12/11/2026).
+The 3D-printed parts and the laser-cut plates (all 6 mm acrylic) are done, and so are the parts in IN_STOCK.
 
 Run:   .venv\\Scripts\\python make_missing_parts.py
-Writes ../Missing_Parts_List.pdf
+Writes ../Missing_Parts_List.pdf  (A4 landscape)
+Edit the lists below (SECTIONS, IN_STOCK, OPEN_ITEMS, NOTES) and run it again.
 """
 from pathlib import Path
 
 from reportlab.lib import colors
-from reportlab.lib.enums import TA_LEFT
-from reportlab.lib.pagesizes import A4
+from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.platypus import Flowable, KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.pdfgen import canvas
+from reportlab.platypus import (Flowable, KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table,
+                                TableStyle)
 
 OUT = Path(__file__).resolve().parent.parent / "Missing_Parts_List.pdf"
-DATE = "12 November 2026"
+PROJECT = "AUTONOMOUS CARGO ROBOT – DESIGN v2"
+TITLE = "PROCUREMENT LIST – PARTS TO PURCHASE"
+DOC_NO, REV, DATE = "CR-V2-PL-001", "A", "12/11/2026"
+SCHOOL = "Arab Academy for Science, Technology & Maritime Transport – Graduation Project II"
 
 FONTS = Path("C:/Windows/Fonts")
 pdfmetrics.registerFont(TTFont("Arial", str(FONTS / "arial.ttf")))
@@ -26,255 +31,348 @@ pdfmetrics.registerFont(TTFont("Arial-Italic", str(FONTS / "ariali.ttf")))
 pdfmetrics.registerFontFamily("Arial", normal="Arial", bold="Arial-Bold", italic="Arial-Italic",
                               boldItalic="Arial-Bold")
 
-INK = colors.HexColor("#1f2933")
-MUTED = colors.HexColor("#5b6670")
-ACCENT = colors.HexColor("#1d5b8f")
-FIRST = colors.HexColor("#fff4d6")
-FIRST_EDGE = colors.HexColor("#d9a400")
-CHANGE = "#b45309"
-RULE = colors.HexColor("#cfd6dd")
-ZEBRA = colors.HexColor("#f4f6f8")
-GREEN = colors.HexColor("#2e7d32")
+PAGE = landscape(A4)
+MARGIN = 12 * mm
+WIDTH = PAGE[0] - 2 * MARGIN
+NAVY = colors.HexColor("#1b3a5c")
+GREY = colors.HexColor("#5f6b76")
+RULE = colors.HexColor("#b9c3cc")
+BAND = colors.HexColor("#e7edf3")
+ZEBRA = colors.HexColor("#f6f8fa")
+INK = colors.HexColor("#1d252c")
 
-title = ParagraphStyle("title", fontName="Arial-Bold", fontSize=20, leading=24, textColor=INK)
-sub = ParagraphStyle("sub", fontName="Arial", fontSize=10, leading=14, textColor=MUTED)
-h2 = ParagraphStyle("h2", fontName="Arial-Bold", fontSize=12.5, leading=16, textColor=ACCENT, spaceBefore=10,
+title_s = ParagraphStyle("title", fontName="Arial-Bold", fontSize=17, leading=21, textColor=NAVY)
+h2 = ParagraphStyle("h2", fontName="Arial-Bold", fontSize=11, leading=14, textColor=NAVY, spaceBefore=8,
                     spaceAfter=4)
-cell = ParagraphStyle("cell", fontName="Arial", fontSize=9, leading=11.5, textColor=INK, alignment=TA_LEFT)
-note = ParagraphStyle("note", parent=cell, textColor=MUTED, fontSize=8.5, leading=11)
-head = ParagraphStyle("head", parent=cell, fontName="Arial-Bold", textColor=colors.white)
-body = ParagraphStyle("body", fontName="Arial", fontSize=9.5, leading=13.5, textColor=INK)
+cell = ParagraphStyle("cell", fontName="Arial", fontSize=8.3, leading=10.4, textColor=INK)
+cell_b = ParagraphStyle("cell_b", parent=cell, fontName="Arial-Bold")
+small = ParagraphStyle("small", parent=cell, fontSize=7.6, leading=9.6, textColor=GREY)
+head = ParagraphStyle("head", parent=cell, fontName="Arial-Bold", fontSize=8, textColor=colors.white)
+label = ParagraphStyle("label", parent=cell, fontSize=6.5, leading=8, textColor=GREY)
+value = ParagraphStyle("value", parent=cell, fontName="Arial-Bold", fontSize=10, leading=12.5)
+note = ParagraphStyle("note", parent=cell, fontSize=8.6, leading=11.4)
+centre = ParagraphStyle("centre", parent=cell, alignment=1)
 
-NEW = f' <font color="{CHANGE}"><b>[changed]</b></font>'   # changed with the 6 mm acrylic plates / fixed
+DELTA = "Δ"     # changed with the 6 mm acrylic plates (from the issue of 10/11/2026)
+
+# (category, remark for the summary, [(description, specification, qty, unit, application, changed)])
+SECTIONS = [
+    ("Drive, main battery and servo supply", "Order first: longest lead time", [
+        ("JGB37-520 gear motor set, 12 V, 110 RPM",
+         "Motor with Hall encoder (6-wire cable), steel L-bracket, hex coupling and Ø65 mm wheel. Output shaft "
+         "Ø6 mm, D-profile (often listed as \"5.5 mm D-shaft\"). Both sets identical.",
+         "2", "set", "Drive, left and right. Two driven wheels; the two ball casters carry the rest.", False),
+        ("LiPo battery, 3S",
+         "11.1 V, 5000 mAh, discharge rating ≥ 20 C, XT60 connector, with balance lead.",
+         "1", "pc", "Main power supply. A second battery is recommended for testing.", False),
+        ("Buck converter XL4016",
+         "8 A, adjustable output, with heat sink. Set to 7.4 V before connecting the servos (max. 8.4 V).",
+         "1", "pc", "Servo supply, kept separate from the 5 V logic supply.", False),
+    ]),
+    ("Battery charging and safety", "", [
+        ("LiPo balance charger", "IMAX B6AC class (mains supply built in). The plain B6 also needs a 12 V, "
+         "≥ 5 A DC adapter.", "1", "pc", "Charging the 3S battery.", False),
+        ("LiPo safety bag", "Fire-resistant.", "1", "pc", "Charging and storing the battery.", False),
+        ("LiPo voltage alarm", "1–8 S, buzzer, connects to the balance lead. Set to 3.5 V per cell.",
+         "1", "pc", "Low-battery warning.", False),
+    ]),
+    ("Panel components (mounted through the 6 mm top deck)", "Must fit a 6 mm panel", [
+        ("Emergency-stop push button", "Ø22 mm panel mount, mushroom head, latching, normally-closed (NC) "
+         "contact block, 10 A. Must clamp a 6 mm panel.", "1", "pc", "Cuts motor and servo power.", True),
+        ("Toggle switch", "12 mm panel mount, rated ≥ 15 A at 12 V DC. Thread length ≥ 9 mm.",
+         "1", "pc", "Master power switch.", True),
+        ("Active buzzer module", "3-pin, 3.3–5 V.", "1", "pc", "Audible signals.", False),
+    ]),
+    ("Power wiring and connectors", "", [
+        ("Inline blade-fuse holder with fuses", "Holder for 14 AWG wire; 10 A blade fuses.", "1 + 5", "pc",
+         "Battery protection.", False),
+        ("XT60 connector pair", "Male and female.", "4", "pair", "Battery and power connections.", False),
+        ("WAGO 221-415 lever connector", "5-way.", "8", "pc", "Power distribution buses.", False),
+        ("WAGO 221-413 lever connector", "3-way.", "6", "pc", "Power distribution buses.", False),
+        ("Silicone wire, 16 AWG", "Red and black.", "3 + 3", "m",
+         "Battery, fuse, switch, E-stop, motor drivers, servo supply.", False),
+        ("Silicone wire, 20 AWG", "Red and black.", "2 + 2", "m", "Buck converters, motors.", False),
+    ]),
+    ("Signal wiring and electronic parts", "", [
+        ("Jumper wires", "20 cm, female–female and male–female.", "40 + 40", "pc", "Signal connections.", False),
+        ("Servo extension lead", "30 cm.", "2", "pc", "Servos to the I/O board.", False),
+        ("USB cable", "Data-capable (not charge-only), ≥ 1 m, connector to suit the ESP32 board.", "1", "pc",
+         "Programming the ESP32.", False),
+        ("Perfboard", "50 × 70 mm.", "2", "pc", "I/O board (1 spare).", False),
+        ("Wire ferrule kit with crimping tool", "Assorted sizes for 16–22 AWG.", "1", "set",
+         "Wire ends in screw terminals.", False),
+        ("Cable management kit", "Heat-shrink assortment, cable ties, spiral wrap, 20 mm hook-and-loop strap "
+         "(1 m), double-sided foam tape.", "1", "set", "Wiring; battery retention.", False),
+        ("VHB mounting tape", "19 mm wide.", "1", "roll", "Mounting the small boards without drilling.", False),
+    ]),
+    ("Fasteners (lengths verified for the 6 mm acrylic plates)", "Washers on all acrylic", [
+        ("M6 threaded rod", "Zinc-plated steel, 1 m. Cut into 6 pieces of 130 mm.", "1", "pc",
+         "Frame columns.", False),
+        ("M6 hex nut", "Zinc-plated steel.", "26", "pc", "Frame columns (24 + 2 spare).", False),
+        ("M6 washer", "Zinc-plated steel.", "26", "pc", "Frame columns (24 + 2 spare).", False),
+        ("M8 × 50 bolt with 2 nuts and 2 washers", "Zinc-plated steel.", "2", "set", "Ball casters.", False),
+        ("M4 × 10 screw", "", "2", "pc", "Bed rests.", False),
+        ("M4 × 12 screw", "Fitted without a washer (needs its full length to engage the nut).", "6", "pc",
+         "Servo mounts.", True),
+        ("M4 × 16 screw", "", "4", "pc", "Servo ear clamps.", False),
+        ("M4 × 20 screw", "", "12", "pc", "Horn adapters (4), bed risers from below (8).", False),
+        ("M4 × 20 countersunk screw", "Flat head, flush with the cargo plate surface.", "8", "pc",
+         "Cargo plate to bed risers.", False),
+        ("M4 hex nut", "", "32", "pc", "All M4 joints.", False),
+        ("M4 washer", "", "32", "pc", "All M4 joints.", False),
+        ("M3 × 8 screw", "Maximum length 8 mm (a longer screw hits the adapter flange).", "8", "pc",
+         "Disc horns to horn adapters.", False),
+        ("M3 × 8 countersunk screw", "", "6", "pc", "Caster rings to caster cups.", False),
+        ("M3 × 12 screw with nut", "", "11", "set", "Motor brackets (8), IR modules (3).", False),
+        ("M3 × 16 screw with nut", "Replaces M3 × 12 here (too short through the part, plate and nut).", "4",
+         "set", "Line sensor bar (2), ultrasonic bracket (2).", True),
+        ("M3 washer", "", "30", "pc", "M3 joints on the acrylic bottom plate.", True),
+    ]),
+    ("Casters, track and consumables", "", [
+        ("Steel ball", "Ø25.4 mm (1 in), bearing grade. A Ø25 mm glass marble is acceptable.", "3", "pc",
+         "Ball casters (2 + 1 spare).", False),
+        ("Floor tape, matte black", "19 mm wide (50 mm is too wide: it reads as a station mark).", "1", "roll",
+         "Line-following track.", False),
+        ("Masking tape", "", "1", "roll", "Track layout.", False),
+        ("Rubber pad, self-adhesive", "Ø18 mm × 2 mm.", "2", "pc", "Bed rests.", False),
+        ("Thread-locker, medium strength", "Blue (removable).", "1", "pc", "Coupling set screws, horn screws.",
+         False),
+        ("Grease", "Petroleum jelly is suitable.", "1", "pc", "Caster cups.", False),
+    ]),
+]
+
+NOTES = [
+    "All four plates (bottom plate, top deck, tilting plate, cargo plate) are laser-cut from 6 mm acrylic. Fit a "
+    "washer under every screw head and nut that bears on acrylic, tighten only until snug, and inspect the rod, "
+    "caster and motor-bracket holes for cracks after the first test runs.",
+    "The motor-bracket holes are the only holes drilled by hand: use a sharp 3.5 mm bit at low speed with a wooden "
+    "backing board. Countersink the eight cargo-plate holes slowly.",
+    "Fastener lengths were checked against the 6 mm plates. The M3 × 12 screws of the line sensor bar and the "
+    "ultrasonic bracket were too short and are replaced by M3 × 16; the servo-horn screws are M3 × 8 (not M3 × 10).",
+    f"{DELTA} in the Rev. column marks an item changed for the 6 mm acrylic plates (compared with the issue of "
+    "10/11/2026). The build guide and the drawing set (CR-V2-001 to CR-V2-010) are revised to match.",
+    "Quantities include spares only where stated. Overall height with the bed flat: 220 mm.",
+]
+
+IN_STOCK = [
+    ("3D-printed parts (PETG)", "Complete set: servo mounts, clamps, horn adapters, bed rests, risers, line "
+     "sensor bar, ultrasonic bracket, caster cups and rings."),
+    ("Laser-cut plates, 6 mm acrylic", "Bottom plate, top deck, tilting plate, cargo plate."),
+    ("ESP32 DevKitC 38-pin", "2 pcs (1 spare), with the 38-pin screw-terminal breakout board."),
+    ("BTS7960 (IBT-2) motor driver", "2 pcs."),
+    ("XL4015 5 A buck converter", "1 pc. Logic supply, set to 5.1 V. No spare (by decision)."),
+    ("DS5160 servo, 60 kg·cm", "2 pcs, with round aluminium disc horns (fit the printed horn adapters)."),
+    ("Sensors", "3-pin IR line sensor modules and the HC-SR04 ultrasonic sensor."),
+    ("Start push button and status LEDs", "12 mm momentary push button (normally open); 5 mm LEDs, green and red."),
+    ("Resistors and capacitor", "For the I/O board. Required: 1 kΩ × 3, 2 kΩ × 3, 10 kΩ × 5, 2.2 kΩ × 1, "
+     "330 Ω × 2 (¼ W) and one 100 nF ceramic capacitor."),
+    ("Tools", "Soldering iron, multimeter, drill and bits, spanners."),
+    ("Test track floor", "Light-coloured floor for the black line."),
+]
+
+OPEN_ITEMS = [
+    ("Start button and LEDs in stock (section 4)", "Check that the push button's thread is at least 9 mm long, so "
+     "that it passes through the 6 mm deck and still takes its nut, and that the LED clips fit a 6 mm panel "
+     "(otherwise bond the LEDs into their holes with hot glue)."),
+]
 
 
 class Box(Flowable):
-    """A tick box, empty or ticked."""
-    def __init__(self, ticked=False, size=3.6 * mm):
+    """Empty tick box for the 'received' column."""
+    def __init__(self, size=3.4 * mm):
         super().__init__()
-        self.size, self.ticked = size, ticked
+        self.size = size
 
     def wrap(self, *_):
         return self.size, self.size
 
     def draw(self):
-        c, s = self.canv, self.size
-        c.setStrokeColor(GREEN if self.ticked else INK)
-        c.setLineWidth(0.8)
-        c.rect(0, 0, s, s)
-        if self.ticked:
-            c.setLineWidth(1.4)
-            c.line(0.2 * s, 0.5 * s, 0.42 * s, 0.22 * s)
-            c.line(0.42 * s, 0.22 * s, 0.85 * s, 0.85 * s)
+        self.canv.setStrokeColor(INK)
+        self.canv.setLineWidth(0.7)
+        self.canv.rect(0, 0, self.size, self.size)
 
 
-# (section title, highlight, [(item, qty, what to check / what it's for)])
-SECTIONS = [
-    ("Buy these first: drive, battery and servo power", True, [
-        ("<b>JGB37-520 12 V 110 RPM gear motor SET</b>: motor with Hall encoder (6 wires) + steel L-bracket "
-         "+ hex coupling + <b>65 mm wheel</b>", "2",
-         "One set per side, both the same RPM. Shaft is 6 mm with a flat (sellers often write \"5.5 mm "
-         "D-shaft\"); the coupling must fit it. <b>2 wheels is all you need</b>: they drive and steer, and "
-         "the 2 printed ball casters (front and rear) carry the rest."),
-        ("<b>Battery: 3S LiPo 11.1 V 5000 mAh</b>, 20 C or more, <b>XT60</b> plug", "1<br/>(2 is better)",
-         "\"3S\" = 3 cells. Check it has the small white balance plug. A second battery saves the demo day."),
-        ("<b>Buck converter XL4016 8 A</b>, with voltage pot and heat sink", "1",
-         "<b>Needed</b>: it feeds the 2 servos at 7.4 V. The battery's 11-12.6 V would burn them (8.4 V max), "
-         "and on your 5 A converter the servos would pull the voltage down and reset the ESP32 while the bed "
-         "tips. Keep the 5 A one for the ESP32 and sensors."),
-    ]),
-    ("Battery care", False, [
-        ("LiPo balance charger (IMAX B6 / B6AC class)", "1",
-         "The plain B6 also needs a 12 V, 5 A or bigger power adapter; the B6AC has one built in."),
-        ("LiPo fire-safe bag", "1", "Charge and store the battery inside it."),
-        ("LiPo voltage alarm (1-8 S buzzer)", "1", "Plugs into the balance lead. Set it to 3.5 V per cell."),
-    ]),
-    ("Panel parts: the buttons, switch and lights on the top deck", False, [
-        ("Emergency-stop button, 22 mm panel-mount, latching, with an <b>NC</b> contact block (10 A)" + NEW, "1",
-         "NC = normally closed: power flows until you press it. Check it clamps a <b>6 mm</b> panel."),
-        ("Toggle switch (master), 12 mm hole, rated <b>12 V DC, 15 A or more</b>" + NEW, "1",
-         "The DC rating matters, not the AC one. Thread at least <b>9 mm</b> long (6 mm deck + nut)."),
-        ("Push button, 12 mm panel-mount, momentary, normally open" + NEW, "1",
-         "The start button. Thread at least <b>9 mm</b> long."),
-        ("5 mm LEDs, green + red, with 5 mm panel clips" + NEW, "1 each",
-         "Check the clips fit a 6 mm panel. If they don't, skip them and hot-glue the LEDs into the 6 mm holes "
-         "from below."),
-        ("Active buzzer module, 3 pins, 3.3-5 V", "1", "\"Active\" = it beeps by itself when powered."),
-    ]),
-    ("Power wiring and connectors", False, [
-        ("Inline blade-fuse holder (14 AWG) + 10 A blade fuses", "1 + 5", ""),
-        ("XT60 connector pairs (male + female)", "4", ""),
-        ("WAGO 221-415 lever connector (5-way)", "8", "Power buses without soldering."),
-        ("WAGO 221-413 lever connector (3-way)", "6", ""),
-        ("Silicone wire 16 AWG, red + black", "3 m each",
-         "Battery, fuse, switch, E-stop, motor drivers, servo supply."),
-        ("Silicone wire 20 AWG, red + black", "2 m each", "Buck converters, motors."),
-    ]),
-    ("Signal wiring and small parts", False, [
-        ("Jumper wires, female-female and male-female, 20 cm", "40 each", "Signals."),
-        ("Servo extension leads, 30 cm", "2", "Servo to the I/O board."),
-        ("USB <b>data</b> cable for the ESP32 (micro-USB or USB-C, to match the board), 1 m or longer", "1",
-         "Some cheap cables only charge: try it on the laptop first."),
-        ("Resistors 1/4 W: 1 kΩ × 3, 2 kΩ × 3, 10 kΩ × 5, 2.2 kΩ × 1, 330 Ω × 2", "1 set",
-         "Voltage dividers, pull-ups, LEDs."),
-        ("Capacitor 100 nF (ceramic)", "1", ""),
-        ("Perfboard 5 × 7 cm", "2", "The I/O board (1 spare)."),
-        ("Ferrule kit + ferrule crimper", "1", "A ferrule on every wire that goes into a screw terminal."),
-        ("Heat-shrink assortment, zip ties, spiral wrap, 20 mm velcro strap (1 m), double-sided foam tape",
-         "1 each", ""),
-        ("VHB tape (strong double-sided foam), 19 mm", "1 roll", "Holds the small boards without drilling."),
-    ]),
-    ("Rods, bolts, screws, nuts and washers (sizes checked for the 6 mm acrylic plates)", False, [
-        ("M6 threaded rod, 1 m, zinc-plated steel", "1", "Cut into 6 pieces of 130 mm."),
-        ("M6 nuts + M6 washers", "26 each", "24 needed (4 per rod)."),
-        ("M8 × 50 bolt + 2 M8 nuts + 2 M8 washers", "2 sets", "One set per ball caster."),
-        ("M4 × 10", "2", "Bed rests."),
-        ("M4 × 12" + NEW, "6",
-         "Servo mounts. <b>No washer</b> under the head here: that leaves about 4 turns of thread in the nut, "
-         "plenty. <b>Not longer</b>: the tip would poke out of the foot into the servo."),
-        ("M4 × 16", "4", "Servo ear clamps."),
-        ("M4 × 20", "12", "Horn adapters (4) + risers from below (8)."),
-        ("M4 × 20 <b>countersunk (flat head)</b>", "8",
-         "Down through the cargo plate into the risers: flush, so the package slides over them."),
-        ("M4 nuts + M4 washers", "32 each", ""),
-        ("M3 × 8", "8", "Disc horns onto the horn adapters. <b>Not longer</b>: longer screws hit the "
-                        "adapter's flange."),
-        ("M3 × 8 <b>countersunk</b>", "6", "Caster rings onto the cups."),
-        ("M3 × 12 + M3 nuts", "11 each",
-         "Motor brackets (8) + IR modules onto the sensor bar (3). On the motor brackets, check the tip "
-         "doesn't touch the motor."),
-        ("M3 × <b>16</b> + M3 nuts" + NEW, "4 each",
-         "Line sensor bar (2) + ultrasonic bracket (2): the printed part + 6 mm plate + nut. M3 × 12 is too "
-         "short (only about 1 thread in the nut)."),
-        ("M3 washers" + NEW, "30",
-         "Under the M3 heads and nuts on the bottom plate. It's acrylic, not plywood: washers spread the "
-         "load so it doesn't crack."),
-    ]),
-    ("Casters, track and finishing", False, [
-        ("Steel bearing ball, 25.4 mm (1 inch)", "3",
-         "2 ball casters + 1 spare. A 25 mm glass marble also works."),
-        ("Black <b>matte</b> tape, <b>19 mm</b> wide", "1 roll",
-         "The line. Not 50 mm: it would cover all 3 sensors and look like a station mark."),
-        ("Masking tape", "1 roll", "Laying out the track."),
-        ("Self-adhesive rubber pads, 18 mm, 2 mm thick", "2", "On the 2 bed rests."),
-        ("Blue thread-locker (medium strength)", "1", "Coupling set screws, horn screws."),
-        ("Grease (Vaseline is fine)", "a little", "Caster cups."),
-    ]),
-]
+class NumberedCanvas(canvas.Canvas):
+    """Draws the running header and footer, with 'Page n of N'."""
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._pages = []
 
-ACRYLIC = [
-    "All four plates are 6 mm acrylic. The first drawings had 6 mm <i>plywood</i> for the bottom and tilting "
-    "plates and 5 mm acrylic for the deck and cargo plate, so only the deck and the cargo plate got 1 mm "
-    "thicker. The drawings, the build guide and this list now all match. Items marked "
-    "<font color=\"%s\"><b>[changed]</b></font> are the ones this affected." % CHANGE,
-    "Almost nothing else changes: the rods stay 130 mm and the other screws are still long enough. The top "
-    "of the cargo plate is about <b>220 mm</b> above the floor (was 218).",
-    "Acrylic cracks more easily than plywood and bends about twice as much. The loads on this robot are "
-    "small, so it's fine, but put washers under heads and nuts on the bottom plate, tighten only until snug, "
-    "and check the rod, caster and motor-bracket holes for cracks after the first test drives.",
-    "The only holes you drill yourself are the motor-bracket holes, now in acrylic. Use a sharp bit, drill "
-    "slowly, with a piece of wood clamped underneath. Countersink the cargo plate's 8 holes slowly too.",
-    "<b>Two fixes to the old list</b> (not caused by the acrylic): the M3 × 12 screws for the line sensor bar "
-    "and the ultrasonic bracket were always too short (now M3 × 16), and the servo-horn screws are M3 × 8, "
-    "not M3 × 10.",
-]
+    def showPage(self):
+        self._pages.append(dict(self.__dict__))
+        self._startPage()
 
-HAVE = [
-    "All 3D-printed parts and all laser-cut plates (6 mm acrylic)",
-    "2 × ESP32 DevKitC 38-pin (one spare) + the 38-pin screw-terminal breakout board",
-    "2 × BTS7960 (IBT-2) motor drivers",
-    "XL4015 5 A buck converter (for the ESP32 and sensors, set to 5.1 V)",
-    "2 × DS5160 servos + 2 round metal disc horns (they fit the printed horn adapters)",
-    "Sensors: the 3-pin IR line modules (3 + 1 spare) and the HC-SR04 ultrasonic sensor",
-    "Tools (soldering iron, multimeter, drill and bits, spanners, ...)",
-    "A light-coloured floor for the track (the black tape goes straight on it)",
-]
+    def save(self):
+        total = len(self._pages)
+        for state in self._pages:
+            self.__dict__.update(state)
+            self.frame(total)
+            super().showPage()
+        super().save()
 
-QUESTIONS = [
-    "<b>Panel parts you may already own.</b> Panel parts are the controls that mount through holes in the top "
-    "deck, like on a control panel: the red emergency-stop button, the master on/off switch, the start button "
-    "and the green and red LEDs (section 3). Each is held by a nut on a threaded part underneath the deck. If "
-    "you already own any of them, check its thread is at least 9 mm long, so it reaches through the 6 mm deck "
-    "and still takes its nut. If you still have to buy them, just check this in the shop.",
-]
+    def frame(self, total):
+        w, h = PAGE
+        self.saveState()
+        self.setStrokeColor(NAVY)
+        self.setLineWidth(0.8)
+        self.line(MARGIN, h - 9 * mm, w - MARGIN, h - 9 * mm)
+        self.setFont("Arial-Bold", 8)
+        self.setFillColor(NAVY)
+        self.drawString(MARGIN, h - 7.6 * mm, PROJECT)
+        self.setFont("Arial", 8)
+        self.drawRightString(w - MARGIN, h - 7.6 * mm, f"Procurement list   |   {DOC_NO}   |   Rev. {REV}   |   {DATE}")
+        self.setStrokeColor(RULE)
+        self.setLineWidth(0.5)
+        self.line(MARGIN, 9.5 * mm, w - MARGIN, 9.5 * mm)
+        self.setFillColor(GREY)
+        self.setFont("Arial", 7.5)
+        self.drawString(MARGIN, 6.5 * mm, SCHOOL)
+        self.drawRightString(w - MARGIN, 6.5 * mm, f"Page {self._pageNumber} of {total}")
+        self.restoreState()
 
 
-def section_table(rows, first, start):
-    data = [["", Paragraph("#", head), Paragraph("Item", head), Paragraph("Qty", head),
-             Paragraph("What to check / what it's for", head)]]
-    for i, (item, qty, why) in enumerate(rows):
-        data.append([Box(), Paragraph(str(start + i), note), Paragraph(item, cell), Paragraph(qty, cell),
-                     Paragraph(why, note)])
-    t = Table(data, colWidths=[8 * mm, 8 * mm, 70 * mm, 19 * mm, 75 * mm], repeatRows=1)
-    style = [
-        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#8a6400") if first else ACCENT),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-        ("LEFTPADDING", (0, 0), (-1, -1), 4),
-        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
-        ("LINEBELOW", (0, 1), (-1, -1), 0.4, RULE),
-        ("TOPPADDING", (0, 1), (0, -1), 5.5),
+def field(lbl, val, big=False):
+    return [Paragraph(lbl, label), Paragraph(val, value if big else cell_b)]
+
+
+def title_block():
+    c = [0.46, 0.18, 0.18, 0.18]
+    cw = [WIDTH * f for f in c]
+    rows = [
+        [field("PROJECT", PROJECT, True), field("DOCUMENT No.", DOC_NO), field("REVISION", REV),
+         field("DATE", DATE)],
+        [field("TITLE", TITLE, True), field("STATUS", "Issued for purchase"), field("SHEET SIZE", "A4 landscape"),
+         field("UNITS", "mm")],
+        [field("INSTITUTION", SCHOOL), field("PREPARED BY", "&nbsp;"), field("CHECKED BY", "&nbsp;"),
+         field("APPROVED BY", "&nbsp;")],
     ]
-    for r in range(1, len(data)):
-        if first:
-            style.append(("BACKGROUND", (0, r), (-1, r), FIRST))
-        elif r % 2 == 0:
-            style.append(("BACKGROUND", (0, r), (-1, r), ZEBRA))
-    if first:
-        style.append(("BOX", (0, 0), (-1, -1), 1, FIRST_EDGE))
-    t.setStyle(TableStyle(style))
+    t = Table(rows, colWidths=cw, rowHeights=[11.5 * mm, 11.5 * mm, 11 * mm])
+    t.setStyle(TableStyle([
+        ("BOX", (0, 0), (-1, -1), 1.0, NAVY),
+        ("INNERGRID", (0, 0), (-1, -1), 0.5, RULE),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5), ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+    ]))
     return t
 
 
-def bullet_list(lines, ticked=False):
-    rows = [[Box(ticked=True) if ticked else Paragraph("•", cell), Paragraph(t, cell)] for t in lines]
-    return Table(rows, colWidths=[8 * mm, 172 * mm],
-                 style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 2.5),
-                        ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5), ("LEFTPADDING", (0, 0), (-1, -1), 4)])
+def grid(data, widths, header_rows=1, zebra=True, extra=(), pad=3.2):
+    t = Table(data, colWidths=widths, repeatRows=header_rows)
+    st = [
+        ("BACKGROUND", (0, 0), (-1, header_rows - 1), NAVY),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("LINEBELOW", (0, header_rows), (-1, -1), 0.4, RULE),
+        ("BOX", (0, 0), (-1, -1), 0.8, NAVY),
+        ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+        ("TOPPADDING", (0, 0), (-1, -1), pad), ("BOTTOMPADDING", (0, 0), (-1, -1), pad),
+    ]
+    if zebra:
+        st += [("BACKGROUND", (0, r), (-1, r), ZEBRA) for r in range(header_rows + 1, len(data), 2)]
+    t.setStyle(TableStyle(st + list(extra)))
+    return t
 
 
-def footer(canv, doc):
-    canv.saveState()
-    canv.setFont("Arial", 8)
-    canv.setFillColor(MUTED)
-    canv.drawString(15 * mm, 10 * mm, f"Cargo robot: parts still missing  |  {DATE}")
-    canv.drawRightString(A4[0] - 15 * mm, 10 * mm, f"page {doc.page}")
-    canv.restoreState()
+def summary():
+    data = [[Paragraph(x, head) for x in ("Sec.", "Category", "Line items", "Remark")]]
+    total = 0
+    for k, (name, remark, rows) in enumerate(SECTIONS, start=1):
+        data.append([Paragraph(str(k), cell), Paragraph(name, cell), Paragraph(str(len(rows)), centre),
+                     Paragraph(remark, cell)])
+        total += len(rows)
+    data.append([Paragraph("", cell), Paragraph("Total", cell_b), Paragraph(str(total), ParagraphStyle(
+        "tc", parent=centre, fontName="Arial-Bold")), Paragraph("", cell)])
+    w = [14 * mm, 125 * mm, 24 * mm, WIDTH - 163 * mm]
+    return grid(data, w, pad=2.4, extra=[("LINEABOVE", (0, -1), (-1, -1), 0.8, NAVY), ("BACKGROUND", (0, -1), (-1, -1), BAND)])
+
+
+def item_table():
+    cols = ["Rcvd", "Item", "Description", "Specification", "Qty", "Unit", "Application", "Rev."]
+    w = [10, 11, 55, 96, 15, 11, 65, 10]
+    w = [x * WIDTH / sum(w) for x in w]
+    data = [[Paragraph(x, head) for x in cols]]
+    bands = []
+    for k, (name, _, rows) in enumerate(SECTIONS, start=1):
+        bands.append(len(data))
+        data.append([Paragraph(f"<b>{k}&nbsp;&nbsp;{name.upper()}</b>", ParagraphStyle(
+            "band", parent=cell, textColor=NAVY, fontSize=8.2))] + [""] * (len(cols) - 1))
+        for i, (desc, spec, qty, unit, app, changed) in enumerate(rows, start=1):
+            data.append([Box(), Paragraph(f"{k}.{i}", cell), Paragraph(desc, cell_b), Paragraph(spec, cell),
+                         Paragraph(qty, centre), Paragraph(unit, centre), Paragraph(app, cell),
+                         Paragraph(f"<b>{DELTA}</b>" if changed else "", centre)])
+    extra = []
+    for r in bands:
+        extra += [("SPAN", (0, r), (-1, r)), ("BACKGROUND", (0, r), (-1, r), BAND),
+                  ("LINEABOVE", (0, r), (-1, r), 0.6, NAVY)]
+    extra.append(("TOPPADDING", (0, 1), (0, -1), 4.2))
+    return grid(data, w, zebra=False, extra=extra)
+
+
+def numbered(lines):
+    data = [[Paragraph(f"{i}.", note), Paragraph(t, note)] for i, t in enumerate(lines, start=1)]
+    t = Table(data, colWidths=[8 * mm, WIDTH - 8 * mm])
+    t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                           ("TOPPADDING", (0, 0), (-1, -1), 1.5), ("BOTTOMPADDING", (0, 0), (-1, -1), 1.5)]))
+    return t
+
+
+def in_stock():
+    data = [[Paragraph(x, head) for x in ("No.", "Component", "Remarks")]]
+    for i, (comp, rem) in enumerate(IN_STOCK, start=1):
+        data.append([Paragraph(str(i), cell), Paragraph(comp, cell_b), Paragraph(rem, cell)])
+    return grid(data, [12 * mm, 75 * mm, WIDTH - 87 * mm], pad=2.4)
+
+
+def open_items():
+    data = [[Paragraph(x, head) for x in ("No.", "Subject", "Action", "Status")]]
+    for i, (subj, act) in enumerate(OPEN_ITEMS, start=1):
+        data.append([Paragraph(str(i), cell), Paragraph(subj, cell_b), Paragraph(act, cell), Paragraph("Open", cell)])
+    return grid(data, [12 * mm, 60 * mm, WIDTH - 97 * mm, 25 * mm], pad=2.4)
+
+
+def approval():
+    data = [[Paragraph(x, head) for x in ("", "Name", "Signature", "Date")]]
+    for role in ("Prepared by", "Checked by", "Approved by"):
+        data.append([Paragraph(role, cell_b), "", "", ""])
+    half = (WIDTH - 80 * mm) / 2
+    t = Table(data, colWidths=[40 * mm, half, half, 40 * mm], rowHeights=[None, 9 * mm, 9 * mm, 9 * mm])
+    t.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), NAVY), ("GRID", (0, 0), (-1, -1), 0.5, RULE),
+                           ("BOX", (0, 0), (-1, -1), 0.8, NAVY), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
+    return t
 
 
 def main():
+    n_items = sum(len(rows) for _, _, rows in SECTIONS)
     story = [
-        Paragraph("Cargo Robot: Parts Still Missing", title),
-        Spacer(1, 3),
-        Paragraph(f"Shopping list, {DATE}. The 3D-printed parts and the laser-cut plates (all <b>6 mm acrylic</b>) "
-                  "are done, and so is everything in the \"already have\" section, so everything below is <b>to "
-                  "buy</b>. Tick each box when you have it. Names and sizes match the build guide (section 0.2) and "
-                  f"the drawings. <font color=\"{CHANGE}\"><b>[changed]</b></font> marks what changed with the "
-                  "acrylic plates.", sub),
-        Spacer(1, 6),
+        Paragraph("Procurement List", title_s),
+        Paragraph("Parts still to be purchased for the assembly of the autonomous cargo robot", ParagraphStyle(
+            "st", parent=note, textColor=GREY, fontSize=10, leading=13)),
+        Spacer(1, 3 * mm),
+        title_block(),
+        Spacer(1, 2 * mm),
+        Paragraph("1. Scope", h2),
+        Paragraph(f"This list covers the {n_items} line items still to be purchased. The 3D-printed parts, the "
+                  "laser-cut plates and the components listed in section 4 are already available and are not "
+                  "included. Part designations and quantities follow the bill of materials of drawing CR-V2-010 "
+                  "and section 0.2 of the build guide.", note),
+        Paragraph("2. Summary", h2),
+        summary(),
+        Paragraph("3. General notes", h2),
+        numbered(NOTES),
+        PageBreak(),
+        Paragraph("Parts to purchase", h2),
+        item_table(),
+        Spacer(1, 2 * mm),
+        Paragraph(f"Rcvd = tick when received.   {DELTA} = changed for the 6 mm acrylic plates.   pc = piece.", small),
+        KeepTogether([Paragraph("4. Components in stock (not included in this list)", h2), in_stock()]),
+        KeepTogether([Paragraph("5. Open items", h2), open_items()]),
+        KeepTogether([Paragraph("6. Approval", h2), approval()]),
     ]
-    n = 1
-    for k, (name, first, rows) in enumerate(SECTIONS, start=1):
-        story.append(KeepTogether([Paragraph(f"{k}. {name}", h2), section_table(rows, first, n)]))
-        n += len(rows)
-    k = len(SECTIONS)
-    story.append(KeepTogether([Paragraph(f"{k + 1}. Because the plates are 6 mm acrylic", h2),
-                               bullet_list(ACRYLIC)]))
-    story.append(KeepTogether([Paragraph(f"{k + 2}. You already have", h2), bullet_list(HAVE, ticked=True)]))
-    qs = [Paragraph(f"{k + 3}. One question left", h2)]
-    for i, q in enumerate(QUESTIONS, 1):
-        qs.append(Table([[Paragraph(f"Q{i}", ParagraphStyle("qn", parent=body, fontName="Arial-Bold",
-                                                            textColor=ACCENT)), Paragraph(q, body)]],
-                        colWidths=[10 * mm, 170 * mm],
-                        style=[("VALIGN", (0, 0), (-1, -1), "TOP"), ("TOPPADDING", (0, 0), (-1, -1), 3),
-                               ("BOTTOMPADDING", (0, 0), (-1, -1), 3)]))
-    story.append(KeepTogether(qs))
-    doc = SimpleDocTemplate(str(OUT), pagesize=A4, leftMargin=15 * mm, rightMargin=15 * mm, topMargin=15 * mm,
-                            bottomMargin=17 * mm, title="Cargo Robot: Parts Still Missing",
-                            author="Cargo robot project")
-    doc.build(story, onFirstPage=footer, onLaterPages=footer)
-    print(f"{n - 1} items to buy -> {OUT}")
+    doc = SimpleDocTemplate(str(OUT), pagesize=PAGE, leftMargin=MARGIN, rightMargin=MARGIN,
+                            topMargin=14 * mm, bottomMargin=14 * mm, title=f"{TITLE} ({DOC_NO} Rev. {REV})",
+                            author="Cargo robot project", subject=PROJECT)
+    doc.build(story, canvasmaker=NumberedCanvas)
+    print(f"{n_items} line items -> {OUT}")
 
 
 if __name__ == "__main__":

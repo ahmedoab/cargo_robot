@@ -101,10 +101,7 @@ SECTIONS = [
          "from below."),
         ("Active buzzer module, 3 pins, 3.3-5 V", "1", "\"Active\" = it beeps by itself when powered."),
     ]),
-    ("Power: spare converter, wiring and connectors", False, [
-        ("XL4015 5 A buck converter, <b>spare</b>", "1",
-         "A spare for the ESP32's 5 V supply: a wrong wire can kill it, and the shop may be days away. "
-         "Set it to 5.1 V before you connect anything to it."),
+    ("Power wiring and connectors", False, [
         ("Inline blade-fuse holder (14 AWG) + 10 A blade fuses", "1 + 5", ""),
         ("XT60 connector pairs (male + female)", "4", ""),
         ("WAGO 221-415 lever connector (5-way)", "8", "Power buses without soldering."),

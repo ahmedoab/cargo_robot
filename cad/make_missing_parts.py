@@ -89,7 +89,7 @@ SECTIONS = [
         ("LiPo fire-safe bag", "1", "Charge and store the battery inside it."),
         ("LiPo voltage alarm (1-8 S buzzer)", "1", "Plugs into the balance lead. Set it to 3.5 V per cell."),
     ]),
-    ("Panel: safety and controls (they mount through the 6 mm deck)", False, [
+    ("Panel parts: the buttons, switch and lights on the top deck", False, [
         ("Emergency-stop button, 22 mm panel-mount, latching, with an <b>NC</b> contact block (10 A)" + NEW, "1",
          "NC = normally closed: power flows until you press it. Check it clamps a <b>6 mm</b> panel."),
         ("Toggle switch (master), 12 mm hole, rated <b>12 V DC, 15 A or more</b>" + NEW, "1",
@@ -101,7 +101,10 @@ SECTIONS = [
          "from below."),
         ("Active buzzer module, 3 pins, 3.3-5 V", "1", "\"Active\" = it beeps by itself when powered."),
     ]),
-    ("Power wiring and connectors", False, [
+    ("Power: spare converter, wiring and connectors", False, [
+        ("XL4015 5 A buck converter, <b>spare</b>", "1",
+         "A spare for the ESP32's 5 V supply: a wrong wire can kill it, and the shop may be days away. "
+         "Set it to 5.1 V before you connect anything to it."),
         ("Inline blade-fuse holder (14 AWG) + 10 A blade fuses", "1 + 5", ""),
         ("XT60 connector pairs (male + female)", "4", ""),
         ("WAGO 221-415 lever connector (5-way)", "8", "Power buses without soldering."),
@@ -181,23 +184,21 @@ ACRYLIC = [
 
 HAVE = [
     "All 3D-printed parts and all laser-cut plates (6 mm acrylic)",
-    "ESP32 DevKitC 38-pin + 38-pin screw-terminal breakout board",
+    "2 × ESP32 DevKitC 38-pin (one spare) + the 38-pin screw-terminal breakout board",
     "2 × BTS7960 (IBT-2) motor drivers",
     "XL4015 5 A buck converter (for the ESP32 and sensors, set to 5.1 V)",
-    "2 × DS5160 servos + 2 round metal disc horns",
+    "2 × DS5160 servos + 2 round metal disc horns (they fit the printed horn adapters)",
     "Sensors: the 3-pin IR line modules (3 + 1 spare) and the HC-SR04 ultrasonic sensor",
     "Tools (soldering iron, multimeter, drill and bits, spanners, ...)",
+    "A light-coloured floor for the track (the black tape goes straight on it)",
 ]
 
 QUESTIONS = [
-    "<b>Your disc horns:</b> are they 38 mm across or less, with 4 screw holes on a circle 19-28 mm across? "
-    "The printed horn adapter's slots only fit that range.",
-    "<b>Spares:</b> do you have a second ESP32 and a second 5 A buck converter? The build guide suggests one "
-    "spare of each (a wrong wire can kill either one, and the shop may be days away).",
-    "<b>The floor for the track:</b> is it white or light-coloured? The IR sensors need black tape on a light "
-    "floor. If the floor is dark, add white tape, white boards or a roll of white vinyl.",
-    "<b>Panel parts you may already own:</b> if you already have an E-stop, switch or button, will its thread "
-    "reach through the 6 mm deck? If not, it needs replacing or a thinner spacer plate.",
+    "<b>Panel parts you may already own.</b> Panel parts are the controls that mount through holes in the top "
+    "deck, like on a control panel: the red emergency-stop button, the master on/off switch, the start button "
+    "and the green and red LEDs (section 3). Each is held by a nut on a threaded part underneath the deck. If "
+    "you already own any of them, check its thread is at least 9 mm long, so it reaches through the 6 mm deck "
+    "and still takes its nut. If you still have to buy them, just check this in the shop.",
 ]
 
 
@@ -264,7 +265,7 @@ def main():
     story.append(KeepTogether([Paragraph(f"{k + 1}. Because the plates are 6 mm acrylic", h2),
                                bullet_list(ACRYLIC)]))
     story.append(KeepTogether([Paragraph(f"{k + 2}. You already have", h2), bullet_list(HAVE, ticked=True)]))
-    qs = [Paragraph(f"{k + 3}. Questions for you: what else might be missing?", h2)]
+    qs = [Paragraph(f"{k + 3}. One question left", h2)]
     for i, q in enumerate(QUESTIONS, 1):
         qs.append(Table([[Paragraph(f"Q{i}", ParagraphStyle("qn", parent=body, fontName="Arial-Bold",
                                                             textColor=ACCENT)), Paragraph(q, body)]],

@@ -33,7 +33,7 @@ OUT = HERE / "autocad"
 GUIDE = HERE.parent / "BUILD_GUIDE.md"
 FIRMWARE = HERE.parent / "firmware" / "cargo_robot"
 PROJECT = "Autonomous cargo robot - design v2"
-DATE = "10 November 2026"
+DATE = "12 November 2026"
 
 ss = getSampleStyleSheet()
 BODY = ParagraphStyle("body", parent=ss["Normal"], fontSize=9.5, leading=12.5)
@@ -99,8 +99,8 @@ STAGES = [
     ("Motors under the bottom plate", ("bottom_plate", "motor_bracket", "gearmotor", "shaft"), [
         "Fix each motor in its steel bracket (the set's M3 screws), the shaft through the bracket's upright.",
         "Turn the bottom plate upside down. Place each bracket's upright 5 mm in from the side edge, centred at "
-        "X = 0, the motor pointing inwards. Mark the bracket's base holes, drill to suit (about 3.5 mm), fix with "
-        "M3 screws + nuts.",
+        "X = 0, the motor pointing inwards. Mark the bracket's base holes and drill them 3.5 mm (acrylic: sharp bit, "
+        "slowly, a piece of wood underneath). Fix with M3 x 12 + nuts, a washer on the acrylic.",
         "Route each motor's 6-wire cable up through the nearest cable slot (X = +40, Y = +-70).",
     ]),
     ("Drive wheels", ("coupling", "tire", "rim"), [
@@ -125,12 +125,12 @@ STAGES = [
         "If an IR module's 3 pins stick straight out of its end, bend them 90 deg towards its front (pliers).",
         "Screw the 3 IR modules to the bar: M3 x 12 through each module's hole and its slot, nut behind; LEDs "
         "down, blue screw to the front; module 1 on the robot's LEFT.",
-        f"Bolt the bar under the bottom plate: 2 x M3 x 12 down through the plate (X = "
+        f"Bolt the bar under the bottom plate: 2 x M3 x 16 + washer down through the plate (X = "
         f"{rc.LINE_BRKT_HOLES[0][0]:.0f}, Y = +-{abs(rc.LINE_BRKT_HOLES[0][1]):.0f}), nuts under the flange. "
         "Their cables go up through the slot behind the bar.",
         "Push the HC-SR04 into the ultrasonic bracket from behind: cans through the windows, board on the 2 "
         "ledges, its 4 pins down through the slot. 2 dots of hot glue. Bolt the bracket on top of the plate's "
-        "front edge (2 x M3).",
+        "front edge (2 x M3 x 16 + nut, washers on the acrylic).",
     ]),
     ("Electronics", ("battery", "BTS7960", "esp32", "io_board", "buck", "servo_buck", "power_bus", "inline_fuse",
                      "buzzer"), [
@@ -148,7 +148,8 @@ STAGES = [
         "Master switch (front, middle) and start button (rear) up through their 12.2 mm holes; LEDs in their clips "
         "next to the button (green nearer the button).",
         "Servo mounts on the deck's front-right and rear-right corners: an M4 nut in each of the foot's 3 slots, "
-        "M4 x 12 up through the deck. Only snug: they are lined up later.",
+        "M4 x 12 up through the deck with NO washer (it needs all its length to reach through the nut). Only snug: "
+        "they are lined up later.",
         "Bed rests at X = +-40, Y = +95: an M4 nut in the pocket under each post, M4 x 10 up through the deck; "
         "rubber pad on top.",
         "Lower the deck onto the 6 rods, washer + nut on top of each, check it is level.",
@@ -219,10 +220,10 @@ def render_stages(folder):
 
 # ============================== the assembly PDF ==============================
 LASER = [
-    ["bottom_plate.dxf", "6 mm birch plywood", f"{rc.L} x {rc.W}", "1", "sheet 03"],
-    ["top_deck.dxf", "5 mm clear acrylic", f"{rc.L} x {rc.W}", "1", "sheet 04"],
-    ["tilt_plate.dxf", "6 mm birch plywood", f"{2 * rc.TILT_X} x {rc.TILT_Y1 - rc.Y_AX}", "1", "sheet 05"],
-    ["cargo_plate.dxf", "5 mm clear acrylic", f"{rc.CARGO[0]} x {rc.CARGO[1]}", "1", "sheet 06"],
+    ["bottom_plate.dxf", rc.PLATE_MATERIAL, f"{rc.L} x {rc.W}", "1", "sheet 03"],
+    ["top_deck.dxf", rc.PLATE_MATERIAL, f"{rc.L} x {rc.W}", "1", "sheet 04"],
+    ["tilt_plate.dxf", rc.PLATE_MATERIAL, f"{2 * rc.TILT_X} x {rc.TILT_Y1 - rc.Y_AX}", "1", "sheet 05"],
+    ["cargo_plate.dxf", rc.PLATE_MATERIAL, f"{rc.CARGO[0]} x {rc.CARGO[1]}", "1", "sheet 06"],
 ]
 PRINTS = [
     ["servo_mount_front.stl, servo_mount_rear.stl", "1 + 1", "lying on the ears' face", "40 %", "none"],
@@ -274,8 +275,8 @@ def assembly_pdf(stage_pngs, path):
     s.append(PageBreak())
 
     s.append(p("3. Assembly, step by step", H1))
-    s.append(p("Use nylock nuts where listed, and don't over-tighten anything that touches acrylic: firm with a "
-               "small spanner is enough. Each picture shows everything fitted so far."))
+    s.append(p("All four plates are 6 mm acrylic: put a washer under every head and nut that touches them, and don't "
+               "over-tighten - firm with a small spanner is enough. Each picture shows everything fitted so far."))
     for i, ((title, _, steps), png) in enumerate(zip(STAGES, stage_pngs), start=1):
         block = [p(f"Step {i}: {title}", H2), picture(png, 150)]
         block += [p(f"{k}. {t}") for k, t in enumerate(steps, start=1)]

@@ -25,7 +25,7 @@ TB = (230, 10, 410, 62)
 N_SHEETS = 4
 PROJECT = "AUTONOMOUS CARGO ROBOT - DESIGN v2"
 SCHOOL = "ARAB ACADEMY FOR SCIENCE, TECHNOLOGY & MARITIME TRANSPORT - GRADUATION PROJECT II"
-DATE = "10/11/2026"
+DATE = "12/11/2026"
 
 doc = ezdxf.new("R2018", setup=True, units=ezdxf.units.MM)
 # net colour (AutoCAD colour index) per layer
@@ -633,7 +633,8 @@ def main():
             ax = fig.add_axes([0, 0, 1, 1])
             ctx = RenderContext(doc)
             ctx.set_current_layout(layout)
-            Frontend(ctx, MatplotlibBackend(ax), config=cfg).draw_layout(layout, finalize=True)
+            Frontend(ctx, MatplotlibBackend(ax, adjust_figure=False), config=cfg).draw_layout(layout, finalize=True)
+            fig.set_size_inches(420 / 25.4, 297 / 25.4)       # true A3: finalize must not shrink the page
             ax.set_xlim(0, 420)
             ax.set_ylim(0, 297)
             ax.set_aspect("equal")

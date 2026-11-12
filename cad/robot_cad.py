@@ -24,7 +24,7 @@ Design choices that keep it simple to build:
   - the cargo plate stands on 4 printed risers on the tilting plate: high enough to clear the horn adapters,
     and wide enough that its right edge overhangs the deck when tipped, so the package slides clear
   - the holes in the plates are laser-cut (servo mounts, risers, the 22 mm E-stop hole, the switch, button and
-    LED holes) - nothing is drilled by hand except the motor brackets in the plywood (and the 8 countersinks
+    LED holes) - nothing is drilled by hand except the motor brackets in the bottom plate (and the 8 countersinks
     on the cargo plate)
   - check_render.py checks every bolt's path through the parts it joins, collisions with the bed at every
     angle, and that each printed part fits a 200 x 200 mm printer with a flat face down
@@ -44,8 +44,9 @@ import cadquery as cq
 
 # ============================== PARAMETERS ==============================
 L, W = 400, 300                  # plate size (X, Y)
-BASE_T, DECK_T, CARGO_T = 6, 5, 5    # bottom plate 6 mm plywood; deck and cargo plate 5 mm acrylic
-TILT_T = 6                       # tilting plate: 6 mm plywood
+PLATE_MATERIAL = "6 mm acrylic"   # all four plates are laser-cut from 6 mm acrylic
+BASE_T, DECK_T, CARGO_T = 6, 6, 6    # bottom plate, top deck, cargo plate
+TILT_T = 6                       # tilting plate
 BAY_H = 100                      # clear height of the electronics bay
 
 WHEEL_D, WHEEL_W = 65, 26        # drive wheels: the 65 mm wheels of the JGB37-520 motor set
@@ -111,12 +112,12 @@ SERVO_CABLE_SLOTS = [(150, -50), (-150, -50)]
 Z_BASE = AXLE_Z + MOTOR_DROP     # underside of bottom plate = 54.5
 Z_LOWER = Z_BASE + BASE_T        # top of bottom plate = 60.5
 Z_DECK = Z_LOWER + BAY_H         # underside of deck = 160.5
-Z_DECK_TOP = Z_DECK + DECK_T     # 165.5
+Z_DECK_TOP = Z_DECK + DECK_T     # 166.5
 SERVO_FOOT = 7                   # printed servo mount: floor under the servo
-Z_AX = Z_DECK_TOP + SERVO_FOOT + SERVO["W"] / 2   # servo shaft (hinge axis) = 187.5
-Z_TILT = Z_AX - TILT_T / 2       # underside of the tilting plate = 184.5 (axis in the middle of the plate)
-Z_TILT_TOP = Z_TILT + TILT_T     # 190.5
-Z_CARGO = Z_TILT_TOP + RISER[2] # underside of cargo plate = 213.2
+Z_AX = Z_DECK_TOP + SERVO_FOOT + SERVO["W"] / 2   # servo shaft (hinge axis) = 188.5
+Z_TILT = Z_AX - TILT_T / 2       # underside of the tilting plate = 185.5 (axis in the middle of the plate)
+Z_TILT_TOP = Z_TILT + TILT_T     # 191.5
+Z_CARGO = Z_TILT_TOP + RISER[2] # underside of cargo plate = 214.2 (top 220.2)
 X_SERVO_TOP = TILT_X + ADAPTER_WALL + HORN_T + HORN_HUB + SERVO["boss_h"]   # servo shaft face = 133
 AXIS = ((0, Y_AX, Z_AX), (1, Y_AX, Z_AX))    # tipping axis (along +X)
 
@@ -135,7 +136,6 @@ def riser_holes(bottom):
 
 # ============================== COLOURS ==============================
 ACRYLIC = (0.75, 0.88, 1.0, 0.45)
-PLYWOOD = (0.85, 0.70, 0.48, 1)
 PRINT = (1.0, 0.55, 0.1, 1)
 STEEL = (0.62, 0.63, 0.66, 1)
 DARK_STEEL = (0.30, 0.30, 0.33, 1)
@@ -263,10 +263,11 @@ def top_deck():
 
 
 plates["bottom_plate"], plates["top_deck"] = bottom_plate(), top_deck()
-add("chassis", "bottom_plate", plates["bottom_plate"], PLYWOOD)
+add("chassis", "bottom_plate", plates["bottom_plate"], ACRYLIC)
 add("chassis", "top_deck", plates["top_deck"], ACRYLIC)
 
-ROD_Z0, ROD_Z1 = Z_BASE - 9, Z_DECK_TOP + 10
+ROD_Z0 = Z_BASE - 9              # M6 rods: 130 mm, from 9 mm under the bottom plate
+ROD_Z1 = ROD_Z0 + 130            # (nut + washer under it) to 2.4 mm above the deck's top nut
 for i, (x, y) in enumerate(ROD_PTS):
     add("chassis", f"rod_{i}", cyl_z(6, ROD_Z1 - ROD_Z0, x, y, ROD_Z0), STEEL)
     hw = (hex_nut(10, 5, x, y, Z_BASE - 6.6, 6)                      # under the bottom plate
@@ -644,7 +645,7 @@ def horn_front():
 
 def bed_items():
     """Every part that tips with the bed, in the flat position."""
-    items = [("tilt_plate", tilt_plate(), PLYWOOD)]
+    items = [("tilt_plate", tilt_plate(), ACRYLIC)]
     n = 0
     for cx in RISER_X:
         for s in (-1, 1):
@@ -714,9 +715,9 @@ BOM = [
     ("Sensors", "Line sensor bar (line_sensor_bar.stl)", 1, "3D print PETG"),
     ("Sensors", "HC-SR04 ultrasonic distance sensor", 1, "buy (get 2)"),
     ("Sensors", "Ultrasonic sensor bracket (sonar_bracket.stl)", 1, "3D print PETG"),
-    ("Tilting bed", f"Cargo plate {CARGO[0]}x{CARGO[1]}x{CARGO_T} (cargo_plate.dxf)", 1, "laser-cut acrylic"),
+    ("Tilting bed", f"Cargo plate {CARGO[0]}x{CARGO[1]}x{CARGO_T} (cargo_plate.dxf)", 1, f"laser-cut {PLATE_MATERIAL}"),
     ("Tilting bed", "Bed riser (bed_riser.stl)", 4, "3D print PETG"),
-    ("Tilting bed", f"Tilting plate {2 * TILT_X}x{TILT_Y1 - Y_AX}x{TILT_T} (tilt_plate.dxf)", 1, "laser-cut 6 mm plywood"),
+    ("Tilting bed", f"Tilting plate {2 * TILT_X}x{TILT_Y1 - Y_AX}x{TILT_T} (tilt_plate.dxf)", 1, f"laser-cut {PLATE_MATERIAL}"),
     ("Tilting bed", "Servo DS5160, 60 kg.cm, metal gears, 180 deg, 6-8.4 V, 65 x 30 x 48 mm", 2, "buy"),
     ("Tilting bed", "Aluminium DISC servo horn for the servo's spline (25T on most DS5160), 38 mm or smaller "
                     "(not the 4-arm horn: its arms hit the deck)", 2, "buy"),
@@ -728,20 +729,20 @@ BOM = [
     ("Power", "3S LiPo 11.1 V 5000 mAh XT60 + balance charger + LiPo bag + voltage alarm", 1, "buy"),
     ("Power", "XL4015 5 A buck converter (5.1 V for the ESP32 and sensors)", 1, "buy"),
     ("Power", "Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs", 1, "buy"),
-    ("Power", "Emergency stop 22 mm panel-mount, latching, NC contact block", 1, "buy"),
-    ("Power", "Toggle switch 12 mm panel-mount, 12 V DC >= 15 A", 1, "buy"),
-    ("Controls", "Push button 12 mm panel-mount, momentary, normally open (start)", 1, "buy"),
-    ("Controls", "5 mm LED green + red, with panel clips, + 330 ohm resistors", 1, "buy"),
+    ("Power", "Emergency stop 22 mm panel-mount, latching, NC contact block (must clamp a 6 mm panel)", 1, "buy"),
+    ("Power", "Toggle switch 12 mm panel-mount, 12 V DC >= 15 A, thread >= 9 mm (6 mm deck)", 1, "buy"),
+    ("Controls", "Push button 12 mm panel-mount, momentary, normally open (start), thread >= 9 mm", 1, "buy"),
+    ("Controls", "5 mm LED green + red, with panel clips for a 6 mm panel (or hot glue), + 330 ohm resistors", 1, "buy"),
     ("Controls", "Active buzzer module, 3-pin, 3.3-5 V", 1, "buy"),
-    ("Chassis", f"Bottom plate {L}x{W}x{BASE_T} (bottom_plate.dxf)", 1, "laser-cut 6 mm plywood"),
-    ("Chassis", f"Top deck {L}x{W}x{DECK_T} (top_deck.dxf)", 1, "laser-cut 5 mm acrylic"),
+    ("Chassis", f"Bottom plate {L}x{W}x{BASE_T} (bottom_plate.dxf)", 1, f"laser-cut {PLATE_MATERIAL}"),
+    ("Chassis", f"Top deck {L}x{W}x{DECK_T} (top_deck.dxf)", 1, f"laser-cut {PLATE_MATERIAL}"),
     ("Chassis", f"M6 threaded rod, cut to {ROD_Z1 - ROD_Z0:.0f} mm", len(ROD_PTS), "cut from 1 m rod"),
     ("Chassis", "M6 nut + M6 washer", 4 * len(ROD_PTS), "buy"),
-    ("Hardware", "M4: x10 (bed rests, 2), x12 (servo mounts, 6), x16 (servo ear clamps, 4), x20 (horn adapters 4 + "
-                 "risers from below 8), x20 COUNTERSUNK (risers through the cargo plate, 8); 32 M4 nuts; M4 washers",
+    ("Hardware", "M4: x10 (bed rests, 2), x12 (servo mounts, 6, NO washer), x16 (servo ear clamps, 4), x20 (horn adapters 4 "
+                 "+ risers from below 8), x20 COUNTERSUNK (risers through the cargo plate, 8); 32 M4 nuts; 32 M4 washers",
      1, "buy"),
-    ("Hardware", "M3: x10 (servo horns, 8), x8 countersunk (caster rings, 6), x12 + nut (line sensor bar 2, IR "
-                 "modules 3, sonar bracket 2); screws for the motor brackets (holes drilled by hand)", 1, "buy"),
+    ("Hardware", "M3: x8 (servo horns, 8), x8 countersunk (caster rings, 6), x12 + nut (motor brackets 8, holes drilled "
+                 "by hand; IR modules 3), x16 + nut (line sensor bar 2, sonar bracket 2); 30 M3 washers", 1, "buy"),
     ("Hardware", "Resistors 1k x1, 2k x1, 10k x5, 2.2k x1, 100 nF x1, small perfboard; VHB tape, velcro strap, zip "
                  "ties, a little grease (casters)", 1, "buy"),
 ]

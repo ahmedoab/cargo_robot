@@ -87,12 +87,12 @@ Gradfinal/                      <- this folder. Put it on GitHub
 
 | | |
 |---|---|
-| Size | 407 × 382 × 218 mm (L × W × H), bed flat |
-| Frame | 6 mm plywood bottom plate + 5 mm acrylic deck, held apart by 6 M6 threaded rods |
+| Size | 407 × 382 × 220 mm (L × W × H), bed flat |
+| Frame | 6 mm acrylic bottom plate + 6 mm acrylic deck, held apart by 6 M6 threaded rods |
 | Drive | 2 × JGB37-520 12 V 110 RPM gear motors with encoders and 65 mm wheels (middle axle), plus a printed ball caster front and rear. Differential drive, so it turns on the spot. |
 | Brain | **One ESP32** (DevKitC, 38 pins), running an Arduino program. Everything is wired straight to it: no I/O expander. No Raspberry Pi, no Linux, no ROS. |
 | Sensors | 3 IR line sensors (on a printed bar under the bottom plate, in front of the wheels), HC-SR04 ultrasonic (front, looking ahead). Nothing weighs the package. |
-| Tilting bed | A plywood tilting plate carries the cargo plate on 4 printed risers. **Two 60 kg·cm servos** on the deck's right edge turn it about their shafts (the shafts are the hinge) to 40°; the package slides off to the right onto the conveyor. |
+| Tilting bed | A 6 mm acrylic tilting plate carries the cargo plate on 4 printed risers. **Two 60 kg·cm servos** on the deck's right edge turn it about their shafts (the shafts are the hinge) to 40°; the package slides off to the right onto the conveyor. |
 | Power | 3S LiPo 11.1 V 5000 mAh → 10 A fuse → master switch. The 12 V goes through the E-stop to the motor drivers and the 7.4 V servo buck; a 5.1 V buck powers the ESP32 and the sensors. |
 | Safety | Latching E-stop cuts **motor and servo power** (the ESP32 stays on and sees it). The software also stops for obstacles and a lost line. |
 | Packages | Up to **3 kg**, up to 20 × 20 × 20 cm. The robot can't weigh them, so this limit is a rule for the people loading it. |
@@ -126,7 +126,7 @@ flowchart LR
 | Obstacle detection by lidar | **One ultrasonic sensor** looking ahead | Cheap, simple, and enough to stop for a person or a box on the line. |
 | Unload by hand | **Tilting bed on 2 servos** | The robot delivers by itself: it tips the package onto the conveyor. |
 | E-stop cuts the whole 12 V line | E-stop cuts the **motor and servo** 12 V only | The ESP32 stays on, sees the E-stop and does not lose its place. Everything that moves still stops at once. |
-| 2020 aluminium or acrylic/MDF frame | Plywood + acrylic plates on **6 M6 threaded rods** | Cheapest and simplest: the rod is cut with a hacksaw, and the deck height is set with nuts. |
+| 2020 aluminium or acrylic/MDF frame | 6 mm acrylic plates on **6 M6 threaded rods** | Cheapest and simplest: the rod is cut with a hacksaw, and the deck height is set with nuts. |
 | Heavy-duty omni-wheel casters | **2 printed ball casters** (a 25 mm steel ball in a printed cup, on an M8 bolt) | Nothing swings round when the robot turns on the spot; the height is set with 2 nuts, so all 4 wheels can be made to touch the floor. |
 | 12 V 300–500 RPM motors | **JGB37-520 12 V 110 RPM set** (motor, bracket, coupling, 65 mm wheel) | Bought as one set. 110 RPM with 65 mm wheels gives about 0.3 m/s top speed, plenty for 0.2 m/s line following, and 3.9 kg·cm rated torque per motor: about 4× what a 3 kg package needs. |
 | IR line sensor array | **3 single IR modules** (3-pin obstacle-avoidance type) on a printed bar | Easy to find; 3 sensors are enough to follow the line, see it lost and see the station marks. |
@@ -220,10 +220,10 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 | E19 | LiPo fire-safe bag | 1 | |
 | E20 | LiPo voltage alarm (1–8 S buzzer, plugs into the balance lead) | 1 | |
 | E21 | Inline blade-fuse holder (14 AWG) + 10 A blade fuses | 1 + 5 | |
-| E22 | Master switch: panel toggle switch, **12 V DC ≥ 15 A**, 12 mm mounting hole | 1 | The DC rating matters, not the AC rating |
-| E23 | Emergency-stop mushroom button, **22 mm panel-mount**, latching, with an **NC contact block** (10 A) | 1 | "NC" = normally closed: power flows until pressed |
-| E24 | Push button, 12 mm panel-mount, momentary, normally open | 1 | The start button |
-| E25 | 5 mm LEDs green + red, with 5 mm panel clips (6 mm hole) | 1 each | |
+| E22 | Master switch: panel toggle switch, **12 V DC ≥ 15 A**, 12 mm mounting hole | 1 | The DC rating matters, not the AC rating. Thread at least 9 mm long (6 mm deck + nut). |
+| E23 | Emergency-stop mushroom button, **22 mm panel-mount**, latching, with an **NC contact block** (10 A) | 1 | "NC" = normally closed: power flows until pressed. It must clamp a **6 mm** panel. |
+| E24 | Push button, 12 mm panel-mount, momentary, normally open | 1 | The start button. Thread at least 9 mm long. |
+| E25 | 5 mm LEDs green + red, with 5 mm panel clips (6 mm hole) | 1 each | Check the clips fit a 6 mm panel. If not, hot-glue the LEDs into their holes from below. |
 | E26 | Active buzzer module, 3 pins, 3.3–5 V | 1 | |
 | E27 | XT60 connector pairs | 4 | |
 | E28 | WAGO 221 lever connectors: 221-415 (5-way) × 8, 221-413 (3-way) × 6 | 14 | Makes power buses without soldering |
@@ -242,17 +242,19 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 
 | # | Item | Qty | Notes |
 |---|---|---|---|
-| M1 | Laser cutting: `bottom_plate.dxf` and `tilt_plate.dxf` in **6 mm plywood** | 1 each | They carry the weight. **Not acrylic** (it cracks). |
-| M2 | Laser cutting: `top_deck.dxf` and `cargo_plate.dxf` in 5 mm acrylic | 1 each | |
+| M1 | Laser cutting: `bottom_plate.dxf` and `tilt_plate.dxf` in **6 mm acrylic** | 1 each | They carry the weight. Acrylic cracks more easily than plywood: a washer under every head and nut, and tighten only until snug. |
+| M2 | Laser cutting: `top_deck.dxf` and `cargo_plate.dxf` in **6 mm acrylic** | 1 each | The E-stop, switch, button and LEDs mount through the 6 mm deck (E22–E25) |
 | M3 | 3D prints (PETG): `servo_mount_front`, `servo_mount_rear`, `servo_clamp` × 4, `horn_adapter_front`, `horn_adapter_rear`, `bed_rest` × 2, `bed_riser` × 4, `line_sensor_bar`, `sonar_bracket`, `caster_cup` × 2, `caster_ring` × 2 (about 350 g, 18 hours) | 1 set | Any printer with a 200 × 200 mm bed. Every STL already lies in its printing position. Settings in section 1.2. |
 | M4 | **M6 threaded rod**, 1 m (zinc-plated steel) | 1 | Cut into 6 pieces of 130 mm |
 | M5 | M6 nuts + M6 washers | 26 each | 24 needed (4 per rod) |
-| M6 | M3 screws + nuts for the motor brackets (length to suit: 6 mm plywood + the bracket) | 8 | You drill these holes to fit the bracket |
-| M7 | M4 screws: × 10 (bed rests, 2), × 12 (servo mounts, 6), × 16 (servo ear clamps, 4), × 20 (horn adapters 4 + risers from below 8) | as listed | + 32 M4 nuts and M4 washers in all |
+| M6 | M3 × 12 screws + nuts for the motor brackets (6 mm acrylic + the bracket + nut) | 8 | You drill these holes to fit the bracket. Check the tips don't touch the motor. |
+| M7 | M4 screws: × 10 (bed rests, 2), × 12 (servo mounts, 6: **no washer**), × 16 (servo ear clamps, 4), × 20 (horn adapters 4 + risers from below 8) | as listed | + 32 M4 nuts and 32 M4 washers in all |
 | M8 | M4 × 20 **countersunk (flat head)** | 8 | Down through the cargo plate into the risers: flush, so the package slides over them |
 | M9 | M3 × 8 **countersunk** | 6 | Caster rings onto the cups (self-tapping into the print) |
 | M10 | M3 × 8 screws | 8 | Servo horns onto the printed adapters (self-tapping) |
-| M11 | M3 × 12 screws + nuts | 7 | Line sensor bar (2), IR modules (3), ultrasonic bracket (2) |
+| M11 | M3 × 12 screws + nuts | 3 | IR modules onto the line sensor bar |
+| M11b | **M3 × 16** screws + nuts | 4 | Line sensor bar (2), ultrasonic bracket (2): through the printed part + the 6 mm plate + a nut (M3 × 12 is too short) |
+| M11c | M3 washers | 30 | Under the M3 heads and nuts on the acrylic bottom plate |
 | M12 | Blue thread-locker; a little grease (Vaseline) | 1 | Coupling set screws, horn screws; the caster cups |
 | M13 | Self-adhesive rubber pads, 18 mm, 2 mm thick | 2 | On the bed rests |
 | M14 | Black matte tape **19 mm** (line) + white/light floor, masking tape | 1 roll each | Line following + station marks. Not 50 mm: it would cover all 3 sensors and look like a mark. |
@@ -263,7 +265,7 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
 - Multimeter (with a 10 A range)
 - Wire stripper, side cutters, ferrule crimper
 - Hacksaw and a file (to cut the threaded rod)
-- Drill with a 3.5 mm bit (the only holes you drill yourself: motor brackets in plywood) and a 90° countersink bit (the cargo plate's 8 holes)
+- Drill with a sharp 3.5 mm bit (the only holes you drill yourself: motor brackets in the acrylic bottom plate) and a 90° countersink bit (the cargo plate's 8 holes)
 - Spanners 5.5 mm (M3), 7 mm (M4), 10 mm (M6 nuts) and 13 mm (M8 caster nuts), hex keys, screwdrivers, pliers; hot glue gun
 - Heat gun or lighter, marker, tape measure, square ruler, protractor (or a phone angle app)
 
@@ -275,10 +277,10 @@ Buy locally what you can; online orders from abroad can take 2–4 weeks. **Orde
    - Material and thickness per the table above.
    - "Keep the protective film on the acrylic."
 3. When you collect them, check them against the hole tables on sheets 03–06 of `CargoRobot_v2_drawings.pdf`:
-   - **Bottom plate** (400 × 300 mm, plywood): 6 rod holes, 2 caster-bolt holes (8.5 mm), 4 small holes (2 at the front edge for the ultrasonic bracket, 2 for the line-sensor bar), 4 battery-strap slots, 3 cable slots.
-   - **Top deck** (400 × 300 mm, acrylic): 6 rod holes, E-stop (22.5 mm), switch and button (12.2 mm), 2 LED holes, 8 M4 holes (servo mounts 6, bed rests 2), 2 servo-cable cut-outs.
-   - **Tilting plate** (236 × 247 mm, plywood): 12 M4 holes (4 for the horn adapters, 8 for the risers).
-   - **Cargo plate** (260 × 280 mm, acrylic): 8 M4 holes. **Countersink them yourself** on the top face (90° bit, slowly) so the flat screw heads sit flush.
+   - **Bottom plate** (400 × 300 mm, 6 mm acrylic): 6 rod holes, 2 caster-bolt holes (8.5 mm), 4 small holes (2 at the front edge for the ultrasonic bracket, 2 for the line-sensor bar), 4 battery-strap slots, 3 cable slots.
+   - **Top deck** (400 × 300 mm, 6 mm acrylic): 6 rod holes, E-stop (22.5 mm), switch and button (12.2 mm), 2 LED holes, 8 M4 holes (servo mounts 6, bed rests 2), 2 servo-cable cut-outs.
+   - **Tilting plate** (236 × 247 mm, 6 mm acrylic): 12 M4 holes (4 for the horn adapters, 8 for the risers).
+   - **Cargo plate** (260 × 280 mm, 6 mm acrylic): 8 M4 holes. **Countersink them yourself** on the top face (90° bit, slowly) so the flat screw heads sit flush.
 
 ### 0.4 Get the parts printed
 
@@ -356,7 +358,7 @@ PETG, 0.2 mm layers, 245 °C nozzle / 80 °C bed, 4 walls. **Every STL already l
 
 ### 1.4 Assembly, step by step
 
-Use nylock nuts where listed, and don't over-tighten anything that touches acrylic: firm with a small spanner is enough.
+All four plates are 6 mm acrylic: put a washer under every head and nut that touches them, and don't over-tighten: firm with a small spanner is enough.
 
 **Step 1: Motors into their brackets**
 
@@ -368,7 +370,7 @@ Use nylock nuts where listed, and don't over-tighten anything that touches acryl
    - the upright (with the shaft) is **5 mm in from the side edge**;
    - the bracket is centred at X = 0 (the middle of the plate's length);
    - the motor body lies along the plate, pointing inwards.
-2. Mark the bracket's 4 base holes, drill them to suit (about **3.5 mm**), and fix with M3 screws + nuts. Do the other side as a mirror image.
+2. Mark the bracket's 4 base holes, drill them to suit (about **3.5 mm**; acrylic: a sharp bit, slowly, with a piece of wood clamped underneath), and fix with M3 × 12 screws + nuts, a washer on the acrylic. Do the other side as a mirror image.
 3. Route each motor's 6-wire cable up through the nearest cable slot (the 20 × 12 mm slots at X = +40, Y = ±70).
 
 **Step 3: Drive wheels**
@@ -399,9 +401,9 @@ The final height is set in section 1.5.
 
 1. **IR line sensors:** if a module's 3 pins stick straight out of its end, bend them **90° towards its front** (the side with the blue screw) with pliers, so the jumper wires plug in from the front.
 2. Screw the 3 modules onto the front of `line_sensor_bar`: an M3 × 12 through each module's hole and the slot behind it, nut at the back. **LEDs pointing down, blue screw facing forwards**, module 1 on the robot's **left**, module 3 on its right.
-3. Bolt the bar **under** the bottom plate: 2 × M3 × 12 down through the 2 holes just behind it (X = +69, Y = ±24), nuts under the flange. The bar's upright faces forwards. Run the 3 cables up through the slot behind the bar (X = +51).
+3. Bolt the bar **under** the bottom plate: 2 × M3 × 16 + washer down through the 2 holes just behind it (X = +69, Y = ±24), nuts under the flange. The bar's upright faces forwards. Run the 3 cables up through the slot behind the bar (X = +51).
 4. Loosen each module's screw and slide it until its two LEDs are **5–10 mm above the floor** (put the robot on the floor for this, after section 1.5); tighten.
-5. **Ultrasonic sensor:** push the HC-SR04 into `sonar_bracket` from behind: its two silver cans through the 18 mm windows, the board resting on the 2 small ledges, its 4 pins pointing **down** through the slot between them. Hold it with 2 dots of hot glue. Bolt the bracket on **top** of the bottom plate at the front edge, looking forward (2 × M3 × 12 + nut).
+5. **Ultrasonic sensor:** push the HC-SR04 into `sonar_bracket` from behind: its two silver cans through the 18 mm windows, the board resting on the 2 small ledges, its 4 pins pointing **down** through the slot between them. Hold it with 2 dots of hot glue. Bolt the bracket on **top** of the bottom plate at the front edge, looking forward (2 × M3 × 16 + nut, a washer under the nut).
 
 **Step 7: Deck parts** (before the deck goes on the rods)
 
@@ -413,7 +415,7 @@ The final height is set in section 1.5.
 2. **Master switch:** remove its nut, push it up through the **12.2 mm hole at the front middle** from **below**, add the washer + nut on top, attach 2 × 40 cm of 16 AWG wire.
 3. **Start button:** the 12.2 mm hole at the **rear**: same way as the switch. Attach 2 × 30 cm jumper wires.
 4. **LEDs:** push the 2 clips into the 6.2 mm holes next to the button (green nearer the button, red outside), then the LEDs into the clips. Note which leg is longer (+). Attach jumper wires.
-5. **Servo mounts:** `servo_mount_front` on the front-right corner, `servo_mount_rear` on the rear-right corner. Put an M4 nut into each of the 3 slots in the mount's foot (the nut sits in the slot and can't turn), stand the mount on the deck, and push 3 × M4 × 12 up through the deck into the nuts. **Only snug them**: the mounts are lined up in step 12. Their uprights face each other across the deck's right edge; compare with `render_iso.png`.
+5. **Servo mounts:** `servo_mount_front` on the front-right corner, `servo_mount_rear` on the rear-right corner. Put an M4 nut into each of the 3 slots in the mount's foot (the nut sits in the slot and can't turn), stand the mount on the deck, and push 3 × M4 × 12 up through the deck into the nuts, **with no washer** (the screw needs all its length to reach through the nut). **Only snug them**: the mounts are lined up in step 12. Their uprights face each other across the deck's right edge; compare with `render_iso.png`.
 6. **Bed rests:** push an M4 nut into the pocket **under** each `bed_rest`, stand it on its hole (X = ±40, Y = +95) and screw an M4 × 10 up through the deck into the nut. Stick a rubber pad on top.
 
 **Step 8: Servos**

@@ -9,9 +9,9 @@ Sensors,"IR obstacle-avoidance module, 3 pins (VCC, GND, OUT), one blue pot (FC-
 Sensors,Line sensor bar (line_sensor_bar.stl),1,3D print PETG
 Sensors,HC-SR04 ultrasonic distance sensor,1,buy (get 2)
 Sensors,Ultrasonic sensor bracket (sonar_bracket.stl),1,3D print PETG
-Tilting bed,Cargo plate 260x280x5 (cargo_plate.dxf),1,laser-cut acrylic
+Tilting bed,Cargo plate 260x280x6 (cargo_plate.dxf),1,laser-cut 6 mm acrylic
 Tilting bed,Bed riser (bed_riser.stl),4,3D print PETG
-Tilting bed,Tilting plate 236x247x6 (tilt_plate.dxf),1,laser-cut 6 mm plywood
+Tilting bed,Tilting plate 236x247x6 (tilt_plate.dxf),1,laser-cut 6 mm acrylic
 Tilting bed,"Servo DS5160, 60 kg.cm, metal gears, 180 deg, 6-8.4 V, 65 x 30 x 48 mm",2,buy
 Tilting bed,"Aluminium DISC servo horn for the servo's spline (25T on most DS5160), 38 mm or smaller (not the 4-arm horn: its arms hit the deck)",2,buy
 Tilting bed,Servo mount (servo_mount_front.stl + servo_mount_rear.stl),2,3D print PETG
@@ -22,15 +22,15 @@ Tilting bed,"Buck converter XL4016 8 A, set to 7.4 V for the servos",1,buy
 Power,3S LiPo 11.1 V 5000 mAh XT60 + balance charger + LiPo bag + voltage alarm,1,buy
 Power,XL4015 5 A buck converter (5.1 V for the ESP32 and sensors),1,buy
 Power,"Inline fuse holder + 10 A fuses, WAGO 221 connectors, XT60 pairs",1,buy
-Power,"Emergency stop 22 mm panel-mount, latching, NC contact block",1,buy
-Power,"Toggle switch 12 mm panel-mount, 12 V DC >= 15 A",1,buy
-Controls,"Push button 12 mm panel-mount, momentary, normally open (start)",1,buy
-Controls,"5 mm LED green + red, with panel clips, + 330 ohm resistors",1,buy
+Power,"Emergency stop 22 mm panel-mount, latching, NC contact block (must clamp a 6 mm panel)",1,buy
+Power,"Toggle switch 12 mm panel-mount, 12 V DC >= 15 A, thread >= 9 mm (6 mm deck)",1,buy
+Controls,"Push button 12 mm panel-mount, momentary, normally open (start), thread >= 9 mm",1,buy
+Controls,"5 mm LED green + red, with panel clips for a 6 mm panel (or hot glue), + 330 ohm resistors",1,buy
 Controls,"Active buzzer module, 3-pin, 3.3-5 V",1,buy
-Chassis,Bottom plate 400x300x6 (bottom_plate.dxf),1,laser-cut 6 mm plywood
-Chassis,Top deck 400x300x5 (top_deck.dxf),1,laser-cut 5 mm acrylic
+Chassis,Bottom plate 400x300x6 (bottom_plate.dxf),1,laser-cut 6 mm acrylic
+Chassis,Top deck 400x300x6 (top_deck.dxf),1,laser-cut 6 mm acrylic
 Chassis,"M6 threaded rod, cut to 130 mm",6,cut from 1 m rod
 Chassis,M6 nut + M6 washer,24,buy
-Hardware,"M4: x10 (bed rests, 2), x12 (servo mounts, 6), x16 (servo ear clamps, 4), x20 (horn adapters 4 + risers from below 8), x20 COUNTERSUNK (risers through the cargo plate, 8); 32 M4 nuts; M4 washers",1,buy
-Hardware,"M3: x10 (servo horns, 8), x8 countersunk (caster rings, 6), x12 + nut (line sensor bar 2, IR modules 3, sonar bracket 2); screws for the motor brackets (holes drilled by hand)",1,buy
+Hardware,"M4: x10 (bed rests, 2), x12 (servo mounts, 6, NO washer), x16 (servo ear clamps, 4), x20 (horn adapters 4 + risers from below 8), x20 COUNTERSUNK (risers through the cargo plate, 8); 32 M4 nuts; 32 M4 washers",1,buy
+Hardware,"M3: x8 (servo horns, 8), x8 countersunk (caster rings, 6), x12 + nut (motor brackets 8, holes drilled by hand; IR modules 3), x16 + nut (line sensor bar 2, sonar bracket 2); 30 M3 washers",1,buy
 Hardware,"Resistors 1k x1, 2k x1, 10k x5, 2.2k x1, 100 nF x1, small perfboard; VHB tape, velcro strap, zip ties, a little grease (casters)",1,buy

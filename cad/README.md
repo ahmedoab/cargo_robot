@@ -1,13 +1,14 @@
 # Cargo robot: mechanical design v2 with a tilting bed (Phase II)
 
-**Overall size:** 407 × 382 × 218 mm (L × W × H) with the bed flat.
+**Overall size:** 407 × 382 × 220 mm (L × W × H) with the bed flat.
 
 **Layout:**
 
 - Two drive wheels in the middle (JGB37-520 110 RPM motor sets with 65 mm wheels), and a printed ball caster at the front and rear (a 25 mm steel ball in a cup, on an M8 bolt whose nuts set the height).
-- The bottom plate (6 mm plywood) carries the electronics: ESP32, motor drivers, battery, two buck converters.
-- The top deck (5 mm acrylic) sits on 6 M6 threaded rods. The E-stop and master switch are at its front, the start button and two LEDs at its rear.
-- **Tilting bed:** a 6 mm plywood tilting plate carries the acrylic cargo plate on 4 printed risers. Two 60 kg·cm servos on the deck's right edge, one at each end of the bed, turn it about their shafts (the shafts are the hinge). The bed tips 40° to the right and the package slides off onto the conveyor. Flat, it rests on two printed posts.
+- All four plates are laser-cut from **6 mm acrylic**.
+- The bottom plate carries the electronics: ESP32, motor drivers, battery, two buck converters.
+- The top deck sits on 6 M6 threaded rods. The E-stop and master switch are at its front, the start button and two LEDs at its rear.
+- **Tilting bed:** the tilting plate carries the cargo plate on 4 printed risers. Two 60 kg·cm servos on the deck's right edge, one at each end of the bed, turn it about their shafts (the shafts are the hinge). The bed tips 40° to the right and the package slides off onto the conveyor. Flat, it rests on two printed posts.
 - **Sensors:** 3 IR line sensors on a printed bar under the bottom plate (in front of the wheels, nothing sticks out), and one HC-SR04 ultrasonic sensor at the front of the electronics bay looking ahead. Everything is wired straight to the ESP32 (no I/O expander, no I2C).
 
 ![The robot, bed tipped](output/views/render_tipped.png)
@@ -26,7 +27,7 @@
   - Fill in the "DRAWN" box in the title block.
 - **True 3D solids** (full AutoCAD, not LT): type `IMPORT` and pick `output/robot_assembly.step` (or `robot_assembly_tipped.step`).
 
-`autocad/CargoRobot_v2_drawings.pdf` has the same 10 sheets as a PDF, for printing or showing without AutoCAD.
+`autocad/CargoRobot_v2_drawings.pdf` has the same 10 sheets as a PDF (true A3 pages, 1:1), for printing or showing without AutoCAD.
 
 ## Electrical schematics
 
@@ -57,8 +58,7 @@ Both are made by `make_docs.py` from `robot_cad.py` (parts), `wiring.py` (wires)
 
 | File | How it's made |
 |---|---|
-| `output/dxf/bottom_plate.dxf`, `tilt_plate.dxf` | Laser-cut 6 mm plywood |
-| `output/dxf/top_deck.dxf`, `cargo_plate.dxf` | Laser-cut 5 mm acrylic. Every hole and slot is in the files. |
+| `output/dxf/bottom_plate.dxf`, `top_deck.dxf`, `tilt_plate.dxf`, `cargo_plate.dxf` | Laser-cut 6 mm acrylic. Every hole and slot is in the files. Use washers on the acrylic and tighten only until snug. |
 | `output/parts/*.stl` (ONLY the printed parts, see below) | 3D print, PETG. Each file already lies in its printing position. |
 | `output/bom.csv` | Everything else (bought parts, rods, nuts) |
 
@@ -76,6 +76,7 @@ Edit the parameters at the top of `robot_cad.py`, then run:
 .venv\Scripts\python make_autocad.py    # AutoCAD DXF (3D model + 10 drawing sheets) + PDF
 .venv\Scripts\python make_schematics.py # electrical schematics DXF + PDF
 .venv\Scripts\python make_docs.py       # assembly PDF + connections PDF (+ updates BUILD_GUIDE.md's wire tables)
+.venv\Scripts\python make_missing_parts.py  # ../Missing_Parts_List.pdf: what is still to buy (edit its lists)
 ```
 
 `make_docs.py` also needs `reportlab` and `pypdf`: `.venv\Scripts\python -m pip install reportlab pypdf`.

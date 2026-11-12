@@ -43,7 +43,7 @@ package to the right company.
   - Two companies (one split) for now, but a route is stored as a **list of turns** so more companies can be
     added later.
 - **Hardware changes since this design was written (the user, 2026-11-10), already in the repo:** JGB37-520
-  110 RPM motor sets with 65 mm wheels (the robot sits 17.5 mm lower: bed top about 218 mm), printed ball
+  110 RPM motor sets with 65 mm wheels (the robot sits 17.5 mm lower; with the 6 mm acrylic plates the bed top is about 220 mm), printed ball
   casters, **3 IR line sensors** 18 mm apart instead of the 8-sensor array, no I/O expander, **no side
   sensor**. The numbers below are updated for them.
 - **No load cells** (the user, 2026-11-10, "remove the weight aspect of this project"). This is already done in
@@ -121,8 +121,8 @@ The robot knows the track only as this pattern. It does not store a map.
 - The robot stops at P facing out, with the middle of the bed level with P (as it does now with
   `stop_mm`). The conveyor is on its right.
 - **The belt ends beside the robot's path, not over it** (my call, after the review): nothing hangs over
-  the robot. The belt surface is **0.5-2 cm above the bed top** (bed top about 218 mm, so the belt top is
-  about 222-237 mm). The package leaves the end of the belt, crosses a **gap of about 3-5 cm** and lands
+  the robot. The belt surface is **0.5-2 cm above the bed top** (bed top about 220 mm, so the belt top is
+  about 225-240 mm). The package leaves the end of the belt, crosses a **gap of about 3-5 cm** and lands
   on the bed with almost no drop. This keeps the bed from being knocked, and keeps the conveyor out of
   the ultrasonic sensor's view.
   - **There are no walls**, so the package has to come to rest on the bed by itself: the belt must run
@@ -281,7 +281,7 @@ back with it and approve this document.
 Answered:
 
 - **The conveyor is not built yet** (the user, 2026-11-10). So it can be built to section 7.1 (belt top at
-  about 222-237 mm, ending beside the robot), and the old interface does not constrain it.
+  about 225-240 mm, ending beside the robot), and the old interface does not constrain it.
 
 Still open, and only the user can answer:
 
